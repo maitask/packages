@@ -1,0 +1,24 @@
+{
+  "name": "@maitask/audio-processor",
+  "version": "0.1.0",
+  "description": "Audio processing and transcription using AI models for Maitask",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "keywords": [
+    "maitask",
+    "ai",
+    "audio",
+    "transcription",
+    "whisper",
+    "speech-to-text"
+  ],
+  "display_name": "Audio Processor",
+  "category": "Media & Multimodal Processing",
+  "maitask": {
+    "display_name": "Audio Processor",
+    "category": "Media & Multimodal Processing"
+  }
+}

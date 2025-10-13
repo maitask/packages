@@ -1,0 +1,26 @@
+{
+  "name": "@maitask/web-search",
+  "version": "0.1.0",
+  "description": "Search the web using multiple search engines",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "keywords": [
+    "maitask",
+    "search",
+    "google",
+    "bing",
+    "web"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "Web Search",
+  "category": "Web & API Integration",
+  "maitask": {
+    "display_name": "Web Search",
+    "category": "Web & API Integration"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "name": "@maitask/file-processor",
+  "version": "0.1.0",
+  "description": "Powerful data processing and transformation engine",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/maitask/packages/tree/main/file-processor",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maitask/packages.git",
+    "directory": "file-processor"
+  },
+  "bugs": {
+    "url": "https://github.com/maitask/packages/issues"
+  },
+  "keywords": [
+    "maitask",
+    "processor",
+    "data",
+    "transformation",
+    "pipeline",
+    "filter",
+    "aggregate",
+    "etl",
+    "processing"
+  ],
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "File Processor",
+  "category": "Data Processing & Transformation",
+  "maitask": {
+    "display_name": "File Processor",
+    "category": "Data Processing & Transformation"
+  }
+}

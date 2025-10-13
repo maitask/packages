@@ -1,0 +1,12 @@
+{
+  "input": {
+    "text": "Hello from Maitask! 🚀"
+  },
+  "options": {
+    "bot_token": "1234567890:ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789",
+    "chat_id": 123456789,
+    "message_type": "text",
+    "parse_mode": "Markdown",
+    "disable_notification": false
+  }
+}

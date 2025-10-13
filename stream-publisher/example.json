@@ -1,0 +1,26 @@
+{
+  "input": [
+    {
+      "event": "user.login",
+      "userId": "u-1001",
+      "timestamp": "2025-01-12T08:31:00Z"
+    },
+    {
+      "event": "user.plan_updated",
+      "userId": "u-1002",
+      "timestamp": "2025-01-12T08:32:15Z",
+      "payload": {
+        "previous": "free",
+        "current": "pro"
+      }
+    }
+  ],
+  "options": {
+    "url": "https://events.example.com/ingest",
+    "mode": "sse",
+    "event_name": "maitask-event",
+    "headers": {
+      "Authorization": "Bearer stream-token"
+    }
+  }
+}

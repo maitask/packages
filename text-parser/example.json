@@ -1,0 +1,6 @@
+{
+  "input": {
+    "text": "# Artificial Intelligence Trends 2025\n\n## Overview\nThe field of artificial intelligence continues to evolve rapidly in 2025.\n\n### Key Technologies\n- Machine Learning\n- Natural Language Processing\n- Computer Vision\n\n```javascript\nconst ai = new AIModel();\nawait ai.train(dataset);\n```\n\n## Conclusion\nThe future looks promising.",
+    "extension": "md"
+  }
+}

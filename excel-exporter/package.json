@@ -1,0 +1,44 @@
+{
+  "name": "@maitask/excel-exporter",
+  "version": "0.1.0",
+  "description": "Export data to Excel spreadsheets with automatic formatting",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/maitask/packages/tree/main/excel-exporter",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maitask/packages.git",
+    "directory": "excel-exporter"
+  },
+  "bugs": {
+    "url": "https://github.com/maitask/packages/issues"
+  },
+  "keywords": [
+    "maitask",
+    "excel",
+    "xlsx",
+    "export",
+    "spreadsheet",
+    "report",
+    "data-export",
+    "office",
+    "tabular"
+  ],
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "Excel Exporter",
+  "category": "Export & Storage",
+  "maitask": {
+    "display_name": "Excel Exporter",
+    "category": "Export & Storage"
+  }
+}

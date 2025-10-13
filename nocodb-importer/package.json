@@ -1,0 +1,26 @@
+{
+  "name": "@maitask/nocodb-importer",
+  "version": "0.1.0",
+  "description": "Import data to NocoDB with authentication",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "keywords": [
+    "maitask",
+    "nocodb",
+    "database",
+    "import",
+    "api"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "NocoDB Importer",
+  "category": "Export & Storage",
+  "maitask": {
+    "display_name": "NocoDB Importer",
+    "category": "Export & Storage"
+  }
+}

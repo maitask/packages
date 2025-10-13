@@ -1,0 +1,26 @@
+{
+  "name": "@maitask/hackernews-crawler",
+  "version": "0.1.0",
+  "description": "Crawl and extract stories from Hacker News using official API",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "keywords": [
+    "maitask",
+    "hackernews",
+    "ycombinator",
+    "crawler",
+    "api"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "Hacker News Crawler",
+  "category": "Web & API Integration",
+  "maitask": {
+    "display_name": "Hacker News Crawler",
+    "category": "Web & API Integration"
+  }
+}

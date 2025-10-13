@@ -1,0 +1,18 @@
+{
+  "input": {
+    "old": {
+      "name": "Maitask Engine",
+      "version": "0.1.0",
+      "features": ["packages", "adapters", "console"]
+    },
+    "new": {
+      "name": "Maitask Engine",
+      "version": "0.2.0",
+      "features": ["packages", "adapters", "console", "playground"],
+      "status": "beta"
+    }
+  },
+  "options": {
+    "mode": "json"
+  }
+}

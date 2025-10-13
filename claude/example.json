@@ -1,0 +1,20 @@
+{
+  "input": {
+    "model": "claude-3-sonnet-20240229",
+    "maxTokens": 400,
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful product assistant."
+      },
+      {
+        "role": "user",
+        "content": "Summarize the main announcements from AWS re:Invent 2024."
+      }
+    ],
+    "temperature": 0.7
+  },
+  "options": {
+    "apiKey": "sk-ant-your-anthropic-key"
+  }
+}

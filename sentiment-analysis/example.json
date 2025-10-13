@@ -1,0 +1,14 @@
+{
+  "input": {
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "text": [
+      "The product launch exceeded all expectations and customers are thrilled.",
+      "We received multiple complaints about the new billing workflow."
+    ],
+    "detailed": true
+  },
+  "options": {
+    "apiKey": "sk-your-openai-api-key"
+  }
+}

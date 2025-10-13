@@ -1,0 +1,44 @@
+{
+  "name": "@maitask/cf-proxy",
+  "version": "0.1.0",
+  "description": "Cloudflare Worker proxy for GitHub and Docker registry acceleration with intelligent redirect handling",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/maitask/packages/tree/main/cf-proxy",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maitask/packages.git",
+    "directory": "cf-proxy"
+  },
+  "bugs": {
+    "url": "https://github.com/maitask/packages/issues"
+  },
+  "keywords": [
+    "maitask",
+    "cloudflare",
+    "proxy",
+    "cdn",
+    "github",
+    "docker",
+    "registry",
+    "acceleration",
+    "mirror"
+  ],
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "Cloudflare Proxy",
+  "category": "Web & API Integration",
+  "maitask": {
+    "display_name": "Cloudflare Proxy",
+    "category": "Web & API Integration"
+  }
+}

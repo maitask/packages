@@ -1,0 +1,14 @@
+{
+  "input": {
+    "url": "https://registry-1.docker.io/v2/library/ubuntu/manifests/latest",
+    "method": "GET",
+    "headers": {
+      "Accept": "application/vnd.docker.distribution.manifest.v2+json"
+    },
+    "config": {
+      "restrictPaths": true,
+      "allowedPaths": ["library"],
+      "maxRedirects": 3
+    }
+  }
+}

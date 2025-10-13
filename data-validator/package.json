@@ -1,0 +1,43 @@
+{
+  "name": "@maitask/data-validator",
+  "version": "0.1.0",
+  "description": "Comprehensive data validation and quality assurance",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/maitask/packages/tree/main/data-validator",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maitask/packages.git",
+    "directory": "data-validator"
+  },
+  "bugs": {
+    "url": "https://github.com/maitask/packages/issues"
+  },
+  "keywords": [
+    "maitask",
+    "validation",
+    "schema",
+    "data-quality",
+    "json-schema",
+    "data-integrity",
+    "quality-assurance",
+    "verification"
+  ],
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "Data Validator",
+  "category": "Data Processing & Transformation",
+  "maitask": {
+    "display_name": "Data Validator",
+    "category": "Data Processing & Transformation"
+  }
+}

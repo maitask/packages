@@ -1,0 +1,30 @@
+{
+  "input": {
+    "provider": "sendgrid",
+    "from": {
+      "email": "reports@maitask.com",
+      "name": "Maitask Reports"
+    },
+    "to": [
+      {
+        "email": "product-team@example.com",
+        "name": "Product Team"
+      }
+    ],
+    "subject": "Weekly Product Update",
+    "template": "report",
+    "template_data": {
+      "report_title": "Product Metrics - Week 42",
+      "summary": "Active users increased 8% and churn dropped to 1.4%.",
+      "stats": {
+        "Active Users": "12,540",
+        "New Signups": "1,102",
+        "Churn": "1.4%"
+      },
+      "timestamp": "2025-10-20T09:00:00Z"
+    }
+  },
+  "options": {
+    "api_key": "SG.your-sendgrid-api-key"
+  }
+}

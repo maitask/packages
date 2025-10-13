@@ -1,0 +1,43 @@
+{
+  "name": "@maitask/slack-notifier",
+  "version": "0.1.0",
+  "description": "Send notifications and messages to Slack channels via incoming webhooks",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/maitask/packages/tree/main/slack-notifier",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maitask/packages.git",
+    "directory": "slack-notifier"
+  },
+  "bugs": {
+    "url": "https://github.com/maitask/packages/issues"
+  },
+  "keywords": [
+    "maitask",
+    "slack",
+    "webhook",
+    "notification",
+    "messaging",
+    "integration",
+    "bot",
+    "alerts"
+  ],
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "Slack Notifier",
+  "category": "Communications & Automation",
+  "maitask": {
+    "display_name": "Slack Notifier",
+    "category": "Communications & Automation"
+  }
+}

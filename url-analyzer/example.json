@@ -1,0 +1,8 @@
+{
+  "input": {
+    "url": "https://www.example.com/products/42?ref=campaign&utm_source=newsletter#features"
+  },
+  "options": {
+    "operation": "analyze"
+  }
+}

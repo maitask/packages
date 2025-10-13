@@ -1,0 +1,26 @@
+{
+  "name": "@maitask/sentiment-analysis",
+  "version": "0.1.0",
+  "description": "Text sentiment analysis using AI models for Maitask",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "keywords": [
+    "maitask",
+    "ai",
+    "sentiment",
+    "nlp",
+    "analysis"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "Sentiment Analysis",
+  "category": "AI & Cognitive Services",
+  "maitask": {
+    "display_name": "Sentiment Analysis",
+    "category": "AI & Cognitive Services"
+  }
+}

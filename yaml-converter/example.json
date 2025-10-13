@@ -1,0 +1,7 @@
+{
+  "input": "service:\n  name: maitask\n  port: 8080\n  features:\n    - engine\n    - maitask\n    - registry",
+  "options": {
+    "direction": "yaml-to-json",
+    "indent": 2
+  }
+}

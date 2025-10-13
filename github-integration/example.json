@@ -1,0 +1,10 @@
+{
+  "input": {
+    "action": "get-repo",
+    "owner": "maitask",
+    "repo": "engine"
+  },
+  "options": {
+    "token": "ghp_yourgithubtoken"
+  }
+}

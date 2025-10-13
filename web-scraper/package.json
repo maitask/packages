@@ -1,0 +1,41 @@
+{
+  "name": "@maitask/web-scraper",
+  "version": "0.1.0",
+  "description": "Extract data from web pages with HTML parsing and CSS selectors",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/maitask/packages/tree/main/web-scraper",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maitask/packages.git",
+    "directory": "web-scraper"
+  },
+  "bugs": {
+    "url": "https://github.com/maitask/packages/issues"
+  },
+  "keywords": [
+    "maitask",
+    "web-scraping",
+    "html-parser",
+    "cheerio-style",
+    "css-selector",
+    "data-extraction"
+  ],
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "Web Scraper",
+  "category": "Web & API Integration",
+  "maitask": {
+    "display_name": "Web Scraper",
+    "category": "Web & API Integration"
+  }
+}

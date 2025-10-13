@@ -1,0 +1,41 @@
+{
+  "name": "@maitask/xml-parser",
+  "version": "0.1.0",
+  "description": "XML to JSON parser with XPath support",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/maitask/packages/tree/main/xml-parser",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maitask/packages.git",
+    "directory": "xml-parser"
+  },
+  "bugs": {
+    "url": "https://github.com/maitask/packages/issues"
+  },
+  "keywords": [
+    "maitask",
+    "xml",
+    "parser",
+    "json",
+    "xpath",
+    "converter"
+  ],
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "XML Parser",
+  "category": "Data Processing & Transformation",
+  "maitask": {
+    "display_name": "XML Parser",
+    "category": "Data Processing & Transformation"
+  }
+}

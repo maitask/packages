@@ -1,0 +1,27 @@
+{
+  "name": "@maitask/deepseek",
+  "version": "0.1.0",
+  "description": "DeepSeek AI models integration for Maitask",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "keywords": [
+    "maitask",
+    "ai",
+    "deepseek",
+    "llm",
+    "chat",
+    "reasoning"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "DeepSeek",
+  "category": "AI & Cognitive Services",
+  "maitask": {
+    "display_name": "DeepSeek",
+    "category": "AI & Cognitive Services"
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "input": {
+    "expression": "0 */6 * * 1-5"
+  },
+  "options": {
+    "operation": "next",
+    "count": 3,
+    "from": "2025-01-01T08:00:00Z"
+  }
+}

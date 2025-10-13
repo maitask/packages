@@ -1,0 +1,9 @@
+{
+  "input": {
+    "text": "# Release Notes\n\n- Added CSV parser support\n- Improved Playground package examples\n\n```bash\nmaitask run @maitask/csv-parser --input data.csv\n```"
+  },
+  "options": {
+    "format": "html",
+    "template": "<article class=\"prose\">{{content}}</article>"
+  }
+}

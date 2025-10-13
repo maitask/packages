@@ -1,0 +1,13 @@
+{
+  "input": {
+    "audioUrl": "https://storage.googleapis.com/maitask/examples/meeting-snippet.mp3",
+    "task": "transcribe",
+    "language": "en",
+    "provider": "whisper",
+    "model": "whisper-1",
+    "prompt": "Transcribe the meeting and highlight action items for the team."
+  },
+  "options": {
+    "apiKey": "sk-your-openai-api-key"
+  }
+}

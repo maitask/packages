@@ -1,0 +1,26 @@
+{
+  "name": "@maitask/github-integration",
+  "version": "0.1.0",
+  "description": "GitHub API integration for repositories and users",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "keywords": [
+    "maitask",
+    "github",
+    "api",
+    "git",
+    "repository"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "GitHub Integration",
+  "category": "Web & API Integration",
+  "maitask": {
+    "display_name": "GitHub Integration",
+    "category": "Web & API Integration"
+  }
+}

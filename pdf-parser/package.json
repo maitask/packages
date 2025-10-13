@@ -1,0 +1,43 @@
+{
+  "name": "@maitask/pdf-parser",
+  "version": "0.1.0",
+  "description": "High-performance PDF parser and text extractor",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/maitask/packages/tree/main/pdf-parser",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maitask/packages.git",
+    "directory": "pdf-parser"
+  },
+  "bugs": {
+    "url": "https://github.com/maitask/packages/issues"
+  },
+  "keywords": [
+    "maitask",
+    "parser",
+    "pdf",
+    "document",
+    "text-extraction",
+    "metadata",
+    "adobe",
+    "portable-document"
+  ],
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "PDF Parser",
+  "category": "Data Processing & Transformation",
+  "maitask": {
+    "display_name": "PDF Parser",
+    "category": "Data Processing & Transformation"
+  }
+}

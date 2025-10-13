@@ -1,0 +1,32 @@
+{
+  "input": {
+    "data": [
+      {
+        "id": "u-1001",
+        "email": "alice@example.com",
+        "age": 29
+      },
+      {
+        "id": "u-1002",
+        "email": "bob@example.com",
+        "age": 17
+      }
+    ]
+  },
+  "options": {
+    "schema": {
+      "type": "object",
+      "properties": {
+        "id": {"type": "string", "required": true},
+        "email": {"type": "string", "required": true},
+        "age": {"type": "number"}
+      }
+    },
+    "required_fields": ["id", "email"],
+    "data_types": {
+      "age": "number"
+    },
+    "validation_mode": "strict",
+    "stop_on_first_error": false
+  }
+}

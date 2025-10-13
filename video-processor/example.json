@@ -1,0 +1,13 @@
+{
+  "input": {
+    "videoUrl": "https://storage.googleapis.com/maitask/examples/product-demo.mp4",
+    "provider": "gemini",
+    "model": "gemini-2.5-pro",
+    "task": "summarize",
+    "prompt": "Summarize the key product capabilities demonstrated in this clip.",
+    "frameRate": 2
+  },
+  "options": {
+    "apiKey": "AIza-your-google-ai-key"
+  }
+}

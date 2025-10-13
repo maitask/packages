@@ -1,0 +1,10 @@
+{
+  "input": {
+    "query": "Artificial intelligence trends 2025",
+    "engine": "duckduckgo",
+    "limit": 5,
+    "page": 1,
+    "language": "en",
+    "includeSnippets": true
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "name": "@maitask/stream-publisher",
+  "version": "0.1.0",
+  "description": "Publish data streams via HTTP chunked transfer or Server-Sent Events",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/maitask/packages/tree/main/stream-publisher",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maitask/packages.git",
+    "directory": "stream-publisher"
+  },
+  "bugs": {
+    "url": "https://github.com/maitask/packages/issues"
+  },
+  "keywords": [
+    "maitask",
+    "stream",
+    "http",
+    "sse",
+    "server-sent-events",
+    "chunked",
+    "real-time",
+    "streaming",
+    "ndjson",
+    "websocket-alternative"
+  ],
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "Stream Publisher",
+  "category": "Communications & Automation",
+  "maitask": {
+    "display_name": "Stream Publisher",
+    "category": "Communications & Automation"
+  }
+}

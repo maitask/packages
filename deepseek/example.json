@@ -1,0 +1,20 @@
+{
+  "input": {
+    "model": "deepseek-chat",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a precise financial research assistant."
+      },
+      {
+        "role": "user",
+        "content": "Compare the revenue growth of Apple and Microsoft in 2023."
+      }
+    ],
+    "temperature": 0.6,
+    "max_tokens": 800
+  },
+  "options": {
+    "apiKey": "sk-deepseek-api-key"
+  }
+}

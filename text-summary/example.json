@@ -1,0 +1,13 @@
+{
+  "input": {
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "text": "Artificial Intelligence (AI) is a rapidly evolving field that encompasses machine learning, deep learning, natural language processing, computer vision, and robotics. Machine learning algorithms enable computers to learn from data without explicit programming. Deep learning, a subset of machine learning, uses neural networks with multiple layers to analyze various factors of data. Natural language processing allows machines to understand and interpret human language. Computer vision enables machines to interpret and make decisions based on visual data. Robotics combines AI with physical machines to perform tasks in the real world.",
+    "style": "bullet",
+    "maxLength": 120,
+    "language": "en"
+  },
+  "options": {
+    "apiKey": "sk-your-openai-api-key"
+  }
+}

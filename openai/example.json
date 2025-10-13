@@ -1,0 +1,20 @@
+{
+  "input": {
+    "model": "gpt-4o-mini",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a helpful engineering assistant."
+      },
+      {
+        "role": "user",
+        "content": "Draft a release note for the new Playbook feature."
+      }
+    ],
+    "temperature": 0.6,
+    "maxTokens": 500
+  },
+  "options": {
+    "apiKey": "sk-your-openai-api-key"
+  }
+}

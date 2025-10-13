@@ -1,0 +1,9 @@
+{
+  "input": {
+    "xml": "<catalog>\n  <book id=\"bk101\">\n    <title>AI at Work</title>\n    <author>Ada Lovelace</author>\n    <price currency=\"USD\">39.99</price>\n  </book>\n  <book id=\"bk102\">\n    <title>Scaling Data Pipelines</title>\n    <author>Alan Turing</author>\n    <price currency=\"USD\">29.50</price>\n  </book>\n</catalog>"
+  },
+  "options": {
+    "operation": "query",
+    "xpath": "//book[price>30]/title"
+  }
+}

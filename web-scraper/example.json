@@ -1,0 +1,19 @@
+{
+  "input": [
+    {
+      "url": "https://example.com/news",
+      "label": "homepage"
+    }
+  ],
+  "options": {
+    "selectors": {
+      "headline": "article h2",
+      "summary": "article p"
+    },
+    "headingLevels": ["h1", "h2"],
+    "linkFilters": {
+      "include": ["/news/"],
+      "exclude": ["?utm_"]
+    }
+  }
+}

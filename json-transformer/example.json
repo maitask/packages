@@ -1,0 +1,13 @@
+{
+  "input": [
+    {"first_name": "John", "last_name": "Doe", "age": 30},
+    {"first_name": "Jane", "last_name": "Smith", "age": 25},
+    {"first_name": "Liu", "last_name": "Wei", "age": 34}
+  ],
+  "options": {
+    "operation": "filter",
+    "condition": {
+      "age": {"$gte": 30}
+    }
+  }
+}

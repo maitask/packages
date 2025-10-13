@@ -1,0 +1,12 @@
+{
+  "input": {
+    "text": "name,role,team,salary\nAlice,Data Scientist,Research,155000\nBob,Product Manager,Growth,142500\nCara,Engineer,Platform,168000",
+    "path": "people.csv"
+  },
+  "options": {
+    "delimiter": ",",
+    "headers": true,
+    "trimValues": true,
+    "skipEmpty": true
+  }
+}

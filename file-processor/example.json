@@ -1,0 +1,24 @@
+{
+  "input": [
+    {"name": "Alice", "team": "Research", "visits": 18, "revenue": 4200},
+    {"name": "Bob", "team": "Growth", "visits": 12, "revenue": 3100},
+    {"name": "Cara", "team": "Research", "visits": 9, "revenue": 2900}
+  ],
+  "options": {
+    "operation": "pipeline",
+    "pipeline": [
+      {
+        "type": "filter",
+        "rules": [
+          {"field": "team", "operator": "eq", "value": "Research"}
+        ]
+      },
+      {
+        "type": "aggregate",
+        "groupBy": ["team"],
+        "totalRevenue": {"op": "sum", "field": "revenue", "as": "totalRevenue"},
+        "avgVisits": {"op": "avg", "field": "visits", "as": "avgVisits"}
+      }
+    ]
+  }
+}

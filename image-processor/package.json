@@ -1,0 +1,26 @@
+{
+  "name": "@maitask/image-processor",
+  "version": "0.1.0",
+  "description": "Image analysis and processing using AI vision models for Maitask",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "keywords": [
+    "maitask",
+    "ai",
+    "image",
+    "vision",
+    "analysis"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "Image Processor",
+  "category": "Media & Multimodal Processing",
+  "maitask": {
+    "display_name": "Image Processor",
+    "category": "Media & Multimodal Processing"
+  }
+}

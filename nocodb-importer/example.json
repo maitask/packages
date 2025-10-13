@@ -1,0 +1,13 @@
+{
+  "input": {
+    "content": "name,email,plan\nAlice,alice@example.com,Pro\nBob,bob@example.com,Free"
+  },
+  "options": {
+    "baseUrl": "https://nocodb.example.com",
+    "token": "nc_your_api_token",
+    "baseId": "proj_123456",
+    "tableName": "customers",
+    "dryRun": true,
+    "delimiter": ","
+  }
+}

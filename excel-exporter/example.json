@@ -1,0 +1,12 @@
+{
+  "input": [
+    {"name": "Alice", "team": "Research", "score": 92},
+    {"name": "Bob", "team": "Growth", "score": 88},
+    {"name": "Cara", "team": "Platform", "score": 95}
+  ],
+  "options": {
+    "path": "reports/quarterly-scorecard.xlsx",
+    "sheet_name": "Q4 Metrics",
+    "auto_fit": true
+  }
+}

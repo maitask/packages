@@ -1,0 +1,12 @@
+{
+  "input": {
+    "imageUrl": "https://storage.googleapis.com/maitask/examples/office-whiteboard.jpg",
+    "provider": "openai",
+    "model": "gpt-4o-mini",
+    "task": "describe",
+    "prompt": "Identify the key topics listed on the whiteboard and summarize the scene."
+  },
+  "options": {
+    "apiKey": "sk-your-openai-api-key"
+  }
+}

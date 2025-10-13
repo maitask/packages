@@ -1,0 +1,10 @@
+{
+  "input": {
+    "base64": "JVBERi0xLjUKJeLjz9MKMSAwIG9iago8PC9UeXBlIC9DYXRhbG9nPj4KZW5kb2JqCnhyZWYKMCAyCjAwMDAwMDAwMDAgNjU1MzUgZgowMDAwMDAwMDEwIDAwMDAwIG4KdHJhaWxlcgo8PC9TaXplIDEvUm9vdCAxIDAgUj4+CnN0YXJ0eHJlZgoxMjQKJSVFT0YK"
+  },
+  "options": {
+    "maxSegments": 20,
+    "maxPreviewLength": 2000,
+    "extractLinks": true
+  }
+}

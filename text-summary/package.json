@@ -1,0 +1,26 @@
+{
+  "name": "@maitask/text-summary",
+  "version": "0.1.0",
+  "description": "Text summarization using AI models for Maitask",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "keywords": [
+    "maitask",
+    "ai",
+    "summary",
+    "nlp",
+    "text"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "Text Summary",
+  "category": "AI & Cognitive Services",
+  "maitask": {
+    "display_name": "Text Summary",
+    "category": "AI & Cognitive Services"
+  }
+}

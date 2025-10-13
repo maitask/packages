@@ -1,0 +1,41 @@
+{
+  "name": "@maitask/yaml-converter",
+  "version": "0.1.0",
+  "description": "YAML to JSON bidirectional converter",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/maitask/packages/tree/main/yaml-converter",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maitask/packages.git",
+    "directory": "yaml-converter"
+  },
+  "bugs": {
+    "url": "https://github.com/maitask/packages/issues"
+  },
+  "keywords": [
+    "maitask",
+    "yaml",
+    "json",
+    "converter",
+    "parser",
+    "serializer"
+  ],
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "YAML Converter",
+  "category": "Data Processing & Transformation",
+  "maitask": {
+    "display_name": "YAML Converter",
+    "category": "Data Processing & Transformation"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "input": {
+    "model": "llama3.2",
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are a concise assistant."
+      },
+      {
+        "role": "user",
+        "content": "List three benefits of running models locally."
+      }
+    ],
+    "stream": false,
+    "temperature": 0.7
+  },
+  "options": {
+    "baseUrl": "http://localhost:11434",
+    "openaiCompat": false
+  }
+}

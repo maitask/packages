@@ -1,0 +1,44 @@
+{
+  "name": "@maitask/csv-parser",
+  "version": "0.1.0",
+  "description": "High-performance CSV parser with advanced features",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/maitask/packages/tree/main/csv-parser",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maitask/packages.git",
+    "directory": "csv-parser"
+  },
+  "bugs": {
+    "url": "https://github.com/maitask/packages/issues"
+  },
+  "keywords": [
+    "maitask",
+    "parser",
+    "csv",
+    "data",
+    "processing",
+    "tabular",
+    "spreadsheet",
+    "delimiter",
+    "rfc4180"
+  ],
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "CSV Parser",
+  "category": "Data Processing & Transformation",
+  "maitask": {
+    "display_name": "CSV Parser",
+    "category": "Data Processing & Transformation"
+  }
+}

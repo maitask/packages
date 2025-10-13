@@ -1,0 +1,9 @@
+{
+  "input": {
+    "storyType": "top",
+    "limit": 5,
+    "includeComments": true,
+    "commentLimit": 2,
+    "commentDepth": 2
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "name": "@maitask/cron-parser",
+  "version": "0.1.0",
+  "description": "Cron expression parser and scheduler",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/maitask/packages/tree/main/cron-parser",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/maitask/packages.git",
+    "directory": "cron-parser"
+  },
+  "bugs": {
+    "url": "https://github.com/maitask/packages/issues"
+  },
+  "keywords": [
+    "maitask",
+    "cron",
+    "parser",
+    "scheduler",
+    "schedule",
+    "timing"
+  ],
+  "files": [
+    "index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "Cron Parser",
+  "category": "Developer Utilities",
+  "maitask": {
+    "display_name": "Cron Parser",
+    "category": "Developer Utilities"
+  }
+}
