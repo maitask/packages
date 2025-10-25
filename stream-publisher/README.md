@@ -9,7 +9,7 @@ Publish data streams via HTTP chunked transfer encoding or Server-Sent Events (S
 - **Real-time Streaming**: Push data updates progressively
 - **Custom Headers**: Add authentication and custom HTTP headers
 - **Configurable**: Adjust chunk sizes, timeouts, and event names
-- **Production Ready**: Optimized for reliable streaming
+- **Production Ready**: High-performance reliable streaming
 
 ## Installation
 

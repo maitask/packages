@@ -149,7 +149,7 @@ This package is designed and includes:
 
 - **Parser metadata**: Automatic file type detection
 - **Error handling**: Structured error responses
-- **Performance**: Optimized for large text files
+- **Performance**: High-performance processing for large text files
 - **Standards compliance**: UTF-8 and Base64 standards
 
 ## Requirements

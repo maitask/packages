@@ -256,7 +256,7 @@ instruction: 'Speak slowly and clearly for educational content'
 
 ### About Index-TTS
 
-Index-TTS is an industrial-level controllable and efficient zero-shot TTS system developed by bilibili, with exceptional performance for **Chinese language** scenarios.
+Index-TTS is an industrial-level controllable and efficient zero-shot TTS system developed by bilibili, with exceptional performance for multilingual scenarios.
 
 ### Key Features
 
@@ -290,7 +290,7 @@ python -m index_tts.server --host 127.0.0.1 --port 8000
 ```javascript
 const result = await execute(
   {
-    text: '你好，欢迎使用 Index-TTS 语音合成系统。',
+    text: 'Welcome to the Index-TTS speech synthesis system.',
     task: 'generate',
     provider: 'index-tts',
     language: 'zh'
@@ -319,7 +319,7 @@ const result = await execute(
 ```javascript
 const result = await execute(
   {
-    text: '今天天气真好！',
+    text: 'The weather is beautiful today!',
     task: 'generate',
     provider: 'index-tts',
     emotion: 'happy',
@@ -334,10 +334,10 @@ const result = await execute(
 ```javascript
 const result = await execute(
   {
-    text: '重庆',
+    text: 'Beijing',
     task: 'generate',
     provider: 'index-tts',
-    pinyin: 'chong2 qing4', // Specify exact pronunciation
+    pinyin: 'bei3 jing1', // Specify exact pronunciation
     language: 'zh'
   },
   { baseUrl: 'http://localhost:8000' }
