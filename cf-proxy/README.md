@@ -149,7 +149,7 @@ Example error:
 
 ```javascript
 await execute('@maitask/cf-proxy', {
-  url: 'https://github.com/maitask/engine/releases/download/v1.0.0/engine-linux-amd64.tar.gz'
+  url: 'https://github.com/maitask/runtime/releases/download/v1.0.0/engine-linux-amd64.tar.gz'
 });
 ```
 
@@ -158,7 +158,7 @@ await execute('@maitask/cf-proxy', {
 ```javascript
 // Get manifest
 const manifest = await execute('@maitask/cf-proxy', {
-  url: 'https://ghcr.io/v2/maitask/engine/manifests/latest',
+  url: 'https://ghcr.io/v2/maitask/runtime/manifests/latest',
   headers: {
     'Accept': 'application/vnd.docker.distribution.manifest.v2+json'
   }
@@ -166,7 +166,7 @@ const manifest = await execute('@maitask/cf-proxy', {
 
 // Get layer blob
 const layer = await execute('@maitask/cf-proxy', {
-  url: 'https://ghcr.io/v2/maitask/engine/blobs/' + digest
+  url: 'https://ghcr.io/v2/maitask/runtime/blobs/' + digest
 });
 ```
 
