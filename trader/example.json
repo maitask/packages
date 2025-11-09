@@ -1,0 +1,35 @@
+{
+  "action": "execute",
+  "symbol": "BTCUSDT",
+  "interval": "5m",
+  "strategy": {
+    "type": "sma-crossover",
+    "fastLength": 9,
+    "slowLength": 26
+  },
+  "risk": {
+    "positionRiskPct": 0.02,
+    "maxDailyLoss": 5,
+    "maxDrawdown": 12,
+    "stopLossPct": 0.01,
+    "takeProfitPct": 0.02,
+    "allowShort": true
+  },
+  "execution": {
+    "type": "MARKET",
+    "timeInForce": "GTC",
+    "quantityPrecision": 3
+  },
+  "performance": {
+    "dailyLoss": -1.2,
+    "drawdown": -3.5,
+    "equity": 12000
+  },
+  "exchange": {
+    "provider": "binance",
+    "market": "futures",
+    "testnet": true,
+    "apiKey": "${BINANCE_API_KEY}",
+    "apiSecret": "${BINANCE_API_SECRET}"
+  }
+}

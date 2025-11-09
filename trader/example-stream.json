@@ -1,0 +1,16 @@
+{
+  "action": "stream",
+  "symbol": "BTCUSDT",
+  "stream": {
+    "channel": "bookTicker",
+    "limit": 30,
+    "durationMs": 8000
+  },
+  "exchange": {
+    "provider": "okx",
+    "market": "swap",
+    "apiKey": "${OKX_API_KEY}",
+    "apiSecret": "${OKX_API_SECRET}",
+    "passphrase": "${OKX_PASSPHRASE}"
+  }
+}

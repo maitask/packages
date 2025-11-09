@@ -1,0 +1,30 @@
+{
+  "name": "@maitask/trader",
+  "version": "0.1.0",
+  "description": "Trader orchestration across Binance futures, Binance spot, and paper modes inside Maitask",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "keywords": [
+    "maitask",
+    "trading",
+    "binance",
+    "aster",
+    "okx",
+    "futures",
+    "websocket",
+    "risk",
+    "automation"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "Trader",
+  "category": "Finance & Trading",
+  "maitask": {
+    "display_name": "Trader",
+    "category": "Finance & Trading"
+  }
+}

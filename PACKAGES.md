@@ -1,6 +1,6 @@
 # Maitask Package Catalogue
 
-> Total packages: **34** · Maintained by official account **`maitask`** · Version: `v0.1.0`
+> Total packages: **35** · Maintained by official account **`maitask`** · Version: `v0.1.0`
 >
 > Every package is published to the Maitask registry and validated against the latest engine.
 
@@ -58,3 +58,7 @@
 
 - [**@maitask/cron-parser**](./cron-parser) `v0.1.0` — Cron expression parser and scheduler
 - [**@maitask/markdown-renderer**](./markdown-renderer) `v0.1.0` — Markdown to HTML converter with template support
+
+## 💹 Finance & Trading (1)
+
+- [**@maitask/trader**](./trader) `v0.1.0` — Trader orchestration across Binance, Aster, OKX, and paper providers
