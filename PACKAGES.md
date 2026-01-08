@@ -1,6 +1,6 @@
 # Maitask Package Catalogue
 
-> Total packages: **35** · Maintained by official account **`maitask`** · Version: `v0.1.0`
+> Total packages: **36** · Maintained by official account **`maitask`** · Version: `v0.1.0`
 >
 > Every package is published to the Maitask registry and validated against the latest engine.
 
@@ -40,10 +40,11 @@
 - [**@maitask/telegram-bot**](./telegram-bot) `v0.1.0` — Send messages to Telegram users and groups via Bot API
 - [**@maitask/stream-publisher**](./stream-publisher) `v0.1.0` — Publish data streams via HTTP chunked transfer or Server-Sent Events
 
-## 🌐 Web & API Integration (6)
+## 🌐 Web & API Integration (7)
 
 - [**@maitask/web-scraper**](./web-scraper) `v0.1.0` — Extract data from web pages with HTML parsing and CSS selectors
 - [**@maitask/web-search**](./web-search) `v0.1.0` — Search the web using multiple search engines
+- [**@maitask/http-request**](./http-request) `v1.0.0` — Production-grade HTTP client with retries and validation
 - [**@maitask/hackernews-crawler**](./hackernews-crawler) `v0.1.0` — Crawl and extract stories from Hacker News using official API
 - [**@maitask/github-integration**](./github-integration) `v0.1.0` — GitHub API integration for repositories and users
 - [**@maitask/url-analyzer**](./url-analyzer) `v0.1.0` — URL parsing, validation, and analysis

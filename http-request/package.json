@@ -1,0 +1,12 @@
+{
+  "name": "@maitask/http-request",
+  "version": "1.0.0",
+  "description": "Advanced HTTP client for Maitask with retries, timeouts, and validation",
+  "main": "index.js",
+  "maitask": {
+    "type": "module",
+    "category": "communication",
+    "tags": ["http", "request", "api", "rest", "fetch"],
+    "icon": "globe"
+  }
+}
