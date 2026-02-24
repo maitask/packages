@@ -22,17 +22,15 @@
  * @param {Object} context - Execution context
  * @returns {Object} Validation results with detailed reporting
  */
-async function execute(input, options, context) {
-    console.log('Data Validator - Starting validation');
-
-    const config = buildConfig(input, options, context);
-    const data = (input && input.data) || input || [];
-
-    if (!Array.isArray(data) && typeof data !== 'object') {
-        throw new Error('Input data must be an array or object');
-    }
-
+async function execute(input = {}, options = {}, context = {}) {
     try {
+        const config = buildConfig(input, options, context);
+        const data = (input && input.data) || input || [];
+
+        if (!Array.isArray(data) && typeof data !== 'object') {
+            throw new Error('Input data must be an array or object');
+        }
+
         let schema = config.schema;
 
         if (config.schema_url && !schema) {
@@ -45,16 +43,42 @@ async function execute(input, options, context) {
 
         const summary = generateValidationSummary(validationResults);
 
+        const isReportOnly = config.validation_mode === 'report-only';
+        if (isReportOnly || summary.valid_count === summary.total_count) {
+            return {
+                success: true,
+                data: {
+                    summary: summary,
+                    results: validationResults,
+                    schema_used: !!schema,
+                    validation_mode: config.validation_mode,
+                    has_errors: summary.error_count > 0
+                },
+                metadata: {
+                    package: '@maitask/data-validator',
+                    validated_at: new Date().toISOString(),
+                    validation_mode: config.validation_mode,
+                    schema_source: config.schema_url ? 'url' : 'inline',
+                    version: '0.1.0'
+                }
+            };
+        }
+
         return {
-            success: summary.valid_count === summary.total_count,
-            message: `Validation completed: ${summary.valid_count}/${summary.total_count} items valid`,
+            success: false,
             data: {
                 summary: summary,
                 results: validationResults,
                 schema_used: !!schema,
                 validation_mode: config.validation_mode
             },
+            error: {
+                message: `Validation completed with invalid records: ${summary.invalid_count} / ${summary.total_count}`,
+                code: 'VALIDATION_RESULT_ERROR',
+                type: 'ValidationResultError'
+            },
             metadata: {
+                package: '@maitask/data-validator',
                 validated_at: new Date().toISOString(),
                 validation_mode: config.validation_mode,
                 schema_source: config.schema_url ? 'url' : 'inline',
@@ -72,6 +96,7 @@ async function execute(input, options, context) {
                 details: error.details || null
             },
             metadata: {
+                package: '@maitask/data-validator',
                 validated_at: new Date().toISOString(),
                 version: '0.1.0'
             }
@@ -85,12 +110,20 @@ function buildConfig(input, options, context) {
     return {
         schema: source.schema,
         schema_url: source.schema_url,
-        validation_mode: source.validation_mode || 'strict',
+        validation_mode: normalizeValidationMode(source.validation_mode),
         required_fields: source.required_fields || [],
         data_types: source.data_types || {},
         custom_rules: source.custom_rules || [],
         stop_on_first_error: source.stop_on_first_error || false
     };
+}
+
+function normalizeValidationMode(value) {
+    const mode = String(value || 'strict').toLowerCase();
+    if (mode === 'strict' || mode === 'loose' || mode === 'report-only') {
+        return mode;
+    }
+    return 'strict';
 }
 
 async function fetchSchemaFromUrl(url) {
@@ -286,7 +319,7 @@ function validateCustomRules(item, customRules) {
                     isValid = typeof value === 'number' && value > 0;
                     break;
                 default:
-                    console.log(`Unknown validation rule: ${rule.rule}`);
+                    isValid = false;
             }
         } catch (error) {
             isValid = false;

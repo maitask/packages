@@ -23,48 +23,78 @@
  * @returns {Object} Import result with row counts and table info
  */
 async function execute(input, options, context) {
-    console.log('NocoDB Importer - Starting import process');
+    try {
+        var config = buildConfig(input, options, context);
+        var csvContent = extractCsvContent(input);
+        if (!csvContent) {
+            throw new Error('Input CSV content is required');
+        }
 
-    var config = buildConfig(input, options, context);
-    var csvContent = extractCsvContent(input);
-    if (!csvContent) {
-        throw new Error('Input CSV content is required');
-    }
+        var parsed = parseCsv(csvContent, config.delimiter, config.inferTypes);
+        if (!parsed || parsed.rows.length === 0) {
+            throw new Error('CSV parsing produced no rows');
+        }
 
-    var parsed = parseCsv(csvContent, config.delimiter, config.inferTypes);
-    if (!parsed || parsed.rows.length === 0) {
-        throw new Error('CSV parsing produced no rows');
-    }
+        var preview = parsed.rows.slice(0, config.previewRows);
+        if (config.dryRun) {
+            return {
+                success: true,
+                data: {
+                    dryRun: true,
+                    preview: preview,
+                    totalRows: parsed.rows.length,
+                    columns: parsed.columns
+                },
+                metadata: {
+                    package: '@maitask/nocodb-importer',
+                    version: '0.1.0',
+                    provider: 'nocodb',
+                    tableName: config.tableName,
+                    timestamp: new Date().toISOString()
+                }
+            };
+        }
 
-    var preview = parsed.rows.slice(0, config.previewRows);
-    if (config.dryRun) {
+        var authHeaders = {
+            'xc-token': config.token,
+            'Accept': 'application/json'
+        };
+
+        var tableMeta = await ensureTable(config, parsed.columns, authHeaders);
+        var importResult = await importRows(config, tableMeta, parsed.rows, authHeaders);
+
         return {
             success: true,
-            message: 'Dry run completed. No data sent to NocoDB.',
-            preview: preview,
-            totalRows: parsed.rows.length,
-            columns: parsed.columns
+            data: {
+                importedRows: parsed.rows.length,
+                createdTable: tableMeta.created,
+                table: tableMeta.info,
+                response: importResult
+            },
+            metadata: {
+                package: '@maitask/nocodb-importer',
+                version: '0.1.0',
+                provider: 'nocodb',
+                tableName: config.tableName,
+                timestamp: new Date().toISOString()
+            }
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: {
+                message: error.message || 'NocoDB import failed',
+                code: 'NOCODB_IMPORT_ERROR',
+                type: error.name || 'NocoDBImportError'
+            },
+            metadata: {
+                package: '@maitask/nocodb-importer',
+                version: '0.1.0',
+                provider: 'nocodb',
+                timestamp: new Date().toISOString()
+            }
         };
     }
-
-    var authHeaders = {
-        'xc-token': config.token,
-        'Accept': 'application/json'
-    };
-
-    var tableMeta = await ensureTable(config, parsed.columns, authHeaders);
-    var importResult = await importRows(config, tableMeta, parsed.rows, authHeaders);
-
-    return {
-        success: true,
-        message: 'Successfully imported ' + parsed.rows.length + ' rows',
-        result: {
-            importedRows: parsed.rows.length,
-            createdTable: tableMeta.created,
-            table: tableMeta.info,
-            response: importResult
-        }
-    };
 }
 
 function buildConfig(input, options, context) {

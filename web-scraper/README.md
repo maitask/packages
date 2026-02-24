@@ -225,3 +225,9 @@ Error response (for individual URL):
 ## License
 
 MIT
+## Response Contract (Current)
+
+The package uses a standardized envelope:
+
+- Success: `{ success: true, data: { total, successCount, failureCount, results }, metadata: {...} }`
+- Failure: `{ success: false, error: { message, code, type }, metadata: {...} }`

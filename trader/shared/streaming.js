@@ -2,7 +2,7 @@ import { collectWebSocketFeed } from './websocket.js';
 
 const BINANCE_FUTURES_WS = 'wss://fstream.binance.com/ws';
 const BINANCE_SPOT_WS = 'wss://stream.binance.com:9443/ws';
-const ASTER_FUTURES_WS = 'wss://fapi.asterdex.com/ws';
+const ASTER_FUTURES_WS = 'wss://fstream.asterdex.com/ws';
 const OKX_PUBLIC_WS = 'wss://ws.okx.com:8443/ws/v5/public';
 
 function buildBinanceStreamName(symbol, channel, interval = '1m') {

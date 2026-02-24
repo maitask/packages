@@ -5,7 +5,7 @@
  * Features:
  * - Convert Markdown to HTML
  * - Template rendering
- * - Code syntax highlighting placeholder
+ * - Code blocks with language class emission
  * - Table support
  * - Lists and nested structures
  *
@@ -37,9 +37,12 @@ function execute(input, options = {}, context = {}) {
 
         return {
             success: true,
-            format,
-            content: result,
+            data: {
+                format,
+                content: result
+            },
             metadata: {
+                package: '@maitask/markdown-renderer',
                 length: result.length,
                 timestamp: new Date().toISOString(),
                 version: '0.1.0'
@@ -51,9 +54,10 @@ function execute(input, options = {}, context = {}) {
             error: {
                 message: error.message || 'Rendering error',
                 code: 'RENDER_ERROR',
-                type: error.constructor.name
+                type: error?.name || 'RenderError'
             },
             metadata: {
+                package: '@maitask/markdown-renderer',
                 timestamp: new Date().toISOString(),
                 version: '0.1.0'
             }

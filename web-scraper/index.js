@@ -1,27 +1,57 @@
 async function execute(input, options = {}, context = {}) {
-    ensureFetch('web-scraper');
-    const targets = normalizeTargets(input);
-    const results = [];
-
-    for (const target of targets) {
-        try {
-            const scraped = await scrapeTarget(target, options);
-            results.push(scraped);
-        } catch (error) {
-            results.push({
-                url: typeof target === 'object' && target !== null ? target.url : target,
-                success: false,
-                error: error.message || String(error)
-            });
+    try {
+        ensureFetch('web-scraper');
+        const targets = normalizeTargets(input);
+        if (!targets.length) {
+            throw new Error('At least one target url is required');
         }
-    }
 
-    return {
-        success: true,
-        total: results.length,
-        results,
-        timestamp: new Date().toISOString()
-    };
+        const results = [];
+
+        for (const target of targets) {
+            try {
+                const scraped = await scrapeTarget(target, options);
+                results.push(scraped);
+            } catch (error) {
+                results.push({
+                    url: typeof target === 'object' && target !== null ? target.url : target,
+                    success: false,
+                    error: error.message || String(error)
+                });
+            }
+        }
+
+        const successCount = results.filter((item) => item.success).length;
+
+        return {
+            success: successCount > 0,
+            data: {
+                total: results.length,
+                successCount,
+                failureCount: results.length - successCount,
+                results
+            },
+            metadata: {
+                package: '@maitask/web-scraper',
+                version: '0.1.0',
+                timestamp: new Date().toISOString()
+            }
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: {
+                message: error.message || 'Web scraping failed',
+                code: 'WEB_SCRAPER_ERROR',
+                type: error.name || 'WebScraperError'
+            },
+            metadata: {
+                package: '@maitask/web-scraper',
+                version: '0.1.0',
+                timestamp: new Date().toISOString()
+            }
+        };
+    }
 }
 
 async function scrapeTarget(target, options) {

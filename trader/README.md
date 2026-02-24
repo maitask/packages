@@ -254,3 +254,10 @@ Each action returns `success: true`, a `timestamp`, and structured fields:
 - `statistics` → backtest KPIs (trades, ROI, max drawdown).
 
 Leverage the data with follow-up Maitask steps (notifications, logging, dashboards, etc.).
+
+## Response Contract
+
+The package returns a formal envelope for all actions:
+
+- Success: `{ success: true, data: {...actionPayload}, metadata: { package, version, action, symbol, provider, mode, timestamp } }`
+- Failure: `{ success: false, error: { message, code, type }, metadata: { package, version, action, symbol, timestamp } }`

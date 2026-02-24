@@ -17,6 +17,8 @@ import { buildDefaultPaperState } from './shared/state.js';
 
 const DEFAULT_INTERVAL = '5m';
 const DEFAULT_CANDLE_LIMIT = 120;
+const PACKAGE_NAME = '@maitask/trader';
+const PACKAGE_VERSION = '0.1.0';
 
 /**
  * Main entry.
@@ -28,41 +30,72 @@ async function execute(input = {}, options = {}, context = {}) {
     ensureFetch();
     ensureCrypto();
 
-    const config = buildConfig(input, options, context);
-    const exchange = await createExchangeClient(config);
-
     try {
+        const config = buildConfig(input, options, context);
+        const exchange = await createExchangeClient(config);
+        let payload;
+
         switch (config.action) {
             case 'analyze':
-                return successResponse(await performAnalysis(config, exchange));
+                payload = await performAnalysis(config, exchange);
+                break;
             case 'execute':
-                return successResponse(await performExecution(config, exchange));
+                payload = await performExecution(config, exchange);
+                break;
             case 'status':
-                return successResponse(await fetchStatus(config, exchange));
+                payload = await fetchStatus(config, exchange);
+                break;
             case 'cancel':
-                return successResponse(await cancelOrder(config, exchange));
+                payload = await cancelOrder(config, exchange);
+                break;
             case 'backtest':
-                return successResponse(await runBacktest(config, exchange));
+                payload = await runBacktest(config, exchange);
+                break;
             case 'stream':
-                return successResponse(await performStream(config, exchange));
+                payload = await performStream(config, exchange);
+                break;
             default:
                 throw new Error(`Unsupported action: ${config.action}`);
         }
+
+        return successResponse(payload, config, exchange);
     } catch (error) {
-        return {
-            success: false,
-            action: config.action,
-            message: error.message,
-            stack: error.stack,
-        };
+        return errorResponse(error, input, options);
     }
 }
 
-function successResponse(payload) {
+function successResponse(payload, config, exchange) {
     return {
         success: true,
-        ...payload,
-        timestamp: new Date().toISOString(),
+        data: payload,
+        metadata: {
+            package: PACKAGE_NAME,
+            version: PACKAGE_VERSION,
+            action: config.action,
+            symbol: config.symbol,
+            provider: config.exchange?.provider,
+            mode: exchange?.mode || null,
+            timestamp: new Date().toISOString(),
+        },
+    };
+}
+
+function errorResponse(error, input = {}, options = {}) {
+    const source = mergeObjects(options, input);
+    return {
+        success: false,
+        error: {
+            message: error?.message || 'Unknown trader error',
+            code: error?.code || 'TRADER_ERROR',
+            type: error?.name || 'TraderError',
+        },
+        metadata: {
+            package: PACKAGE_NAME,
+            version: PACKAGE_VERSION,
+            action: source.action || 'analyze',
+            symbol: source.symbol || 'BTCUSDT',
+            timestamp: new Date().toISOString(),
+        },
     };
 }
 
@@ -122,14 +155,19 @@ function buildConfig(input, options, context) {
 }
 
 function buildRiskConfig(source) {
+    const positionRiskPct = clamp(toNumber(source.positionRiskPct ?? source?.risk?.positionRiskPct), 0.0001, 1, 0.02);
+    const slippageBps = clamp(toNumber(source.slippageBps ?? source?.risk?.slippageBps), 0, 5000, 5);
+    const stopLossPct = clamp(toNumber(source.stopLossPct ?? source?.risk?.stopLossPct), 0.0001, 1, 0.01);
+    const takeProfitPct = clamp(toNumber(source.takeProfitPct ?? source?.risk?.takeProfitPct), 0.0001, 5, 0.02);
+
     return {
         maxDailyLoss: toNumber(source.maxDailyLoss ?? source?.risk?.maxDailyLoss),
         maxDrawdown: toNumber(source.maxDrawdown ?? source?.risk?.maxDrawdown),
         maxPositionSize: toNumber(source.maxPositionSize ?? source?.risk?.maxPositionSize),
-        positionRiskPct: toNumber(source.positionRiskPct ?? source?.risk?.positionRiskPct) || 0.02,
-        slippageBps: toNumber(source.slippageBps ?? source?.risk?.slippageBps) || 5,
-        stopLossPct: toNumber(source.stopLossPct ?? source?.risk?.stopLossPct) || 0.01,
-        takeProfitPct: toNumber(source.takeProfitPct ?? source?.risk?.takeProfitPct) || 0.02,
+        positionRiskPct,
+        slippageBps,
+        stopLossPct,
+        takeProfitPct,
         allowShort: source.allowShort ?? source?.risk?.allowShort ?? true,
         allowLong: source.allowLong ?? source?.risk?.allowLong ?? true,
     };
@@ -278,7 +316,6 @@ async function runBacktest(config, exchange) {
         throw new Error('Not enough candles for backtest');
     }
 
-    const closes = data.map((c) => Number(c[4]));
     const strategy = config.strategy || {};
     const initialBalance = config.backtest?.capital || 10000;
     let balance = initialBalance;
@@ -518,6 +555,11 @@ function computeMaxDrawdown(trades, initialBalance) {
         maxDD = Math.min(maxDD, dd);
     }
     return maxDD;
+}
+
+function clamp(value, min, max, fallback) {
+    if (!Number.isFinite(value)) return fallback;
+    return Math.min(max, Math.max(min, value));
 }
 
 execute;

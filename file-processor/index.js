@@ -23,63 +23,80 @@
  * @returns {Object} Processing result with transformed data
  */
 function execute(input, options, context) {
-    var resolvedOptions = normalizeOptions(options, input, context);
-    var operation = (resolvedOptions.operation || 'transform').toLowerCase();
-    var data = normalizeInput(input);
-    var metadata = {
-        operation: operation,
-        inputCount: data.length,
-        steps: [],
-        executedAt: new Date().toISOString(),
-        version: '0.1.0'
-    };
+    try {
+        var resolvedOptions = normalizeOptions(options, input, context);
+        var operation = (resolvedOptions.operation || 'transform').toLowerCase();
+        var data = normalizeInput(input);
+        var metadata = {
+            operation: operation,
+            inputCount: data.length,
+            steps: [],
+            executedAt: new Date().toISOString(),
+            version: '0.1.0'
+        };
 
-    var working = data.slice();
-    if (resolvedOptions.preprocess) {
-        working = applyPreprocess(working, resolvedOptions.preprocess, metadata);
-    }
-
-    var result;
-    if (resolvedOptions.pipeline && Array.isArray(resolvedOptions.pipeline) && resolvedOptions.pipeline.length > 0) {
-        result = runPipeline(working, resolvedOptions.pipeline, metadata);
-    } else {
-        switch (operation) {
-            case 'transform':
-                result = applyTransform(working, resolvedOptions.transformRules || resolvedOptions.transforms || {});
-                break;
-            case 'filter':
-                result = applyFilters(working, resolvedOptions.filterRules || resolvedOptions.filters || []);
-                break;
-            case 'aggregate':
-                result = applyAggregations(working, resolvedOptions.aggregateRules || resolvedOptions.aggregations || {});
-                break;
-            case 'pipeline':
-                result = runPipeline(working, resolvedOptions.steps || [], metadata);
-                break;
-            default:
-                throw new Error('Unsupported operation: ' + operation);
+        var working = data.slice();
+        if (resolvedOptions.preprocess) {
+            working = applyPreprocess(working, resolvedOptions.preprocess, metadata);
         }
+
+        var result;
+        if (resolvedOptions.pipeline && Array.isArray(resolvedOptions.pipeline) && resolvedOptions.pipeline.length > 0) {
+            result = runPipeline(working, resolvedOptions.pipeline, metadata);
+        } else {
+            switch (operation) {
+                case 'transform':
+                    result = applyTransform(working, resolvedOptions.transformRules || resolvedOptions.transforms || {});
+                    break;
+                case 'filter':
+                    result = applyFilters(working, resolvedOptions.filterRules || resolvedOptions.filters || []);
+                    break;
+                case 'aggregate':
+                    result = applyAggregations(working, resolvedOptions.aggregateRules || resolvedOptions.aggregations || {});
+                    break;
+                case 'pipeline':
+                    result = runPipeline(working, resolvedOptions.steps || [], metadata);
+                    break;
+                default:
+                    throw new Error('Unsupported operation: ' + operation);
+            }
+        }
+
+        if (resolvedOptions.sort && Array.isArray(result)) {
+            result = applySort(result, resolvedOptions.sort);
+            metadata.steps.push({ type: 'sort', details: resolvedOptions.sort });
+        }
+
+        if (typeof resolvedOptions.limit === 'number' && Array.isArray(result)) {
+            result = result.slice(0, resolvedOptions.limit);
+            metadata.steps.push({ type: 'limit', count: resolvedOptions.limit });
+        }
+
+        metadata.outputCount = Array.isArray(result) ? result.length : 1;
+        metadata.fields = inferFields(Array.isArray(result) ? result : [result]);
+
+        return {
+            success: true,
+            data: {
+                operation: operation,
+                result: result
+            },
+            metadata: metadata
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: {
+                message: error.message || 'File processing failed',
+                code: 'FILE_PROCESSOR_ERROR',
+                type: error.name || 'FileProcessorError'
+            },
+            metadata: {
+                executedAt: new Date().toISOString(),
+                version: '0.1.0'
+            }
+        };
     }
-
-    if (resolvedOptions.sort && Array.isArray(result)) {
-        result = applySort(result, resolvedOptions.sort);
-        metadata.steps.push({ type: 'sort', details: resolvedOptions.sort });
-    }
-
-    if (typeof resolvedOptions.limit === 'number' && Array.isArray(result)) {
-        result = result.slice(0, resolvedOptions.limit);
-        metadata.steps.push({ type: 'limit', count: resolvedOptions.limit });
-    }
-
-    metadata.outputCount = Array.isArray(result) ? result.length : 1;
-    metadata.fields = inferFields(Array.isArray(result) ? result : [result]);
-
-    return {
-        success: true,
-        operation: operation,
-        result: result,
-        metadata: metadata
-    };
 }
 
 function normalizeOptions(options, input, context) {

@@ -22,17 +22,15 @@
  * @returns {Object} GitHub operation result with rate limit info
  */
 async function execute(input, options, context) {
-    console.log('GitHub Integration - Starting');
-
-    ensureFetch('github-integration');
-
-    const config = buildConfig(input, options, context);
-
-    if (!config.token) {
-        throw new Error('GitHub token is required. Set token in options or input.');
-    }
-
     try {
+        ensureFetch('github-integration');
+
+        const config = buildConfig(input, options, context);
+
+        if (!config.token) {
+            throw new Error('GitHub token is required. Set token in options or input.');
+        }
+
         let result;
 
         switch (config.action) {
@@ -57,9 +55,11 @@ async function execute(input, options, context) {
 
         return {
             success: true,
-            message: `GitHub ${config.action} completed successfully`,
             data: result,
             metadata: {
+                package: '@maitask/github-integration',
+                version: '0.1.0',
+                provider: 'github',
                 action: config.action,
                 executedAt: new Date().toISOString(),
                 rateLimit: result.rateLimit || null
@@ -69,9 +69,18 @@ async function execute(input, options, context) {
     } catch (error) {
         return {
             success: false,
-            message: `GitHub API error: ${error.message}`,
-            error: error.toString(),
-            action: config.action
+            error: {
+                message: error.message || 'GitHub API request failed',
+                code: 'GITHUB_INTEGRATION_ERROR',
+                type: error.name || 'GitHubIntegrationError'
+            },
+            metadata: {
+                package: '@maitask/github-integration',
+                version: '0.1.0',
+                provider: 'github',
+                action: input?.action || options?.action || 'list-repos',
+                executedAt: new Date().toISOString()
+            }
         };
     }
 }

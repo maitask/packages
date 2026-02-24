@@ -404,3 +404,10 @@ MIT © Maitask Team
 - Multi-step processing pipelines
 - Preprocessing utilities
 - Comprehensive type system
+
+## Response Contract
+
+The package now returns a unified envelope:
+
+- Success: `{ success: true, data: { operation, result }, metadata: {...} }`
+- Failure: `{ success: false, error: { message, code, type }, metadata: {...} }`

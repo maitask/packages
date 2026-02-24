@@ -10,6 +10,9 @@
  * - Detailed error reporting
  */
 
+const PACKAGE_NAME = '@maitask/http-request';
+const PACKAGE_VERSION = '1.0.0';
+
 /**
  * Main execution function
  * @param {Object} input - Request configuration
@@ -27,7 +30,6 @@ async function execute(input, options = {}, context = {}) {
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
         try {
             if (attempt > 0) {
-                console.log(`Retry attempt ${attempt}/${maxRetries} for ${config.url}`);
                 await sleep(retryDelay * Math.pow(2, attempt - 1));
             }
 
@@ -43,11 +45,15 @@ async function execute(input, options = {}, context = {}) {
 
             return {
                 success: true,
-                status: response.status,
-                statusText: response.statusText,
-                headers: Object.fromEntries(response.headers.entries()),
-                data: parsedBody,
+                data: {
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Object.fromEntries(response.headers.entries()),
+                    body: parsedBody
+                },
                 metadata: {
+                    package: PACKAGE_NAME,
+                    version: PACKAGE_VERSION,
                     url: config.url,
                     method: config.method,
                     attempt: attempt + 1,
@@ -56,7 +62,6 @@ async function execute(input, options = {}, context = {}) {
             };
 
         } catch (error) {
-            console.error(`Request failed (attempt ${attempt + 1}/${maxRetries + 1}): ${error.message}`);
             lastError = error;
             
             // Don't retry on certain errors (e.g. validation errors, 4xx client errors if not configured to retry)
@@ -71,9 +76,12 @@ async function execute(input, options = {}, context = {}) {
         error: {
             message: lastError?.message || "Request failed",
             code: lastError?.code || "REQUEST_FAILED",
+            type: lastError?.name || 'HttpRequestError',
             details: lastError?.details || null
         },
         metadata: {
+            package: PACKAGE_NAME,
+            version: PACKAGE_VERSION,
             url: config.url,
             attempts: maxRetries + 1,
             timestamp: new Date().toISOString()
@@ -177,7 +185,6 @@ async function parseBody(response, type) {
                 return await response.text();
         }
     } catch (e) {
-        console.warn('Failed to parse response body:', e);
         return null;
     }
 }

@@ -22,45 +22,64 @@
  * @returns {Object} Crawled stories with comments
  */
 async function execute(input, options, context) {
-    console.log('Hacker News Crawler - Starting crawl');
+    try {
+        ensureFetch();
 
-    var config = buildConfig(input, options, context);
-    var ids = await fetchStoryIds(config.storyType);
-    if (!ids || !ids.length) {
-        throw new Error('No story identifiers returned from Hacker News API');
-    }
-
-    var limitedIds = ids.slice(0, config.limit);
-    var stories = [];
-    for (var i = 0; i < limitedIds.length; i++) {
-        var storyData = await fetchItem(limitedIds[i]);
-        if (!storyData || storyData.type !== 'story') {
-            continue;
+        var config = buildConfig(input, options, context);
+        var ids = await fetchStoryIds(config.storyType);
+        if (!ids || !ids.length) {
+            throw new Error('No story identifiers returned from Hacker News API');
         }
-        var story = normalizeStory(storyData);
-        if (config.includeComments && Array.isArray(storyData.kids) && storyData.kids.length > 0) {
-            story.comments = await fetchComments(storyData.kids, config.commentLimit, config.commentDepth);
+
+        var limitedIds = ids.slice(0, config.limit);
+        var stories = [];
+        for (var i = 0; i < limitedIds.length; i++) {
+            var storyData = await fetchItem(limitedIds[i]);
+            if (!storyData || storyData.type !== 'story') {
+                continue;
+            }
+            var story = normalizeStory(storyData);
+            if (config.includeComments && Array.isArray(storyData.kids) && storyData.kids.length > 0) {
+                story.comments = await fetchComments(storyData.kids, config.commentLimit, config.commentDepth);
+            }
+            stories.push(story);
         }
-        stories.push(story);
-    }
 
-    var metadata = {
-        storyType: config.storyType,
-        fetchedAt: new Date().toISOString(),
-        requested: config.limit,
-        delivered: stories.length
-    };
-
-    return {
-        success: true,
-        message: 'Successfully fetched stories from Hacker News',
-        data: {
+        var metadata = {
+            package: '@maitask/hackernews-crawler',
+            version: '0.1.0',
+            provider: 'hackernews',
             storyType: config.storyType,
-            totalStories: stories.length,
-            stories: stories
-        },
-        metadata: metadata
-    };
+            fetchedAt: new Date().toISOString(),
+            requested: config.limit,
+            delivered: stories.length
+        };
+
+        return {
+            success: true,
+            data: {
+                storyType: config.storyType,
+                totalStories: stories.length,
+                stories: stories
+            },
+            metadata: metadata
+        };
+    } catch (error) {
+        return {
+            success: false,
+            error: {
+                message: error.message || 'Hacker News crawl failed',
+                code: 'HACKERNEWS_CRAWLER_ERROR',
+                type: error.name || 'HackerNewsCrawlerError'
+            },
+            metadata: {
+                package: '@maitask/hackernews-crawler',
+                version: '0.1.0',
+                provider: 'hackernews',
+                fetchedAt: new Date().toISOString()
+            }
+        };
+    }
 }
 
 function buildConfig(input, options, context) {
@@ -221,6 +240,12 @@ function mergeObjects(base, extra) {
 
 function isPlainObject(value) {
     return value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function ensureFetch() {
+    if (typeof fetch !== 'function') {
+        throw new Error('Global fetch API is unavailable. Node.js 18+ is required.');
+    }
 }
 
 execute;

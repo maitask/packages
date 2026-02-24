@@ -48,16 +48,20 @@ Advanced HTTP client wrapper for Maitask Runtime.
 ```json
 {
   "success": true,
-  "status": 201,
-  "statusText": "Created",
-  "headers": {
-    "content-type": "application/json"
-  },
   "data": {
-    "id": "123",
-    "name": "John Doe"
+    "status": 201,
+    "statusText": "Created",
+    "headers": {
+      "content-type": "application/json"
+    },
+    "body": {
+      "id": "123",
+      "name": "John Doe"
+    }
   },
   "metadata": {
+    "package": "@maitask/http-request",
+    "version": "1.0.0",
     "url": "https://api.example.com/users",
     "attempt": 1,
     "timestamp": "2023-10-27T10:00:00Z"

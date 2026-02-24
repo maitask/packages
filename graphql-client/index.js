@@ -31,11 +31,32 @@ async function execute(input, options = {}, context = {}) {
     const errors = Array.isArray(result.errors) ? result.errors : [];
     const hasData = result.data != null;
 
+    if (errors.length > 0) {
+      return {
+        success: false,
+        data: {
+          data: hasData ? result.data : null,
+          errors,
+          extensions: result.extensions || null
+        },
+        error: {
+          message: 'GraphQL responded with one or more errors',
+          code: 'GRAPHQL_RESPONSE_ERROR',
+          type: 'GraphQLResponseError'
+        },
+        metadata: {
+          url,
+          timestamp: new Date().toISOString(),
+          version: '0.1.0'
+        }
+      };
+    }
+
     return {
-      success: errors.length === 0,
+      success: true,
       data: {
         data: hasData ? result.data : null,
-        errors,
+        errors: [],
         extensions: result.extensions || null
       },
       metadata: {

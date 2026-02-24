@@ -23,8 +23,6 @@
  * @returns {Object} Email sending result with delivery confirmation
  */
 async function execute(input, options, context) {
-    console.log('Email Sender - Starting');
-
     var config = buildConfig(input, options, context);
 
     // Validate required fields
@@ -44,8 +42,8 @@ async function execute(input, options, context) {
 
         return {
             success: true,
-            message: 'Email sent successfully via ' + config.provider,
             data: {
+                message: 'Email sent successfully via ' + config.provider,
                 provider: config.provider,
                 from: config.from.email,
                 to: config.to.map(function(recipient) {
@@ -219,7 +217,6 @@ function htmlToText(html) {
 }
 
 async function sendEmail(provider, emailData, config) {
-    console.log('Sending email via', provider);
     ensureFetch('email-sender');
 
     switch (provider) {

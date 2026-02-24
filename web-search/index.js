@@ -1,20 +1,15 @@
 async function execute(input, options, context) {
-    console.log('Web Search - Starting search');
-
-    ensureFetch('web-search');
-
-    var config = buildConfig(input, options, context);
-    if (!config.query) {
-        throw new Error('Search query is required');
-    }
-
-    console.log('Performing search with query:', config.query);
-
     try {
+        ensureFetch('web-search');
+
+        var config = buildConfig(input, options, context);
+        if (!config.query) {
+            throw new Error('Search query is required');
+        }
+
         var searchResult = await performSearch(config);
         return {
             success: true,
-            message: 'Found ' + searchResult.results.length + ' results for "' + config.query + '"',
             data: {
                 query: config.query,
                 engine: searchResult.engine,
@@ -25,15 +20,27 @@ async function execute(input, options, context) {
                 results: searchResult.results,
                 fetchedAt: new Date().toISOString()
             },
-            metadata: searchResult.metadata,
+            metadata: {
+                package: '@maitask/web-search',
+                version: '0.1.0',
+                ...searchResult.metadata,
+                timestamp: new Date().toISOString()
+            },
             pagination: searchResult.pagination || null
         };
     } catch (err) {
-        console.log('Search error:', err.toString());
         return {
             success: false,
-            message: 'Search failed: ' + err.toString(),
-            error: err.toString()
+            error: {
+                message: err.message || String(err),
+                code: 'WEB_SEARCH_ERROR',
+                type: err.name || 'WebSearchError'
+            },
+            metadata: {
+                package: '@maitask/web-search',
+                version: '0.1.0',
+                timestamp: new Date().toISOString()
+            }
         };
     }
 }
@@ -67,13 +74,12 @@ function buildConfig(input, options, context) {
 }
 
 async function performSearch(config) {
-    console.log('Search engine:', config.engine);
 
     if (config.engine === 'bing') {
         try {
             return await searchBing(config);
         } catch (err) {
-            console.log('Bing search failed, falling back to DuckDuckGo:', err.message);
+            // fallback to DuckDuckGo
         }
     }
 
@@ -81,7 +87,7 @@ async function performSearch(config) {
         try {
             return await searchGoogle(config);
         } catch (err) {
-            console.log('Google search failed, falling back to DuckDuckGo:', err.message);
+            // fallback to DuckDuckGo
         }
     }
 
@@ -102,16 +108,9 @@ async function searchDuckDuckGo(config) {
 
     var url = 'https://duckduckgo.com/html/?' + buildQueryString(params);
 
-    console.log('Fetching DuckDuckGo URL:', url);
-
     try {
         var html = await fetchPage(url, config.headers);
         var results = parseDuckDuckGo(html, config.limit, config.includeSnippets);
-
-        // Log if no results found
-        if (results.length === 0) {
-            console.log('No real results found for query:', config.query);
-        }
 
         // Check if there are more results
         var hasNextPage = html.indexOf('class="nav-link"') > -1 || results.length >= config.limit;
@@ -129,7 +128,6 @@ async function searchDuckDuckGo(config) {
             pagination: pagination
         };
     } catch (err) {
-        console.log('DuckDuckGo request failed:', err.message);
         return {
             engine: 'duckduckgo',
             results: [],
@@ -151,16 +149,9 @@ async function searchBing(config) {
 
     var url = 'https://www.bing.com/search?' + buildQueryString(params);
 
-    console.log('Fetching Bing URL:', url);
-
     try {
         var html = await fetchPage(url, config.headers);
         var results = parseBing(html, config.limit, config.includeSnippets);
-
-        // Log if no results found
-        if (results.length === 0) {
-            console.log('No real Bing results found for query:', config.query);
-        }
 
         // Check if there are more results
         var hasNextPage = html.indexOf('class="sb_pagN"') > -1 || results.length >= config.limit;
@@ -178,7 +169,6 @@ async function searchBing(config) {
             pagination: pagination
         };
     } catch (err) {
-        console.log('Bing request failed:', err.message);
         return {
             engine: 'bing',
             results: [],
@@ -200,16 +190,9 @@ async function searchGoogle(config) {
 
     var url = 'https://www.google.com/search?' + buildQueryString(params);
 
-    console.log('Fetching Google URL:', url);
-
     try {
         var html = await fetchPage(url, config.headers);
         var results = parseGoogle(html, config.limit, config.includeSnippets);
-
-        // Log if no results found
-        if (results.length === 0) {
-            console.log('No real Google results found for query:', config.query);
-        }
 
         // Check if there are more results
         var hasNextPage = html.indexOf('id="pnnext"') > -1 || results.length >= config.limit;
@@ -227,7 +210,6 @@ async function searchGoogle(config) {
             pagination: pagination
         };
     } catch (err) {
-        console.log('Google request failed:', err.message);
         return {
             engine: 'google',
             results: [],
@@ -243,15 +225,12 @@ async function fetchPage(url, headers) {
         'Accept-Language': 'en-US,en;q=0.9'
     }, headers || {});
 
-    console.log('Making HTTP request to:', url);
-
     var response = await fetch(url, {
         method: 'GET',
         headers: requestHeaders
     });
 
     var body = await response.text();
-    console.log('HTTP response received, status:', response.status, 'body length:', body ? body.length : 0);
 
     if (!response.ok) {
         throw new Error('Request to ' + url + ' failed with status ' + response.status);
@@ -264,11 +243,8 @@ async function fetchPage(url, headers) {
 function parseDuckDuckGo(html, limit, includeSnippets) {
     var results = [];
     if (!html || typeof html !== 'string') {
-        console.log('Invalid HTML received for DuckDuckGo');
         return results;
     }
-
-    console.log('Parsing DuckDuckGo HTML, length:', html.length);
 
     // Improved patterns for DuckDuckGo results
     var resultBlocks = html.split('<div class="result result');
@@ -310,19 +286,14 @@ function parseDuckDuckGo(html, limit, includeSnippets) {
             }
         }
     }
-
-    console.log('DuckDuckGo parsing completed, found:', foundCount, 'valid results out of', resultBlocks.length, 'potential blocks');
     return results;
 }
 
 function parseBing(html, limit, includeSnippets) {
     var results = [];
     if (!html || typeof html !== 'string') {
-        console.log('Invalid HTML received for Bing');
         return results;
     }
-
-    console.log('Parsing Bing HTML, length:', html.length);
 
     // Improved patterns for Bing search results
     // Look for li elements with class containing "b_algo" which are the main results
@@ -387,19 +358,14 @@ function parseBing(html, limit, includeSnippets) {
         // Find next algorithm block
         algoStart = html.indexOf('<li class="b_algo"', nextSearch);
     }
-
-    console.log('Bing parsing completed, found:', foundCount, 'valid results out of potential blocks');
     return results;
 }
 
 function parseGoogle(html, limit, includeSnippets) {
     var results = [];
     if (!html || typeof html !== 'string') {
-        console.log('Invalid HTML received for Google');
         return results;
     }
-
-    console.log('Parsing Google HTML, length:', html.length);
 
     // Improved Google search result parsing following modern structures
     // Look for <div class="g" blocks which represent results in Google modern format
@@ -450,8 +416,6 @@ function parseGoogle(html, limit, includeSnippets) {
             }
         }
     }
-
-    console.log('Google parsing completed, found:', foundCount, 'valid results out of', blocks.length, 'potential blocks');
     return results;
 }
 

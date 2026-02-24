@@ -28,8 +28,9 @@ function execute(input, options = {}, context = {}) {
 
         return {
             success: true,
-            ...metadata,
+            data: metadata,
             metadata: {
+                package: '@maitask/image-metadata',
                 timestamp: new Date().toISOString(),
                 version: '0.1.0'
             }
@@ -40,9 +41,10 @@ function execute(input, options = {}, context = {}) {
             error: {
                 message: error.message || 'Metadata extraction error',
                 code: 'METADATA_ERROR',
-                type: error.constructor.name
+                type: error?.name || 'MetadataError'
             },
             metadata: {
+                package: '@maitask/image-metadata',
                 timestamp: new Date().toISOString(),
                 version: '0.1.0'
             }

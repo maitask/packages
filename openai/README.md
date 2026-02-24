@@ -55,6 +55,33 @@ console.log(result.data.content);
 ### Options
 
 - `apiKey` - OpenAI API key (required)
+- `timeoutMs` - Request timeout in milliseconds (default: `60000`)
+- `retries` - Retry count for transient failures (default: `2`)
+
+## Return Envelope
+
+```json
+{
+  "success": true,
+  "data": {
+    "content": "model output",
+    "finishReason": "stop",
+    "model": "gpt-5",
+    "usage": {
+      "promptTokens": 12,
+      "completionTokens": 34,
+      "totalTokens": 46
+    }
+  },
+  "metadata": {
+    "package": "@maitask/openai",
+    "version": "0.1.0",
+    "provider": "openai",
+    "model": "gpt-5",
+    "timestamp": "2026-02-24T00:00:00.000Z"
+  }
+}
+```
 
 ## Examples
 

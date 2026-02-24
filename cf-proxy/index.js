@@ -1,241 +1,275 @@
 /**
  * @maitask/cf-proxy
- *
- * Cloudflare Worker proxy for GitHub and Docker registry acceleration.
- * Handles intelligent redirects, authentication, and AWS S3 signature headers.
- *
- * @param {Object} input - Configuration and request data
- * @param {string} input.url - Target URL to proxy
- * @param {string} [input.method='GET'] - HTTP method
- * @param {Object} [input.headers={}] - Request headers
- * @param {Object} [input.config] - Proxy configuration
- * @param {string[]} [input.config.allowedHosts] - Whitelist of allowed domains
- * @param {boolean} [input.config.restrictPaths=false] - Enable path restrictions
- * @param {string[]} [input.config.allowedPaths] - Allowed path keywords
- * @param {number} [input.config.maxRedirects=5] - Maximum redirect follow count
- * @param {Object} options - Execution options
- * @param {Object} context - Execution context
- * @returns {Object} Proxy response with status, headers, and body
+ * Cloudflare Worker-style proxy helper for GitHub and container registries.
  */
-async function main(input, options, context) {
-    // Default configuration
-    const DEFAULT_ALLOWED_HOSTS = [
-        'quay.io',
-        'gcr.io',
-        'k8s.gcr.io',
-        'registry.k8s.io',
-        'ghcr.io',
-        'docker.cloudsmith.io',
-        'registry-1.docker.io',
-        'github.com',
-        'api.github.com',
-        'raw.githubusercontent.com',
-        'gist.github.com',
-        'gist.githubusercontent.com'
-    ];
 
-    const config = {
-        allowedHosts: input.config?.allowedHosts || DEFAULT_ALLOWED_HOSTS,
-        restrictPaths: input.config?.restrictPaths || false,
-        allowedPaths: input.config?.allowedPaths || ['library'],
-        maxRedirects: input.config?.maxRedirects || 5
-    };
+const PACKAGE_NAME = '@maitask/cf-proxy';
+const PACKAGE_VERSION = '0.1.0';
 
-    // Validate input
-    if (!input.url) {
-        throw new Error('URL is required');
-    }
+const DEFAULT_ALLOWED_HOSTS = [
+  'quay.io',
+  'gcr.io',
+  'k8s.gcr.io',
+  'registry.k8s.io',
+  'ghcr.io',
+  'docker.cloudsmith.io',
+  'registry-1.docker.io',
+  'github.com',
+  'api.github.com',
+  'raw.githubusercontent.com',
+  'gist.github.com',
+  'gist.githubusercontent.com'
+];
 
-    // Parse URL using simpler method for compatibility
-    let targetDomain, targetPath;
-    try {
-        const urlMatch = input.url.match(/^https?:\/\/([^\/]+)(\/.*)?$/);
-        if (!urlMatch) {
-            throw new Error('Invalid URL format');
-        }
-        targetDomain = urlMatch[1];
-        targetPath = (urlMatch[2] || '/').substring(1);
-    } catch (e) {
-        throw new Error(`Failed to parse URL: ${e.message}`);
-    }
+const DOCKER_HOSTS = new Set([
+  'quay.io',
+  'gcr.io',
+  'k8s.gcr.io',
+  'registry.k8s.io',
+  'ghcr.io',
+  'docker.cloudsmith.io',
+  'registry-1.docker.io'
+]);
 
-    // Domain whitelist check
-    if (!config.allowedHosts.includes(targetDomain)) {
-        throw new Error(`Domain ${targetDomain} not in allowed list`);
-    }
+async function execute(input = {}, options = {}, context = {}) {
+  try {
+    ensureFetch();
 
-    // Path whitelist check (if enabled)
-    if (config.restrictPaths) {
-        const isPathAllowed = config.allowedPaths.some(pathString =>
-            targetPath.toLowerCase().includes(pathString.toLowerCase())
-        );
-        if (!isPathAllowed) {
-            throw new Error(`Path ${targetPath} not in allowed paths`);
-        }
-    }
+    const cfg = buildConfig(input);
+    const target = parseTargetUrl(cfg.url);
+    validateTarget(target, cfg);
 
-    // Detect if this is a Docker registry request
-    const isDockerRequest = [
-        'quay.io',
-        'gcr.io',
-        'k8s.gcr.io',
-        'registry.k8s.io',
-        'ghcr.io',
-        'docker.cloudsmith.io',
-        'registry-1.docker.io'
-    ].includes(targetDomain);
-
-    // Prepare request headers
-    const requestHeaders = input.headers || {};
-    requestHeaders.Host = targetDomain;
-
-    // Check if target is AWS S3
-    const isS3 = targetDomain.includes('amazonaws.com');
-    if (isS3) {
-        requestHeaders['x-amz-content-sha256'] = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
-        const now = new Date().toISOString().replace(/[-:T]/g, '').slice(0, -5) + 'Z';
-        requestHeaders['x-amz-date'] = now;
-    }
-
-    // Make HTTP request using httpRequest helper
-    const response = await httpRequest(input.url, {
-        method: input.method || 'GET',
-        headers: requestHeaders
-    });
-
-    // Handle Docker authentication challenge (401)
-    if (isDockerRequest && response.status === 401) {
-        const wwwAuth = response.headers['www-authenticate'] || response.headers['WWW-Authenticate'];
-        if (wwwAuth) {
-            const authMatch = wwwAuth.match(/Bearer realm="([^"]+)",service="([^"]*)",scope="([^"]*)"/);
-            if (authMatch) {
-                const [, realm, service, scope] = authMatch;
-
-                // Get authentication token
-                const tokenUrl = `${realm}?service=${service || targetDomain}&scope=${scope}`;
-                const tokenResponse = await httpRequest(tokenUrl, {
-                    method: 'GET',
-                    headers: { 'Accept': 'application/json' }
-                });
-
-                if (tokenResponse.ok) {
-                    const tokenData = JSON.parse(tokenResponse.body);
-                    const token = tokenData.token || tokenData.access_token;
-
-                    if (token) {
-                        // Retry request with token
-                        requestHeaders.Authorization = `Bearer ${token}`;
-                        const authedResponse = await httpRequest(input.url, {
-                            method: input.method || 'GET',
-                            headers: requestHeaders
-                        });
-                        return processResponse(authedResponse, config.maxRedirects, requestHeaders, 0);
-                    }
-                }
-            }
-        }
-    }
-
-    // Handle redirects (302/307) for Docker registry
-    if (isDockerRequest && (response.status === 302 || response.status === 307)) {
-        const redirectUrl = response.headers.location || response.headers.Location;
-        if (redirectUrl) {
-            return await handleRedirect(redirectUrl, requestHeaders, config.maxRedirects, 1);
-        }
-    }
+    const response = await sendWithDockerAuthIfNeeded(target, cfg);
 
     return {
-        success: true,
+      success: true,
+      data: {
         status: response.status,
         statusText: response.ok ? 'OK' : 'Error',
         headers: response.headers,
         body: response.body,
-        metadata: {
-            targetDomain,
-            targetPath,
-            isDockerRequest,
-            isS3,
-            timestamp: new Date().toISOString()
-        }
+        targetDomain: target.domain,
+        targetPath: target.path,
+        isDockerRequest: DOCKER_HOSTS.has(target.domain),
+        isS3: target.domain.includes('amazonaws.com')
+      },
+      metadata: {
+        package: PACKAGE_NAME,
+        version: PACKAGE_VERSION,
+        redirects: response.redirectCount,
+        timestamp: new Date().toISOString()
+      }
     };
-}
-
-/**
- * Handle HTTP redirects recursively
- */
-async function handleRedirect(redirectUrl, headers, maxRedirects, currentRedirect) {
-    if (currentRedirect >= maxRedirects) {
-        throw new Error(`Max redirects (${maxRedirects}) exceeded`);
-    }
-
-    const domainMatch = redirectUrl.match(/^https?:\/\/([^\/]+)/);
-    const redirectDomain = domainMatch ? domainMatch[1] : '';
-    headers.Host = redirectDomain;
-
-    // Add AWS headers if redirecting to S3
-    if (redirectDomain.includes('amazonaws.com')) {
-        headers['x-amz-content-sha256'] = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
-        const now = new Date().toISOString().replace(/[-:T]/g, '').slice(0, -5) + 'Z';
-        headers['x-amz-date'] = now;
-    }
-
-    const response = await httpRequest(redirectUrl, {
-        method: 'GET',
-        headers
-    });
-
-    // Handle further redirects
-    if (response.status === 302 || response.status === 307) {
-        const nextRedirect = response.headers.location || response.headers.Location;
-        if (nextRedirect) {
-            return await handleRedirect(nextRedirect, headers, maxRedirects, currentRedirect + 1);
-        }
-    }
-
-    return processResponse(response, maxRedirects, headers, currentRedirect);
-}
-
-/**
- * Process final response
- */
-function processResponse(response, maxRedirects, headers, redirectCount) {
+  } catch (error) {
     return {
-        success: response.ok,
-        status: response.status,
-        statusText: response.ok ? 'OK' : 'Error',
-        headers: response.headers,
-        body: response.body,
-        metadata: {
-            redirectCount,
-            maxRedirects,
-            timestamp: new Date().toISOString()
-        }
+      success: false,
+      error: {
+        message: error?.message || 'Unknown proxy error',
+        code: 'CF_PROXY_ERROR',
+        type: error?.name || 'ProxyError'
+      },
+      metadata: {
+        package: PACKAGE_NAME,
+        version: PACKAGE_VERSION,
+        timestamp: new Date().toISOString()
+      }
     };
+  }
 }
 
-/**
- * HTTP request helper (uses Deno Core op_http_request)
- */
-async function httpRequest(url, options) {
-    try {
-        // Use Deno Core op system
-        const response = await Deno.core.ops.op_http_request(url, options);
+function buildConfig(input) {
+  const config = input.config || {};
+  const url = asNonEmptyString(input.url);
+  if (!url) {
+    throw new Error('url is required');
+  }
 
-        return {
-            ok: response.ok,
-            status: response.status,
-            statusText: response.ok ? 'OK' : 'Error',
-            headers: response.headers || {},
-            body: response.body || ''
-        };
-    } catch (error) {
-        throw new Error(`HTTP request failed: ${error.message}`);
+  return {
+    url,
+    method: String(input.method || 'GET').toUpperCase(),
+    headers: sanitizeHeaders(input.headers),
+    allowedHosts: Array.isArray(config.allowedHosts) && config.allowedHosts.length ? config.allowedHosts : DEFAULT_ALLOWED_HOSTS,
+    restrictPaths: Boolean(config.restrictPaths),
+    allowedPaths: Array.isArray(config.allowedPaths) && config.allowedPaths.length ? config.allowedPaths : ['library'],
+    maxRedirects: toBoundedInt(config.maxRedirects, 0, 20, 5)
+  };
+}
+
+function parseTargetUrl(url) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error('Invalid URL format');
+  }
+
+  return {
+    href: parsed.href,
+    domain: parsed.hostname,
+    path: parsed.pathname.replace(/^\//, '')
+  };
+}
+
+function validateTarget(target, cfg) {
+  if (!cfg.allowedHosts.includes(target.domain)) {
+    throw new Error(`Domain ${target.domain} is not allowed`);
+  }
+
+  if (!cfg.restrictPaths) return;
+
+  const pathLower = target.path.toLowerCase();
+  const allowed = cfg.allowedPaths.some((entry) => pathLower.includes(String(entry).toLowerCase()));
+  if (!allowed) {
+    throw new Error(`Path ${target.path || '/'} is not allowed`);
+  }
+}
+
+async function sendWithDockerAuthIfNeeded(target, cfg) {
+  const isDockerRequest = DOCKER_HOSTS.has(target.domain);
+  const baseHeaders = {
+    ...cfg.headers,
+    Host: target.domain
+  };
+
+  const first = await request(target.href, {
+    method: cfg.method,
+    headers: withS3Headers(baseHeaders, target.domain)
+  });
+
+  if (!isDockerRequest) {
+    return processRedirects(first, cfg.maxRedirects, withS3Headers(baseHeaders, target.domain), 0);
+  }
+
+  if (first.status === 401) {
+    const authHeader = first.headers['www-authenticate'] || first.headers['WWW-Authenticate'];
+    const token = await requestDockerToken(authHeader);
+    if (token) {
+      const authed = await request(target.href, {
+        method: cfg.method,
+        headers: withS3Headers({
+          ...baseHeaders,
+          Authorization: `Bearer ${token}`
+        }, target.domain)
+      });
+      return processRedirects(authed, cfg.maxRedirects, withS3Headers(baseHeaders, target.domain), 0);
     }
+  }
+
+  return processRedirects(first, cfg.maxRedirects, withS3Headers(baseHeaders, target.domain), 0);
 }
 
-// Export main function
-if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { main };
-} else {
-    globalThis.main = main;
+async function processRedirects(response, maxRedirects, headers, redirectCount) {
+  let current = response;
+  let redirects = redirectCount;
+
+  while ((current.status === 302 || current.status === 307) && redirects < maxRedirects) {
+    const nextUrl = current.headers.location || current.headers.Location;
+    if (!nextUrl) break;
+
+    const nextDomain = new URL(nextUrl).hostname;
+    current = await request(nextUrl, {
+      method: 'GET',
+      headers: withS3Headers({ ...headers, Host: nextDomain }, nextDomain)
+    });
+    redirects += 1;
+  }
+
+  if ((current.status === 302 || current.status === 307) && redirects >= maxRedirects) {
+    throw new Error(`Max redirects (${maxRedirects}) exceeded`);
+  }
+
+  return {
+    ...current,
+    redirectCount: redirects
+  };
 }
+
+async function requestDockerToken(wwwAuthHeader) {
+  if (!wwwAuthHeader) return null;
+
+  const match = wwwAuthHeader.match(/Bearer\s+realm="([^"]+)",service="([^"]*)",scope="([^"]*)"/i);
+  if (!match) return null;
+
+  const [, realm, service, scope] = match;
+  const tokenUrl = `${realm}?service=${encodeURIComponent(service)}&scope=${encodeURIComponent(scope)}`;
+  const tokenRes = await request(tokenUrl, {
+    method: 'GET',
+    headers: { Accept: 'application/json' }
+  });
+
+  if (!tokenRes.ok) return null;
+
+  let json;
+  try {
+    json = JSON.parse(tokenRes.body || '{}');
+  } catch {
+    return null;
+  }
+
+  return json.token || json.access_token || null;
+}
+
+function withS3Headers(headers, domain) {
+  if (!domain.includes('amazonaws.com')) {
+    return headers;
+  }
+
+  const now = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+  return {
+    ...headers,
+    'x-amz-content-sha256': 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+    'x-amz-date': now
+  };
+}
+
+async function request(url, init) {
+  if (globalThis.Deno?.core?.ops?.op_http_request) {
+    const denoRes = await Deno.core.ops.op_http_request(url, init);
+    return {
+      ok: Boolean(denoRes.ok),
+      status: Number(denoRes.status),
+      headers: denoRes.headers || {},
+      body: denoRes.body || ''
+    };
+  }
+
+  const res = await fetch(url, init);
+  const body = await res.text();
+  return {
+    ok: res.ok,
+    status: res.status,
+    headers: Object.fromEntries(res.headers.entries()),
+    body
+  };
+}
+
+function sanitizeHeaders(headers) {
+  if (!headers || typeof headers !== 'object' || Array.isArray(headers)) {
+    return {};
+  }
+  const result = {};
+  for (const [key, value] of Object.entries(headers)) {
+    if (value === undefined || value === null) continue;
+    result[String(key)] = String(value);
+  }
+  return result;
+}
+
+function toBoundedInt(value, min, max, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(num)));
+}
+
+function asNonEmptyString(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+}
+
+function ensureFetch() {
+  if (typeof fetch !== 'function') {
+    throw new Error('Global fetch API is unavailable. Node.js 18+ is required.');
+  }
+}
+
+execute;

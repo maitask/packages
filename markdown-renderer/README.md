@@ -7,7 +7,7 @@ Markdown to HTML converter with template support for Maitask.
 - Convert Markdown to HTML
 - Plain text extraction
 - Template rendering
-- Code blocks with syntax highlighting placeholders
+- Code blocks with language classes (compatible with Prism/Highlight.js)
 - Tables, lists, blockquotes
 - Links and images
 
@@ -52,6 +52,24 @@ echo '# Title' | maitask run @maitask/markdown-renderer --options '{
 - `format`: Output format (`html` or `plain`)
 - `template`: HTML template with `{{content}}` placeholder
 - `templateVars`: Variables for template substitution
+
+## Response Contract
+
+```json
+{
+  "success": true,
+  "data": {
+    "format": "html",
+    "content": "<h1 id=\"title\">Title</h1>"
+  },
+  "metadata": {
+    "package": "@maitask/markdown-renderer",
+    "length": 31,
+    "version": "0.1.0",
+    "timestamp": "2026-02-24T00:00:00.000Z"
+  }
+}
+```
 
 ## License
 

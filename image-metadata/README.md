@@ -34,17 +34,24 @@ maitask run @maitask/image-metadata --input image.png
 ```json
 {
   "success": true,
-  "format": "PNG",
-  "fileSize": 12345,
-  "dimensions": {
-    "width": 1920,
-    "height": 1080
+  "data": {
+    "format": "PNG",
+    "fileSize": 12345,
+    "dimensions": {
+      "width": 1920,
+      "height": 1080
+    },
+    "colorInfo": {
+      "bitDepth": 8,
+      "colorType": "RGBA"
+    },
+    "exif": null
   },
-  "colorInfo": {
-    "bitDepth": 8,
-    "colorType": "RGBA"
-  },
-  "exif": null
+  "metadata": {
+    "package": "@maitask/image-metadata",
+    "version": "0.1.0",
+    "timestamp": "2026-02-24T00:00:00.000Z"
+  }
 }
 ```
 

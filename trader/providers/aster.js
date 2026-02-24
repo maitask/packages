@@ -103,7 +103,7 @@ export function createAsterClient(config) {
                 limit: options.limit,
                 durationMs: options.durationMs,
                 market: 'aster',
-                endpointOverride: 'wss://fapi.asterdex.com/ws',
+                endpointOverride: 'wss://fstream.asterdex.com/ws',
             });
         },
     };

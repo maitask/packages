@@ -1,154 +1,407 @@
 /**
  * @maitask/claude
- * Anthropic Claude AI models integration
+ * Anthropic Claude integration using the Messages API.
  *
- * Supports Claude Sonnet 4.5, Claude Opus 4.1, Claude 3.5 Sonnet with Messages API.
- * Features: System prompts, multimodal inputs, streaming, temperature control.
- *
- * @version 0.1.0
- * @license MIT
+ * Production-focused behavior:
+ * - Strict input normalization
+ * - Timeout + retry with exponential backoff
+ * - Streaming SSE aggregation
+ * - Unified success/error envelope
  */
 
+const PACKAGE_NAME = '@maitask/claude';
+const PACKAGE_VERSION = '0.1.0';
 const API_ENDPOINT = 'https://api.anthropic.com/v1/messages';
 const API_VERSION = '2023-06-01';
 
-/**
- * Main execution function
- * @param {Object} input - Input configuration
- * @param {Array} input.messages - Chat messages array (text or multimodal with images)
- * @param {string} input.text - Simple text input (alternative to messages)
- * @param {string} input.model - Model name (default: claude-sonnet-4-5)
- * @param {string|Array} input.system - System prompt
- * @param {number} input.maxTokens - Maximum tokens to generate (required)
- * @param {Object} options - API configuration
- * @param {string} options.apiKey - Anthropic API key
- * @param {Object} context - Execution context
- * @returns {Object} AI response
- */
-async function execute(input, options = {}, context = {}) {
-    try {
-        // Validate API key
-        const apiKey = options.apiKey || options.api_key || options.ANTHROPIC_API_KEY;
-        if (!apiKey) {
-            throw new Error('Anthropic API key is required. Provide via options.apiKey');
-        }
+async function execute(input = {}, options = {}, context = {}) {
+  try {
+    ensureFetch();
 
-        // Validate max_tokens (required by Anthropic)
-        const maxTokens = input.maxTokens || input.max_tokens || options.maxTokens || options.max_tokens;
-        if (!maxTokens) {
-            throw new Error('max_tokens is required for Claude API. Provide via input.maxTokens');
-        }
+    const cfg = buildConfig(input, options, context);
+    const requestBody = buildRequestBody(input, cfg);
 
-        // Process messages - support text-only and multimodal content
-        let messages = input.messages || [];
-        if (input.text || input.prompt) {
-            // Simple text input
-            messages = [{ role: 'user', content: input.text || input.prompt }];
-        }
+    const response = await requestWithRetry(
+      API_ENDPOINT,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': cfg.apiKey,
+          'anthropic-version': API_VERSION
+        },
+        body: JSON.stringify(requestBody)
+      },
+      cfg.timeoutMs,
+      cfg.retries
+    );
 
-        // Build request body
-        const requestBody = {
-            model: input.model || options.model || 'claude-sonnet-4-5',
-            max_tokens: maxTokens,
-            messages: messages
-        };
-
-        // System prompt (separate from messages)
-        if (input.system || options.system) {
-            requestBody.system = input.system || options.system;
-        }
-
-        // Optional parameters
-        if (input.temperature !== undefined || options.temperature !== undefined) {
-            requestBody.temperature = input.temperature !== undefined ? input.temperature : options.temperature;
-        }
-
-        if (input.top_p !== undefined || options.top_p !== undefined) {
-            requestBody.top_p = input.top_p !== undefined ? input.top_p : options.top_p;
-        }
-
-        if (input.top_k !== undefined || options.top_k !== undefined) {
-            requestBody.top_k = input.top_k !== undefined ? input.top_k : options.top_k;
-        }
-
-        // Stream mode
-        const stream = input.stream || options.stream || false;
-        requestBody.stream = stream;
-
-        // Stop sequences
-        if (input.stop_sequences || options.stop_sequences) {
-            requestBody.stop_sequences = input.stop_sequences || options.stop_sequences;
-        }
-
-        // Metadata
-        if (input.metadata || options.metadata) {
-            requestBody.metadata = input.metadata || options.metadata;
-        }
-
-        // Make API request
-        const response = await fetch(API_ENDPOINT, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'x-api-key': apiKey,
-                'anthropic-version': API_VERSION
-            },
-            body: JSON.stringify(requestBody)
-        });
-
-        if (!response.ok) {
-            const errorText = await response.text();
-            let errorMessage;
-            try {
-                const errorJson = JSON.parse(errorText);
-                errorMessage = errorJson.error?.message || errorText;
-            } catch {
-                errorMessage = errorText;
-            }
-            throw new Error(`Claude API Error (${response.status}): ${errorMessage}`);
-        }
-
-        const result = await response.json();
-
-        // Extract content
-        const content = result.content?.[0]?.text || '';
-        const stopReason = result.stop_reason || '';
-
-        return {
-            success: true,
-            data: {
-                content: content,
-                stopReason: stopReason,
-                model: result.model,
-                usage: {
-                    inputTokens: result.usage?.input_tokens || 0,
-                    outputTokens: result.usage?.output_tokens || 0,
-                    totalTokens: (result.usage?.input_tokens || 0) + (result.usage?.output_tokens || 0)
-                },
-                raw: result
-            },
-            metadata: {
-                provider: 'anthropic',
-                timestamp: new Date().toISOString(),
-                version: '0.1.0',
-                model: result.model
-            }
-        };
-    } catch (error) {
-        return {
-            success: false,
-            error: {
-                message: error.message,
-                code: 'CLAUDE_API_ERROR',
-                type: error.constructor.name
-            },
-            metadata: {
-                provider: 'anthropic',
-                timestamp: new Date().toISOString(),
-                version: '0.1.0'
-            }
-        };
+    if (!response.ok) {
+      return buildApiError('CLAUDE_API_ERROR', 'Claude API request failed', response, cfg);
     }
+
+    if (cfg.stream) {
+      const streamResult = await parseClaudeStream(response);
+      return buildSuccess(
+        {
+          content: streamResult.content,
+          stopReason: streamResult.stopReason,
+          model: cfg.model,
+          usage: streamResult.usage,
+          chunks: streamResult.chunks
+        },
+        cfg
+      );
+    }
+
+    const result = await response.json();
+    const text = extractClaudeText(result.content);
+
+    return buildSuccess(
+      {
+        content: text,
+        stopReason: result.stop_reason || null,
+        model: result.model || cfg.model,
+        usage: {
+          inputTokens: Number(result.usage?.input_tokens || 0),
+          outputTokens: Number(result.usage?.output_tokens || 0),
+          totalTokens: Number(result.usage?.input_tokens || 0) + Number(result.usage?.output_tokens || 0)
+        },
+        raw: result
+      },
+      cfg
+    );
+  } catch (error) {
+    return buildError('CLAUDE_API_ERROR', error, {
+      provider: 'anthropic'
+    });
+  }
+}
+
+function buildConfig(input, options, context) {
+  const apiKey =
+    options.apiKey || options.api_key || input.apiKey || input.api_key || context?.secrets?.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    throw new Error('Anthropic API key is required. Provide via options.apiKey or context.secrets.ANTHROPIC_API_KEY');
+  }
+
+  return {
+    apiKey,
+    model: String(input.model || options.model || 'claude-sonnet-4-5').trim(),
+    maxTokens: readPositiveInt(input.maxTokens ?? input.max_tokens ?? options.maxTokens ?? options.max_tokens, 1024),
+    stream: Boolean(input.stream ?? options.stream ?? false),
+    timeoutMs: readBoundedInt(input.timeoutMs ?? options.timeoutMs, 1000, 300000, 60000),
+    retries: readBoundedInt(input.retries ?? options.retries, 0, 5, 2)
+  };
+}
+
+function buildRequestBody(input, cfg) {
+  const messages = normalizeMessages(input);
+  if (!messages.length) {
+    throw new Error('messages or text/prompt is required');
+  }
+
+  const body = {
+    model: cfg.model,
+    max_tokens: cfg.maxTokens,
+    messages,
+    stream: cfg.stream
+  };
+
+  if (input.system !== undefined) body.system = input.system;
+  if (input.temperature !== undefined) body.temperature = readNumber(input.temperature, undefined);
+  if (input.top_p !== undefined) body.top_p = readNumber(input.top_p, undefined);
+  if (input.top_k !== undefined) body.top_k = readNumber(input.top_k, undefined);
+  if (Array.isArray(input.stop_sequences)) body.stop_sequences = input.stop_sequences;
+
+  return body;
+}
+
+function normalizeMessages(input) {
+  if (Array.isArray(input.messages) && input.messages.length > 0) {
+    return input
+      .messages
+      .map((message) => {
+        if (!message || typeof message !== 'object') return null;
+        const role = asNonEmptyString(message.role) || 'user';
+        if (typeof message.content === 'string') {
+          const text = message.content.trim();
+          if (!text) return null;
+          return { role, content: text };
+        }
+        if (Array.isArray(message.content)) {
+          return { role, content: message.content };
+        }
+        return null;
+      })
+      .filter(Boolean);
+  }
+
+  const text = asNonEmptyString(input.text || input.prompt);
+  if (!text) return [];
+  return [{ role: 'user', content: text }];
+}
+
+function extractClaudeText(content) {
+  if (!Array.isArray(content)) return '';
+  return content
+    .filter((entry) => entry?.type === 'text' && typeof entry?.text === 'string')
+    .map((entry) => entry.text)
+    .join('');
+}
+
+async function parseClaudeStream(response) {
+  const chunks = [];
+  let content = '';
+  let stopReason = null;
+  const usage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+
+  await parseSSE(response, (event) => {
+    const payload = event.data;
+    if (!payload || typeof payload !== 'object') return;
+
+    if (payload.type === 'message_start') {
+      usage.inputTokens = Number(payload.message?.usage?.input_tokens || usage.inputTokens);
+      usage.outputTokens = Number(payload.message?.usage?.output_tokens || usage.outputTokens);
+      return;
+    }
+
+    if (payload.type === 'content_block_delta') {
+      const text = payload.delta?.text || payload.delta?.partial_json || '';
+      if (text) {
+        content += text;
+        chunks.push(text);
+      }
+      return;
+    }
+
+    if (payload.type === 'message_delta') {
+      stopReason = payload.delta?.stop_reason || stopReason;
+      if (payload.usage?.output_tokens !== undefined) {
+        usage.outputTokens = Number(payload.usage.output_tokens || usage.outputTokens);
+      }
+      return;
+    }
+
+    if (payload.type === 'message_stop' && payload.stop_reason) {
+      stopReason = payload.stop_reason;
+    }
+  });
+
+  usage.totalTokens = usage.inputTokens + usage.outputTokens;
+  return { content, stopReason, usage, chunks };
+}
+
+async function requestWithRetry(url, init, timeoutMs, retries) {
+  let attempt = 0;
+  while (true) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, { ...init, signal: controller.signal });
+      if (response.ok || !shouldRetryStatus(response.status) || attempt >= retries) {
+        return response;
+      }
+
+      const waitMs = resolveRetryDelay(attempt, response.headers.get('retry-after'));
+      await sleep(waitMs);
+      attempt += 1;
+    } catch (error) {
+      if (error?.name === 'AbortError') {
+        if (attempt >= retries) {
+          throw new Error(`Request timed out after ${timeoutMs}ms`);
+        }
+        await sleep(resolveRetryDelay(attempt));
+        attempt += 1;
+        continue;
+      }
+
+      if (attempt >= retries) {
+        throw error;
+      }
+
+      await sleep(resolveRetryDelay(attempt));
+      attempt += 1;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+}
+
+function shouldRetryStatus(status) {
+  return status === 408 || status === 409 || status === 425 || status === 429 || status >= 500;
+}
+
+function resolveRetryDelay(attempt, retryAfterHeader) {
+  const retryAfterSeconds = Number(retryAfterHeader);
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+    return Math.min(retryAfterSeconds * 1000, 10000);
+  }
+  return Math.min(500 * Math.pow(2, attempt), 5000);
+}
+
+async function parseSSE(response, onEvent) {
+  if (!response.body || typeof response.body.getReader !== 'function') {
+    throw new Error('Streaming response body is unavailable');
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const frames = buffer.split(/\r?\n\r?\n/);
+    buffer = frames.pop() || '';
+
+    for (const frame of frames) {
+      const event = parseSSEEvent(frame);
+      if (!event) continue;
+      onEvent(event);
+    }
+  }
+
+  buffer += decoder.decode();
+  const tail = buffer.trim();
+  if (tail) {
+    const event = parseSSEEvent(tail);
+    if (event) onEvent(event);
+  }
+}
+
+function parseSSEEvent(frame) {
+  const lines = frame.split(/\r?\n/);
+  let eventName = 'message';
+  const dataLines = [];
+
+  for (const line of lines) {
+    if (!line || line.startsWith(':')) continue;
+    if (line.startsWith('event:')) {
+      eventName = line.slice(6).trim() || eventName;
+      continue;
+    }
+    if (line.startsWith('data:')) {
+      dataLines.push(line.slice(5).trimStart());
+    }
+  }
+
+  if (!dataLines.length) return null;
+  const dataText = dataLines.join('\n').trim();
+  if (!dataText || dataText === '[DONE]') return null;
+
+  try {
+    return { event: eventName, data: JSON.parse(dataText) };
+  } catch {
+    return { event: eventName, data: { raw: dataText } };
+  }
+}
+
+async function buildApiError(code, fallbackMessage, response, cfg) {
+  let bodyText = '';
+  try {
+    bodyText = await response.text();
+  } catch {
+    bodyText = '';
+  }
+
+  let parsed;
+  try {
+    parsed = bodyText ? JSON.parse(bodyText) : null;
+  } catch {
+    parsed = null;
+  }
+
+  const message =
+    parsed?.error?.message ||
+    parsed?.message ||
+    bodyText ||
+    `${fallbackMessage} (${response.status})`;
+
+  return {
+    success: false,
+    error: {
+      message,
+      code,
+      type: 'ClaudeAPIError',
+      status: response.status,
+      retriable: shouldRetryStatus(response.status)
+    },
+    metadata: {
+      package: PACKAGE_NAME,
+      version: PACKAGE_VERSION,
+      provider: 'anthropic',
+      model: cfg.model,
+      timestamp: new Date().toISOString()
+    }
+  };
+}
+
+function buildSuccess(data, cfg) {
+  return {
+    success: true,
+    data,
+    metadata: {
+      package: PACKAGE_NAME,
+      version: PACKAGE_VERSION,
+      provider: 'anthropic',
+      model: cfg.model,
+      timestamp: new Date().toISOString()
+    }
+  };
+}
+
+function buildError(code, error, meta = {}) {
+  return {
+    success: false,
+    error: {
+      message: error?.message || 'Unknown error',
+      code,
+      type: error?.name || 'Error'
+    },
+    metadata: {
+      package: PACKAGE_NAME,
+      version: PACKAGE_VERSION,
+      timestamp: new Date().toISOString(),
+      ...meta
+    }
+  };
+}
+
+function readNumber(value, fallback) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : fallback;
+}
+
+function readPositiveInt(value, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0) return fallback;
+  return Math.floor(num);
+}
+
+function readBoundedInt(value, min, max, fallback) {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(num)));
+}
+
+function asNonEmptyString(value) {
+  if (value === undefined || value === null) return '';
+  return String(value).trim();
+}
+
+function ensureFetch() {
+  if (typeof fetch !== 'function') {
+    throw new Error('Global fetch API is unavailable. Node.js 18+ is required.');
+  }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 execute;

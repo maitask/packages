@@ -50,6 +50,33 @@ console.log(result.data.content);
 ### Options
 
 - `apiKey` - Google AI API key (required)
+- `timeoutMs` - Request timeout in milliseconds (default: `60000`)
+- `retries` - Retry count for transient failures (default: `2`)
+
+## Return Envelope
+
+```json
+{
+  "success": true,
+  "data": {
+    "content": "model output",
+    "finishReason": "STOP",
+    "model": "gemini-2.5-pro",
+    "usage": {
+      "promptTokens": 10,
+      "completionTokens": 50,
+      "totalTokens": 60
+    }
+  },
+  "metadata": {
+    "package": "@maitask/gemini",
+    "version": "0.1.0",
+    "provider": "google",
+    "model": "gemini-2.5-pro",
+    "timestamp": "2026-02-24T00:00:00.000Z"
+  }
+}
+```
 
 ## Examples
 

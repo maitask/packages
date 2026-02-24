@@ -53,6 +53,33 @@ console.log(result.data.content);
 ### Options
 
 - `apiKey` - Anthropic API key (required)
+- `timeoutMs` - Request timeout in milliseconds (default: `60000`)
+- `retries` - Retry count for transient failures (default: `2`)
+
+## Return Envelope
+
+```json
+{
+  "success": true,
+  "data": {
+    "content": "model output",
+    "stopReason": "end_turn",
+    "model": "claude-sonnet-4-5",
+    "usage": {
+      "inputTokens": 20,
+      "outputTokens": 80,
+      "totalTokens": 100
+    }
+  },
+  "metadata": {
+    "package": "@maitask/claude",
+    "version": "0.1.0",
+    "provider": "anthropic",
+    "model": "claude-sonnet-4-5",
+    "timestamp": "2026-02-24T00:00:00.000Z"
+  }
+}
+```
 
 ## Examples
 

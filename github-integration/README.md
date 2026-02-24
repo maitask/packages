@@ -165,3 +165,12 @@ Error response:
   "error": "error details"
 }
 ```
+
+## Response Contract (Current)
+
+The package uses a standardized envelope:
+
+- Success: `{ success: true, data: {...}, metadata: {...} }`
+- Failure: `{ success: false, error: { message, code, type }, metadata: {...} }`
+
+Legacy `message` and string `error` fields are deprecated.

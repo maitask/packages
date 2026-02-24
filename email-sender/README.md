@@ -40,7 +40,7 @@ const result = execute({
 });
 
 console.log(result.success); // true
-console.log(result.data.message_id); // Email message ID
+console.log(result.metadata.message_id); // Email message ID
 ```
 
 ### Using Templates
@@ -241,8 +241,8 @@ const result = execute({
 ```javascript
 {
   success: true,
-  message: "Email sent successfully via sendgrid",
   data: {
+    message: "Email sent successfully via sendgrid",
     provider: "sendgrid",
     from: "sender@example.com",
     to: ["recipient1@example.com", "recipient2@example.com"],
@@ -318,7 +318,7 @@ const sendEmailWithRetry = async (emailConfig, maxRetries = 3) => {
       const result = execute(emailConfig);
 
       if (result.success) {
-        console.log('Email sent successfully:', result.data.message_id);
+        console.log('Email sent successfully:', result.metadata.message_id);
         return result;
       } else {
         console.log(`Attempt ${attempt} failed:`, result.error.message);

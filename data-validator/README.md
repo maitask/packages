@@ -164,7 +164,6 @@ const result = execute(data, {
 ```javascript
 {
   success: true,
-  message: "Validation completed: 10/10 items valid",
   data: {
     summary: {
       total_count: 10,
@@ -185,9 +184,11 @@ const result = execute(data, {
       }
     ],
     schema_used: true,
-    validation_mode: "strict"
+    validation_mode: "strict",
+    has_errors: false
   },
   metadata: {
+    package: "@maitask/data-validator",
     validated_at: "2023-01-15T10:30:00.000Z",
     validation_mode: "strict",
     schema_source: "inline",
@@ -208,6 +209,7 @@ const result = execute(data, {
     details: null
   },
   metadata: {
+    package: "@maitask/data-validator",
     validated_at: "2023-01-15T10:30:00.000Z",
     version: "0.1.0"
   }

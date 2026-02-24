@@ -53,6 +53,34 @@ console.log(result.data.content);
 ### Options
 
 - `apiKey` - DeepSeek API key (required)
+- `timeoutMs` - Request timeout in milliseconds (default: `60000`)
+- `retries` - Retry count for transient failures (default: `2`)
+
+## Return Envelope
+
+```json
+{
+  "success": true,
+  "data": {
+    "content": "final answer",
+    "reasoningContent": "optional reasoning stream",
+    "finishReason": "stop",
+    "model": "deepseek-chat",
+    "usage": {
+      "promptTokens": 10,
+      "completionTokens": 80,
+      "totalTokens": 90
+    }
+  },
+  "metadata": {
+    "package": "@maitask/deepseek",
+    "version": "0.1.0",
+    "provider": "deepseek",
+    "model": "deepseek-chat",
+    "timestamp": "2026-02-24T00:00:00.000Z"
+  }
+}
+```
 
 ## Examples
 
@@ -83,8 +111,8 @@ const result = await execute(
   { apiKey: 'sk-...' }
 );
 
-// Reasoner model includes reasoning_content showing thought process
-console.log(result.data.reasoning);
+// Reasoner model includes reasoningContent showing thought process
+console.log(result.data.reasoningContent);
 console.log(result.data.content);
 ```
 

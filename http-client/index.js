@@ -36,15 +36,33 @@ async function execute(input, options = {}, context = {}) {
 
         const raw = await response.text();
         const parsed = tryParseJson(raw);
+        const data = {
+          status: response.status,
+          statusText: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          body: parsed == null ? raw : parsed
+        };
+
+        if (!response.ok) {
+          return {
+            success: false,
+            data,
+            error: {
+              message: `HTTP request failed with status ${response.status}`,
+              code: 'HTTP_CLIENT_RESPONSE_ERROR',
+              type: 'HttpClientResponseError'
+            },
+            metadata: {
+              attempt: attempt + 1,
+              timestamp: new Date().toISOString(),
+              version: '0.1.0'
+            }
+          };
+        }
 
         return {
-          success: response.ok,
-          data: {
-            status: response.status,
-            statusText: response.statusText,
-            headers: Object.fromEntries(response.headers.entries()),
-            body: parsed == null ? raw : parsed
-          },
+          success: true,
+          data,
           metadata: {
             attempt: attempt + 1,
             timestamp: new Date().toISOString(),
