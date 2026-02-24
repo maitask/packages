@@ -1,0 +1,25 @@
+{
+  "name": "@maitask/redis-cache",
+  "version": "0.1.0",
+  "description": "Redis cache operations via HTTP - get, set, delete, expire",
+  "main": "index.js",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "keywords": [
+    "maitask",
+    "redis",
+    "cache",
+    "storage",
+    "key-value"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "Redis Cache",
+  "category": "Export & Storage",
+  "maitask": {
+    "display_name": "Redis Cache",
+    "category": "Export & Storage"
+  }
+}

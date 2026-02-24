@@ -1,0 +1,15 @@
+{
+  "data": [
+    {
+      "revenue": 120,
+      "month": "2026-01"
+    },
+    {
+      "revenue": 136,
+      "month": "2026-02"
+    }
+  ],
+  "task": "trends",
+  "provider": "claude",
+  "apiKey": "sk-xxx"
+}

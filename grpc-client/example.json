@@ -1,0 +1,9 @@
+{
+  "host": "grpc-gateway.internal",
+  "port": 8080,
+  "service": "user.v1.UserService",
+  "method": "GetUser",
+  "body": {
+    "id": "42"
+  }
+}

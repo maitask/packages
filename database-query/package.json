@@ -1,0 +1,26 @@
+{
+  "name": "@maitask/database-query",
+  "version": "0.1.0",
+  "description": "Execute SQL queries against PostgreSQL, MySQL, or SQLite via HTTP data APIs",
+  "main": "index.js",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "keywords": [
+    "maitask",
+    "database",
+    "sql",
+    "postgresql",
+    "mysql",
+    "query"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "Database Query",
+  "category": "Web & API Integration",
+  "maitask": {
+    "display_name": "Database Query",
+    "category": "Web & API Integration"
+  }
+}

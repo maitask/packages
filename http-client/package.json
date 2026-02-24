@@ -1,7 +1,7 @@
 {
-  "name": "@maitask/http-request",
-  "version": "1.0.0",
-  "description": "Advanced HTTP client for Maitask with retries, timeouts, and validation",
+  "name": "@maitask/http-client",
+  "version": "0.1.0",
+  "description": "HTTP client with retry, timeout, and auth support",
   "main": "index.js",
   "type": "module",
   "author": "Maitask Team <team@maitask.com>",
@@ -11,16 +11,15 @@
     "http",
     "request",
     "api",
-    "rest",
-    "fetch"
+    "client"
   ],
   "engines": {
     "node": ">=18.0.0"
   },
-  "display_name": "HTTP Request",
+  "display_name": "HTTP Client",
   "category": "Web & API Integration",
   "maitask": {
-    "display_name": "HTTP Request",
+    "display_name": "HTTP Client",
     "category": "Web & API Integration"
   }
 }

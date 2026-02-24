@@ -1,0 +1,7 @@
+{
+  "prompt": "A minimalistic poster of a robotic crane at sunset",
+  "provider": "openai",
+  "model": "dall-e-3",
+  "size": "1024x1024",
+  "apiKey": "sk-xxx"
+}

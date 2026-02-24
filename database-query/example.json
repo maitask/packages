@@ -1,0 +1,11 @@
+{
+  "type": "postgresql",
+  "host": "db-proxy.internal",
+  "port": 5432,
+  "database": "analytics",
+  "query": "SELECT id, email FROM users WHERE id = $1",
+  "params": [
+    42
+  ],
+  "timeoutMs": 15000
+}

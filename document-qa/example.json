@@ -1,0 +1,6 @@
+{
+  "document": "SLA: P1 incident response <= 15 minutes.",
+  "question": "What is the P1 response target?",
+  "provider": "openai",
+  "apiKey": "sk-xxx"
+}

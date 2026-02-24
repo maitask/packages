@@ -1,0 +1,8 @@
+{
+  "url": "https://api.example.com/graphql",
+  "query": "query User($id: ID!) { user(id: $id) { id email } }",
+  "variables": {
+    "id": "42"
+  },
+  "timeoutMs": 20000
+}

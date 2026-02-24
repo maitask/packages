@@ -1,0 +1,25 @@
+{
+  "name": "@maitask/kafka-publisher",
+  "version": "0.1.0",
+  "description": "Publish messages to Kafka topics via REST proxy",
+  "main": "index.js",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "keywords": [
+    "maitask",
+    "kafka",
+    "messaging",
+    "events",
+    "streaming"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "Kafka Publisher",
+  "category": "Communications & Automation",
+  "maitask": {
+    "display_name": "Kafka Publisher",
+    "category": "Communications & Automation"
+  }
+}

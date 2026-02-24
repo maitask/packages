@@ -28,22 +28,22 @@ Adding a venue is as simple as dropping a file into `providers/` and registering
 
 ## Inputs
 
-| Field | Description |
-|-------|-------------|
-| `action` | `analyze` (default), `execute`, `status`, `cancel`, or `backtest`. |
-| `symbol` | Trading pair, e.g., `BTCUSDT`. |
-| `interval` | Kline interval (`5m`, `1h`, etc.). |
-| `strategy` | Strategy config – choose `type` from `sma-crossover`, `rsi-mean-reversion`, `momentum-breakout`, or `manual`. |
-| `decision` | Optional manual decision `{ signal, confidence, reason }` that skips indicator logic. |
-| `quantity` / `quoteQuantity` | Absolute size (base) or notional amount in quote currency. If omitted, the package sizes positions using `positionRiskPct`. |
-| `execution` | Order parameters: `{ type, timeInForce, reduceOnly, quantityPrecision, orderId/clientOrderId }`. |
-| `risk` | `{ maxDailyLoss, maxDrawdown, positionRiskPct, stopLossPct, takeProfitPct, allowLong, allowShort }`. |
-| `performance` | Live metrics (`dailyLoss`, `drawdown`, `equity`) used for guardrails. |
-| `exchange` | `{ provider: 'binance' \\ 'aster' \\ 'okx' \\ 'paper', market?, apiKey, apiSecret, testnet?, passphrase? }`. Keys can also live in `context.secrets`. |
-| `exchange.market` | Market flavor per provider (`'futures'`, `'spot'`, `'swap'`). Defaults to `'futures'` for Binance, `'swap'` for OKX, and is ignored for the paper simulator. |
-| `stream` | Streaming preferences `{ channel, interval, limit, durationMs }` used by the `stream` action. |
-| `paperState` | Persisted simulator state from the previous invocation (positions, balance, equity curve). |
-| `backtest` | Optional `{ candles, capital }` override for the `backtest` action. |
+| Field                        | Description                                                                                                                                                  |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `action`                     | `analyze` (default), `execute`, `status`, `cancel`, or `backtest`.                                                                                           |
+| `symbol`                     | Trading pair, e.g., `BTCUSDT`.                                                                                                                               |
+| `interval`                   | Kline interval (`5m`, `1h`, etc.).                                                                                                                           |
+| `strategy`                   | Strategy config – choose `type` from `sma-crossover`, `rsi-mean-reversion`, `momentum-breakout`, or `manual`.                                                |
+| `decision`                   | Optional manual decision `{ signal, confidence, reason }` that skips indicator logic.                                                                        |
+| `quantity` / `quoteQuantity` | Absolute size (base) or notional amount in quote currency. If omitted, the package sizes positions using `positionRiskPct`.                                  |
+| `execution`                  | Order parameters: `{ type, timeInForce, reduceOnly, quantityPrecision, orderId/clientOrderId }`.                                                             |
+| `risk`                       | `{ maxDailyLoss, maxDrawdown, positionRiskPct, stopLossPct, takeProfitPct, allowLong, allowShort }`.                                                         |
+| `performance`                | Live metrics (`dailyLoss`, `drawdown`, `equity`) used for guardrails.                                                                                        |
+| `exchange`                   | `{ provider: 'binance' \\ 'aster' \\ 'okx' \\ 'paper', market?, apiKey, apiSecret, testnet?, passphrase? }`. Keys can also live in `context.secrets`.        |
+| `exchange.market`            | Market flavor per provider (`'futures'`, `'spot'`, `'swap'`). Defaults to `'futures'` for Binance, `'swap'` for OKX, and is ignored for the paper simulator. |
+| `stream`                     | Streaming preferences `{ channel, interval, limit, durationMs }` used by the `stream` action.                                                                |
+| `paperState`                 | Persisted simulator state from the previous invocation (positions, balance, equity curve).                                                                   |
+| `backtest`                   | Optional `{ candles, capital }` override for the `backtest` action.                                                                                          |
 
 ## Supported Providers
 

@@ -1,0 +1,26 @@
+{
+  "name": "@maitask/s3-storage",
+  "version": "0.1.0",
+  "description": "S3-compatible storage operations: upload, download, list, delete",
+  "main": "index.js",
+  "type": "module",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "keywords": [
+    "maitask",
+    "s3",
+    "storage",
+    "aws",
+    "upload",
+    "download"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "S3 Storage",
+  "category": "Export & Storage",
+  "maitask": {
+    "display_name": "S3 Storage",
+    "category": "Export & Storage"
+  }
+}

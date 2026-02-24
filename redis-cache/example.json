@@ -1,0 +1,9 @@
+{
+  "operation": "set",
+  "key": "session:user:42",
+  "value": {
+    "role": "admin"
+  },
+  "ttl": 3600,
+  "proxyUrl": "https://redis-proxy.internal/redis"
+}

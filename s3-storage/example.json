@@ -1,0 +1,6 @@
+{
+  "operation": "upload",
+  "presignedUrl": "https://bucket.s3.amazonaws.com/path/file.txt?...",
+  "body": "hello world",
+  "timeoutMs": 30000
+}

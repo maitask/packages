@@ -162,7 +162,7 @@ function createEmptyResponse(input, config) {
             delimiter: config.delimiter,
             hasHeaders: config.headers !== false,
             parsedAt: new Date().toISOString(),
-            version: '1.0.0'
+            version: '0.1.0'
         }
     };
 }

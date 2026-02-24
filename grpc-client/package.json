@@ -1,26 +1,25 @@
 {
-  "name": "@maitask/http-request",
-  "version": "1.0.0",
-  "description": "Advanced HTTP client for Maitask with retries, timeouts, and validation",
+  "name": "@maitask/grpc-client",
+  "version": "0.1.0",
+  "description": "gRPC client via HTTP/JSON transcoding - call gRPC services over HTTP",
   "main": "index.js",
   "type": "module",
   "author": "Maitask Team <team@maitask.com>",
   "license": "MIT",
   "keywords": [
     "maitask",
-    "http",
-    "request",
+    "grpc",
+    "rpc",
     "api",
-    "rest",
-    "fetch"
+    "protobuf"
   ],
   "engines": {
     "node": ">=18.0.0"
   },
-  "display_name": "HTTP Request",
+  "display_name": "gRPC Client",
   "category": "Web & API Integration",
   "maitask": {
-    "display_name": "HTTP Request",
+    "display_name": "gRPC Client",
     "category": "Web & API Integration"
   }
 }

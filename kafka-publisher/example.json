@@ -1,0 +1,15 @@
+{
+  "proxyUrl": "https://kafka-proxy.internal",
+  "topic": "user.events",
+  "messages": [
+    {
+      "event": "signup",
+      "user_id": "u-1"
+    },
+    {
+      "event": "login",
+      "user_id": "u-1"
+    }
+  ],
+  "key": "u-1"
+}
