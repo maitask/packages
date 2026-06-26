@@ -206,54 +206,374 @@ function validateItem(item, schema, config, index) {
 }
 
 function validateAgainstSchema(item, schema) {
-    const errors = [];
-
     try {
-        // Basic JSON Schema validation (simplified)
-        if (schema.type && typeof item !== schema.type) {
-            errors.push({
-                field: 'root',
-                rule: 'type',
-                message: `Expected type ${schema.type}, got ${typeof item}`,
-                severity: 'error'
-            });
-        }
-
-        if (schema.properties && typeof item === 'object') {
-            Object.keys(schema.properties).forEach(key => {
-                const propSchema = schema.properties[key];
-                const value = item[key];
-
-                if (propSchema.type && value !== undefined && typeof value !== propSchema.type) {
-                    errors.push({
-                        field: key,
-                        rule: 'type',
-                        message: `Expected ${key} to be ${propSchema.type}, got ${typeof value}`,
-                        severity: 'error'
-                    });
-                }
-
-                if (propSchema.required && value === undefined) {
-                    errors.push({
-                        field: key,
-                        rule: 'required',
-                        message: `Required field ${key} is missing`,
-                        severity: 'error'
-                    });
-                }
-            });
-        }
-
+        return validateSchemaValue(item, schema, 'root', schema);
     } catch (error) {
+        const errors = [];
         errors.push({
             field: 'schema',
             rule: 'validation',
             message: `Schema validation error: ${error.message}`,
             severity: 'error'
         });
+        return errors;
+    }
+}
+
+function validateSchemaValue(value, schema, path, rootSchema) {
+    if (schema === true || schema === undefined || schema === null) return [];
+    if (schema === false) {
+        return [schemaError(path, 'schema', 'Value is not allowed by schema')];
+    }
+    if (typeof schema !== 'object') {
+        return [schemaError(path, 'schema', 'Schema must be an object or boolean')];
+    }
+
+    const resolvedSchema = schema.$ref ? resolveSchemaRef(rootSchema, schema.$ref) : schema;
+    if (resolvedSchema !== schema) {
+        return validateSchemaValue(value, resolvedSchema, path, rootSchema);
+    }
+
+    const errors = [];
+
+    if (resolvedSchema.type !== undefined && !matchesSchemaType(value, resolvedSchema.type)) {
+        errors.push(schemaError(
+            path,
+            'type',
+            `Expected type ${formatExpectedTypes(resolvedSchema.type)}, got ${jsonTypeOf(value)}`
+        ));
+        return errors;
+    }
+
+    if (resolvedSchema.const !== undefined && !deepEqual(value, resolvedSchema.const)) {
+        errors.push(schemaError(path, 'const', 'Value does not match const'));
+    }
+
+    if (Array.isArray(resolvedSchema.enum) && !resolvedSchema.enum.some(entry => deepEqual(value, entry))) {
+        errors.push(schemaError(path, 'enum', 'Value is not one of the allowed enum values'));
+    }
+
+    if (resolvedSchema.allOf) {
+        for (const subSchema of ensureArray(resolvedSchema.allOf)) {
+            errors.push(...validateSchemaValue(value, subSchema, path, rootSchema));
+        }
+    }
+
+    if (resolvedSchema.anyOf) {
+        const candidates = ensureArray(resolvedSchema.anyOf);
+        if (!candidates.some(subSchema => validateSchemaValue(value, subSchema, path, rootSchema).length === 0)) {
+            errors.push(schemaError(path, 'anyOf', 'Value does not match any allowed schema'));
+        }
+    }
+
+    if (resolvedSchema.oneOf) {
+        const candidates = ensureArray(resolvedSchema.oneOf);
+        const matches = candidates.filter(subSchema => validateSchemaValue(value, subSchema, path, rootSchema).length === 0);
+        if (matches.length !== 1) {
+            errors.push(schemaError(path, 'oneOf', `Value must match exactly one schema, matched ${matches.length}`));
+        }
+    }
+
+    if (resolvedSchema.not && validateSchemaValue(value, resolvedSchema.not, path, rootSchema).length === 0) {
+        errors.push(schemaError(path, 'not', 'Value matches a schema it must not match'));
+    }
+
+    if (typeof value === 'string') {
+        validateStringConstraints(value, resolvedSchema, path, errors);
+    } else if (typeof value === 'number' && Number.isFinite(value)) {
+        validateNumberConstraints(value, resolvedSchema, path, errors);
+    } else if (Array.isArray(value)) {
+        validateArrayConstraints(value, resolvedSchema, path, rootSchema, errors);
+    } else if (isPlainObject(value)) {
+        validateObjectConstraints(value, resolvedSchema, path, rootSchema, errors);
     }
 
     return errors;
+}
+
+function validateStringConstraints(value, schema, path, errors) {
+    if (schema.minLength !== undefined && value.length < schema.minLength) {
+        errors.push(schemaError(path, 'minLength', `String length must be at least ${schema.minLength}`));
+    }
+    if (schema.maxLength !== undefined && value.length > schema.maxLength) {
+        errors.push(schemaError(path, 'maxLength', `String length must be at most ${schema.maxLength}`));
+    }
+    if (schema.pattern !== undefined) {
+        const regex = new RegExp(schema.pattern);
+        if (!regex.test(value)) {
+            errors.push(schemaError(path, 'pattern', `String does not match pattern ${schema.pattern}`));
+        }
+    }
+    if (schema.format && !matchesFormat(value, schema.format)) {
+        errors.push(schemaError(path, 'format', `String does not match format ${schema.format}`));
+    }
+}
+
+function validateNumberConstraints(value, schema, path, errors) {
+    if (schema.minimum !== undefined && value < schema.minimum) {
+        errors.push(schemaError(path, 'minimum', `Number must be greater than or equal to ${schema.minimum}`));
+    }
+    if (schema.maximum !== undefined && value > schema.maximum) {
+        errors.push(schemaError(path, 'maximum', `Number must be less than or equal to ${schema.maximum}`));
+    }
+    if (schema.exclusiveMinimum !== undefined) {
+        const limit = schema.exclusiveMinimum === true ? schema.minimum : schema.exclusiveMinimum;
+        if (limit !== undefined && value <= limit) {
+            errors.push(schemaError(path, 'exclusiveMinimum', `Number must be greater than ${limit}`));
+        }
+    }
+    if (schema.exclusiveMaximum !== undefined) {
+        const limit = schema.exclusiveMaximum === true ? schema.maximum : schema.exclusiveMaximum;
+        if (limit !== undefined && value >= limit) {
+            errors.push(schemaError(path, 'exclusiveMaximum', `Number must be less than ${limit}`));
+        }
+    }
+    if (schema.multipleOf !== undefined && !isMultipleOf(value, schema.multipleOf)) {
+        errors.push(schemaError(path, 'multipleOf', `Number must be a multiple of ${schema.multipleOf}`));
+    }
+}
+
+function validateArrayConstraints(value, schema, path, rootSchema, errors) {
+    if (schema.minItems !== undefined && value.length < schema.minItems) {
+        errors.push(schemaError(path, 'minItems', `Array must contain at least ${schema.minItems} item(s)`));
+    }
+    if (schema.maxItems !== undefined && value.length > schema.maxItems) {
+        errors.push(schemaError(path, 'maxItems', `Array must contain at most ${schema.maxItems} item(s)`));
+    }
+    if (schema.uniqueItems && !arrayItemsUnique(value)) {
+        errors.push(schemaError(path, 'uniqueItems', 'Array items must be unique'));
+    }
+
+    if (Array.isArray(schema.items)) {
+        schema.items.forEach((itemSchema, index) => {
+            if (index < value.length) {
+                errors.push(...validateSchemaValue(value[index], itemSchema, `${path}[${index}]`, rootSchema));
+            }
+        });
+        if (schema.additionalItems === false && value.length > schema.items.length) {
+            errors.push(schemaError(path, 'additionalItems', 'Array contains additional tuple items'));
+        } else if (schema.additionalItems && typeof schema.additionalItems === 'object') {
+            value.slice(schema.items.length).forEach((item, offset) => {
+                const index = schema.items.length + offset;
+                errors.push(...validateSchemaValue(item, schema.additionalItems, `${path}[${index}]`, rootSchema));
+            });
+        }
+    } else if (schema.items && typeof schema.items === 'object') {
+        value.forEach((item, index) => {
+            errors.push(...validateSchemaValue(item, schema.items, `${path}[${index}]`, rootSchema));
+        });
+    }
+
+    if (schema.contains) {
+        const matchCount = value.filter(item => validateSchemaValue(item, schema.contains, path, rootSchema).length === 0).length;
+        const minContains = schema.minContains === undefined ? 1 : schema.minContains;
+        if (matchCount < minContains) {
+            errors.push(schemaError(path, 'contains', `Array must contain at least ${minContains} matching item(s)`));
+        }
+        if (schema.maxContains !== undefined && matchCount > schema.maxContains) {
+            errors.push(schemaError(path, 'contains', `Array must contain at most ${schema.maxContains} matching item(s)`));
+        }
+    }
+}
+
+function validateObjectConstraints(value, schema, path, rootSchema, errors) {
+    const keys = Object.keys(value);
+    if (schema.minProperties !== undefined && keys.length < schema.minProperties) {
+        errors.push(schemaError(path, 'minProperties', `Object must have at least ${schema.minProperties} property/properties`));
+    }
+    if (schema.maxProperties !== undefined && keys.length > schema.maxProperties) {
+        errors.push(schemaError(path, 'maxProperties', `Object must have at most ${schema.maxProperties} property/properties`));
+    }
+
+    if (Array.isArray(schema.required)) {
+        for (const key of schema.required) {
+            if (!Object.prototype.hasOwnProperty.call(value, key)) {
+                errors.push(schemaError(joinPath(path, key), 'required', `Required property ${key} is missing`));
+            }
+        }
+    }
+
+    const validatedKeys = new Set();
+    if (schema.properties && typeof schema.properties === 'object') {
+        for (const key of Object.keys(schema.properties)) {
+            if (Object.prototype.hasOwnProperty.call(value, key)) {
+                validatedKeys.add(key);
+                errors.push(...validateSchemaValue(value[key], schema.properties[key], joinPath(path, key), rootSchema));
+            }
+        }
+    }
+
+    if (schema.patternProperties && typeof schema.patternProperties === 'object') {
+        for (const pattern of Object.keys(schema.patternProperties)) {
+            const regex = new RegExp(pattern);
+            for (const key of keys) {
+                if (regex.test(key)) {
+                    validatedKeys.add(key);
+                    errors.push(...validateSchemaValue(value[key], schema.patternProperties[pattern], joinPath(path, key), rootSchema));
+                }
+            }
+        }
+    }
+
+    if (schema.propertyNames) {
+        for (const key of keys) {
+            errors.push(...validateSchemaValue(key, schema.propertyNames, `${path} property name`, rootSchema));
+        }
+    }
+
+    const extras = keys.filter(key => !validatedKeys.has(key));
+    if (schema.additionalProperties === false && schema.properties) {
+        for (const key of extras) {
+            errors.push(schemaError(joinPath(path, key), 'additionalProperties', `Additional property ${key} is not allowed`));
+        }
+    } else if (schema.additionalProperties && typeof schema.additionalProperties === 'object') {
+        for (const key of extras) {
+            errors.push(...validateSchemaValue(value[key], schema.additionalProperties, joinPath(path, key), rootSchema));
+        }
+    }
+
+    if (schema.dependencies && typeof schema.dependencies === 'object') {
+        for (const key of Object.keys(schema.dependencies)) {
+            if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+            const dependency = schema.dependencies[key];
+            if (Array.isArray(dependency)) {
+                for (const requiredKey of dependency) {
+                    if (!Object.prototype.hasOwnProperty.call(value, requiredKey)) {
+                        errors.push(schemaError(joinPath(path, requiredKey), 'dependencies', `Property ${requiredKey} is required when ${key} is present`));
+                    }
+                }
+            } else if (dependency && typeof dependency === 'object') {
+                errors.push(...validateSchemaValue(value, dependency, path, rootSchema));
+            }
+        }
+    }
+}
+
+function schemaError(field, rule, message) {
+    return {
+        field,
+        rule,
+        message,
+        severity: 'error'
+    };
+}
+
+function resolveSchemaRef(rootSchema, ref) {
+    if (typeof ref !== 'string' || !ref.startsWith('#')) {
+        throw new Error(`Only local JSON Schema $ref values are supported: ${ref}`);
+    }
+    if (ref === '#') return rootSchema;
+    const parts = ref
+        .slice(2)
+        .split('/')
+        .map(part => part.replace(/~1/g, '/').replace(/~0/g, '~'));
+    let current = rootSchema;
+    for (const part of parts) {
+        if (!current || typeof current !== 'object' || !(part in current)) {
+            throw new Error(`Unable to resolve JSON Schema $ref ${ref}`);
+        }
+        current = current[part];
+    }
+    return current;
+}
+
+function matchesSchemaType(value, expectedType) {
+    return ensureArray(expectedType).some(type => {
+        switch (type) {
+            case 'null':
+                return value === null;
+            case 'boolean':
+                return typeof value === 'boolean';
+            case 'object':
+                return isPlainObject(value);
+            case 'array':
+                return Array.isArray(value);
+            case 'number':
+                return typeof value === 'number' && Number.isFinite(value);
+            case 'integer':
+                return Number.isInteger(value);
+            case 'string':
+                return typeof value === 'string';
+            default:
+                return false;
+        }
+    });
+}
+
+function jsonTypeOf(value) {
+    if (value === null) return 'null';
+    if (Array.isArray(value)) return 'array';
+    if (Number.isInteger(value)) return 'integer';
+    return typeof value;
+}
+
+function formatExpectedTypes(type) {
+    return ensureArray(type).join(' or ');
+}
+
+function ensureArray(value) {
+    return Array.isArray(value) ? value : [value];
+}
+
+function isPlainObject(value) {
+    return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function joinPath(path, key) {
+    return path ? `${path}.${key}` : key;
+}
+
+function deepEqual(a, b) {
+    return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function arrayItemsUnique(items) {
+    const seen = new Set();
+    for (const item of items) {
+        const key = JSON.stringify(item);
+        if (seen.has(key)) return false;
+        seen.add(key);
+    }
+    return true;
+}
+
+function isMultipleOf(value, divisor) {
+    if (typeof divisor !== 'number' || divisor === 0) return false;
+    const quotient = value / divisor;
+    return Math.abs(quotient - Math.round(quotient)) < Number.EPSILON * 100;
+}
+
+function matchesFormat(value, format) {
+    switch (format) {
+        case 'email':
+        case 'idn-email':
+            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+        case 'uri':
+        case 'url':
+        case 'iri':
+            try {
+                new URL(value);
+                return true;
+            } catch {
+                return false;
+            }
+        case 'date-time':
+            return !Number.isNaN(Date.parse(value));
+        case 'date':
+            return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
+        case 'time':
+            return /^([01]\d|2[0-3]):[0-5]\d(:[0-5]\d(\.\d+)?)?(Z|[+-][0-2]\d:[0-5]\d)?$/.test(value);
+        case 'uuid':
+            return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+        case 'hostname':
+            return /^(?=.{1,253}$)([a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(value);
+        case 'ipv4':
+            return /^(25[0-5]|2[0-4]\d|1?\d?\d)(\.(25[0-5]|2[0-4]\d|1?\d?\d)){3}$/.test(value);
+        case 'ipv6':
+            return /^[0-9a-f:]+$/i.test(value) && value.includes(':');
+        default:
+            return true;
+    }
 }
 
 function validateRequiredFields(item, requiredFields) {
@@ -281,11 +601,11 @@ function validateDataTypes(item, dataTypes) {
         const expectedType = dataTypes[field];
         const value = getNestedValue(item, field);
 
-        if (value !== undefined && typeof value !== expectedType) {
+        if (value !== undefined && !matchesSchemaType(value, expectedType)) {
             errors.push({
                 field: field,
                 rule: 'datatype',
-                message: `Field ${field} should be ${expectedType}, got ${typeof value}`,
+                message: `Field ${field} should be ${formatExpectedTypes(expectedType)}, got ${jsonTypeOf(value)}`,
                 severity: 'error'
             });
         }
