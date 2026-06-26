@@ -4,8 +4,8 @@ Extract data from web pages with HTML parsing, CSS selectors, and XPath support.
 
 ## Features
 
-- Extract content using CSS selectors (tag, class, id)
-- XPath selector support for advanced queries
+- Extract content using CSS selectors, selector lists, descendant/child combinators, compound selectors, and attribute filters
+- XPath selector support with descendant/child axes, predicates, text extraction, and attribute extraction
 - HTML content parsing with metadata extraction
 - Text and attribute extraction
 - Configurable headers and options
@@ -20,7 +20,7 @@ Extract data from web pages with HTML parsing, CSS selectors, and XPath support.
 
 ### Optional Options
 
-- `selectors`: Object mapping names to CSS selectors
+- `selectors`: Object mapping names to CSS selector strings or selector descriptors
 - `xpath`: Object mapping names to XPath expressions
 - `headingLevels`: Array of heading levels to extract (default: ['h1', 'h2', 'h3'])
 - `linkFilters`: Filter configuration for link extraction
@@ -50,7 +50,12 @@ Returns: title, meta tags, headings, and links
   "selectors": {
     "mainTitle": "h1",
     "description": ".description",
-    "productPrice": "#price"
+    "productPrice": "#price",
+    "featuredTitles": "article.featured[data-type=\"item\"] h2",
+    "buyLinks": {
+      "selector": "article.card a.buy",
+      "attr": "href"
+    }
   }
 }
 ```
@@ -59,6 +64,11 @@ Supported CSS selectors:
 - Tag selectors: `div`, `p`, `span`
 - Class selectors: `.classname`
 - ID selectors: `#elementid`
+- Compound selectors: `article.card.featured`, `a#primary.cta`
+- Descendant and child combinators: `article h2`, `section > article > h2`
+- Selector lists: `h2, span.price`
+- Attribute filters: `[data-type]`, `[data-type="item"]`, `[href^="/products"]`, `[href$=".pdf"]`, `[class~="active"]`, `[lang|="en"]`
+- Attribute extraction descriptors: `{ "selector": "a.download", "attr": "href" }`
 
 ### Using XPath Selectors
 
@@ -75,11 +85,17 @@ Supported CSS selectors:
 ```
 
 Supported XPath patterns:
-- `//tag` - Select all elements with tag
-- `//tag[@attr='value']` - Select elements with specific attribute
-- `//tag/text()` - Extract text content
-- `//tag/@attr` - Extract attribute value
-- `//*[@attr='value']` - Select any element with attribute
+- `//tag` - Select all matching descendants
+- `/html/body/main` - Select by child path from the document root
+- `//article/h2/text()` - Extract descendant text
+- `//article//a/@href` - Extract descendant attribute values
+- `//tag[@attr='value']` - Filter by attribute equality
+- `//tag[@attr]` - Filter by attribute presence
+- `//tag[contains(@class,'featured')]` - Filter by substring in an attribute
+- `//h2[contains(text(),'Beta')]` - Filter by substring in text
+- `//h2[normalize-space()='Alpha']` - Filter by normalized text
+- `//article[1]` - Filter by 1-based position within the current matching tag set
+- `//*[@attr='value']` - Select any element with an attribute value
 
 ### Advanced Configuration
 
@@ -128,41 +144,49 @@ Success response:
 ```javascript
 {
   "success": true,
-  "total": 1,
-  "results": [
-    {
-      "url": "https://example.com",
-      "label": null,
-      "status": 200,
-      "success": true,
-      "title": "Page Title",
-      "meta": {
-        "description": "Page description",
-        "keywords": "keyword1, keyword2",
-        "author": "Author Name"
-      },
-      "headings": [
-        { "level": "h1", "text": "Main Heading" },
-        { "level": "h2", "text": "Subheading" }
-      ],
-      "links": [
-        { "href": "https://example.com/page", "text": "Link text" }
-      ],
-      "patterns": [
-        {
-          "name": "email",
-          "matches": ["contact@example.com", "info@example.com"]
-        }
-      ],
-      "customData": {
-        "mainTitle": ["Welcome to Example"],
-        "prices": ["$19.99", "$29.99"],
-        "ratings": ["4.5", "4.8"]
-      },
-      "fetchedAt": "2025-10-05T10:30:00.000Z"
-    }
-  ],
-  "timestamp": "2025-10-05T10:30:00.000Z"
+  "data": {
+    "total": 1,
+    "successCount": 1,
+    "failureCount": 0,
+    "results": [
+      {
+        "url": "https://example.com",
+        "label": null,
+        "status": 200,
+        "success": true,
+        "title": "Page Title",
+        "meta": {
+          "description": "Page description",
+          "keywords": "keyword1, keyword2",
+          "author": "Author Name"
+        },
+        "headings": [
+          { "level": "h1", "text": "Main Heading" },
+          { "level": "h2", "text": "Subheading" }
+        ],
+        "links": [
+          { "href": "https://example.com/page", "text": "Link text" }
+        ],
+        "patterns": [
+          {
+            "name": "email",
+            "matches": ["contact@example.com", "info@example.com"]
+          }
+        ],
+        "customData": {
+          "mainTitle": ["Welcome to Example"],
+          "prices": ["$19.99", "$29.99"],
+          "ratings": ["4.5", "4.8"]
+        },
+        "fetchedAt": "2025-10-05T10:30:00.000Z"
+      }
+    ]
+  },
+  "metadata": {
+    "package": "@maitask/web-scraper",
+    "version": "0.1.0",
+    "timestamp": "2025-10-05T10:30:00.000Z"
+  }
 }
 ```
 
@@ -170,15 +194,23 @@ Error response (for individual URL):
 ```javascript
 {
   "success": true,
-  "total": 1,
-  "results": [
-    {
-      "url": "https://example.com",
-      "success": false,
-      "error": "Request failed with status 404"
-    }
-  ],
-  "timestamp": "2025-10-05T10:30:00.000Z"
+  "data": {
+    "total": 1,
+    "successCount": 0,
+    "failureCount": 1,
+    "results": [
+      {
+        "url": "https://example.com",
+        "success": false,
+        "error": "Request failed"
+      }
+    ]
+  },
+  "metadata": {
+    "package": "@maitask/web-scraper",
+    "version": "0.1.0",
+    "timestamp": "2025-10-05T10:30:00.000Z"
+  }
 }
 ```
 

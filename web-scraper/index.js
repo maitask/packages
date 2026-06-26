@@ -223,128 +223,664 @@ function extractCustomSelectors(html, config) {
     return result;
 }
 
-function extractByCSS(html, selector) {
-    // Simple CSS selector support (tag, class, id)
+function extractByCSS(html, selectorConfig) {
+    var descriptor = typeof selectorConfig === 'object' && selectorConfig !== null
+        ? selectorConfig
+        : { selector: selectorConfig };
+    var selector = descriptor.selector || descriptor.css || descriptor.path;
+    var attr = descriptor.attr || descriptor.attribute;
+    if (typeof attr === 'string') {
+        attr = attr.toLowerCase();
+    }
     var results = [];
 
-    if (typeof selector === 'string') {
-        // Support basic selectors
-        if (selector.startsWith('.')) {
-            // Class selector
-            var className = selector.substring(1);
-            var regex = new RegExp('<[^>]+class=["\'][^"\']*\\b' + escapeRegex(className) + '\\b[^"\']*["\'][^>]*>([\\s\\S]*?)</[^>]+>', 'gi');
-            var match;
-            while ((match = regex.exec(html)) !== null) {
-                results.push(stripTags(match[1]));
-            }
-        } else if (selector.startsWith('#')) {
-            // ID selector
-            var id = selector.substring(1);
-            var regex = new RegExp('<[^>]+id=["\'  ]' + escapeRegex(id) + '["\'][^>]*>([\\s\\S]*?)</[^>]+>', 'i');
-            var match = html.match(regex);
-            if (match) {
-                results.push(stripTags(match[1]));
-            }
-        } else {
-            // Tag selector
-            var regex = new RegExp('<' + escapeRegex(selector) + '[^>]*>([\\s\\S]*?)</' + escapeRegex(selector) + '>', 'gi');
-            var match;
-            while ((match = regex.exec(html)) !== null) {
-                results.push(stripTags(match[1]));
-            }
-        }
+    if (typeof selector !== 'string' || !selector.trim()) {
+        return null;
     }
 
+    splitSelectorList(selector).forEach(function(selectorPart) {
+        var tokens = splitDescendantSelector(selectorPart);
+        var elements = selectElements(html, tokens);
+        elements.forEach(function(element) {
+            if (attr) {
+                if (Object.prototype.hasOwnProperty.call(element.attrs, attr)) {
+                    results.push(decodeEntities(String(element.attrs[attr])));
+                }
+            } else {
+                results.push(decodeEntities(getElementText(element)));
+            }
+        });
+    });
+
+    results = uniqueValues(results.filter(function(value) { return value !== null && value !== undefined; }));
     return results.length > 0 ? results : null;
 }
 
 function extractByXPath(html, xpath) {
-    // Simplified XPath implementation for common patterns
-    // Supports: //tag, //tag[@attr='value'], //tag/text(), //*[@attr='value']
-
-    var results = [];
-
-    // Parse XPath expression
-    if (typeof xpath !== 'string') {
+    if (typeof xpath !== 'string' || !xpath.trim()) {
         return null;
     }
 
-    // Handle //tag pattern
-    var tagMatch = xpath.match(/^\/\/(\w+)(?:\[([^\]]+)\])?(?:\/(text\(\)|@\w+))?$/);
-    if (tagMatch) {
-        var tag = tagMatch[1];
-        var predicate = tagMatch[2];
-        var selector = tagMatch[3];
-
-        // Build regex for tag
-        var pattern = '<' + escapeRegex(tag) + '([^>]*)>([\\s\\S]*?)</' + escapeRegex(tag) + '>';
-        var regex = new RegExp(pattern, 'gi');
-        var match;
-
-        while ((match = regex.exec(html)) !== null) {
-            var attributes = match[1];
-            var content = match[2];
-
-            // Check predicate if present
-            if (predicate) {
-                var attrMatch = predicate.match(/@(\w+)=["']([^"']+)["']/);
-                if (attrMatch) {
-                    var attrName = attrMatch[1];
-                    var attrValue = attrMatch[2];
-                    var attrRegex = new RegExp('\\b' + escapeRegex(attrName) + '=["\']' + escapeRegex(attrValue) + '["\'  ]');
-                    if (!attrRegex.test(attributes)) {
-                        continue;
-                    }
-                }
-            }
-
-            // Extract value based on selector
-            if (selector === 'text()') {
-                results.push(stripTags(content));
-            } else if (selector && selector.startsWith('@')) {
-                var attrName = selector.substring(1);
-                var attrRegex = new RegExp('\\b' + escapeRegex(attrName) + '=["\'  ]([^"\']+)["\'  ]');
-                var attrMatch = attributes.match(attrRegex);
-                if (attrMatch) {
-                    results.push(decodeEntities(attrMatch[1]));
-                }
-            } else {
-                results.push(stripTags(content));
-            }
-        }
+    var parsed = parseXPath(xpath.trim());
+    if (!parsed) {
+        return null;
     }
 
-    // Handle //*[@attr='value'] pattern
-    var wildcardMatch = xpath.match(/^\/\/\*\[@(\w+)=["']([^"']+)["']\](?:\/(text\(\)|@\w+))?$/);
-    if (wildcardMatch) {
-        var attrName = wildcardMatch[1];
-        var attrValue = wildcardMatch[2];
-        var selector = wildcardMatch[3];
-
-        var pattern = '<(\\w+)([^>]*\\b' + escapeRegex(attrName) + '=["\'  ]' + escapeRegex(attrValue) + '["\'][^>]*)>([\\s\\S]*?)</\\1>';
-        var regex = new RegExp(pattern, 'gi');
-        var match;
-
-        while ((match = regex.exec(html)) !== null) {
-            var attributes = match[2];
-            var content = match[3];
-
-            if (selector === 'text()') {
-                results.push(stripTags(content));
-            } else if (selector && selector.startsWith('@')) {
-                var extractAttr = selector.substring(1);
-                var attrRegex = new RegExp('\\b' + escapeRegex(extractAttr) + '=["\'  ]([^"\']+)["\'  ]');
-                var attrMatch = attributes.match(attrRegex);
-                if (attrMatch) {
-                    results.push(decodeEntities(attrMatch[1]));
-                }
-            } else {
-                results.push(stripTags(content));
-            }
+    var elements = selectXPathElements(html, parsed.segments);
+    var results = elements.map(function(element) {
+        if (parsed.output === 'text') {
+            return decodeEntities(getElementText(element));
         }
-    }
+        if (parsed.output && parsed.output.type === 'attr') {
+            return Object.prototype.hasOwnProperty.call(element.attrs, parsed.output.name)
+                ? decodeEntities(String(element.attrs[parsed.output.name]))
+                : null;
+        }
+        return decodeEntities(getElementText(element));
+    }).filter(function(value) {
+        return value !== null && value !== undefined && value !== '';
+    });
 
+    results = uniqueValues(results);
     return results.length > 0 ? results : null;
+}
+
+function splitSelectorList(selector) {
+    var parts = [];
+    var current = '';
+    var quote = null;
+    var bracketDepth = 0;
+
+    for (var i = 0; i < selector.length; i++) {
+        var char = selector[i];
+
+        if (quote) {
+            current += char;
+            if (char === quote && selector[i - 1] !== '\\') {
+                quote = null;
+            }
+            continue;
+        }
+
+        if (char === '"' || char === "'") {
+            quote = char;
+            current += char;
+            continue;
+        }
+
+        if (char === '[') {
+            bracketDepth += 1;
+            current += char;
+            continue;
+        }
+
+        if (char === ']') {
+            bracketDepth = Math.max(0, bracketDepth - 1);
+            current += char;
+            continue;
+        }
+
+        if (char === ',' && bracketDepth === 0) {
+            if (current.trim()) parts.push(current.trim());
+            current = '';
+            continue;
+        }
+
+        current += char;
+    }
+
+    if (current.trim()) parts.push(current.trim());
+    return parts;
+}
+
+function splitDescendantSelector(selector) {
+    var steps = [];
+    var current = '';
+    var quote = null;
+    var bracketDepth = 0;
+    var nextCombinator = 'descendant';
+
+    function pushCurrent() {
+        if (!current.trim()) return;
+        steps.push({
+            selector: current.trim(),
+            combinator: steps.length === 0 ? 'self' : nextCombinator
+        });
+        current = '';
+        nextCombinator = 'descendant';
+    }
+
+    for (var i = 0; i < selector.length; i++) {
+        var char = selector[i];
+
+        if (quote) {
+            current += char;
+            if (char === quote && selector[i - 1] !== '\\') {
+                quote = null;
+            }
+            continue;
+        }
+
+        if (char === '"' || char === "'") {
+            quote = char;
+            current += char;
+            continue;
+        }
+
+        if (char === '[') {
+            bracketDepth += 1;
+            current += char;
+            continue;
+        }
+
+        if (char === ']') {
+            bracketDepth = Math.max(0, bracketDepth - 1);
+            current += char;
+            continue;
+        }
+
+        if (bracketDepth === 0 && char === '>') {
+            pushCurrent();
+            nextCombinator = 'child';
+            continue;
+        }
+
+        if (bracketDepth === 0 && /\s/.test(char)) {
+            pushCurrent();
+            if (nextCombinator !== 'child') {
+                nextCombinator = 'descendant';
+            }
+            continue;
+        }
+
+        current += char;
+    }
+
+    pushCurrent();
+    return steps;
+}
+
+function selectElements(html, steps) {
+    var root = parseHtmlTree(html);
+    var contexts = [root];
+
+    steps.forEach(function(step) {
+        var criteria = parseCssSelector(step.selector || step);
+        if (!criteria) {
+            contexts = [];
+            return;
+        }
+
+        var next = [];
+        contexts.forEach(function(context) {
+            var candidates = step.combinator === 'child'
+                ? getElementChildren(context)
+                : getDescendantElements(context);
+            candidates.forEach(function(element) {
+                if (matchesCssCriteria(element, criteria)) {
+                    next.push(element);
+                }
+            });
+        });
+        contexts = uniqueElements(next);
+    });
+
+    return contexts;
+}
+
+function findElements(html, selector) {
+    var criteria = parseCssSelector(selector);
+    if (!criteria) return [];
+
+    return getDescendantElements(parseHtmlTree(html)).filter(function(element) {
+        return matchesCssCriteria(element, criteria);
+    });
+}
+
+function parseHtmlTree(html) {
+    var source = String(html || '');
+    var root = {
+        type: 'root',
+        tag: '#document',
+        attrs: {},
+        children: [],
+        parent: null,
+        order: 0
+    };
+    var stack = [root];
+    var order = 1;
+    var tokenRegex = /<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<![^>]*>|<\/?[a-zA-Z][^>]*>/g;
+    var lastIndex = 0;
+    var lowerHtml = source.toLowerCase();
+    var match;
+
+    function currentParent() {
+        return stack[stack.length - 1] || root;
+    }
+
+    function appendText(value) {
+        if (!value) return;
+        currentParent().children.push({
+            type: 'text',
+            text: value,
+            parent: currentParent(),
+            order: order++
+        });
+    }
+
+    while ((match = tokenRegex.exec(source)) !== null) {
+        appendText(source.slice(lastIndex, match.index));
+
+        var token = match[0];
+        lastIndex = tokenRegex.lastIndex;
+
+        if (token.indexOf('<!--') === 0 || /^<!doctype/i.test(token)) {
+            continue;
+        }
+
+        if (token.indexOf('<![CDATA[') === 0) {
+            appendText(token.slice(9, -3));
+            continue;
+        }
+
+        var closingMatch = token.match(/^<\s*\/\s*([a-zA-Z][\w:-]*)\s*>$/);
+        if (closingMatch) {
+            closeElement(closingMatch[1].toLowerCase(), stack);
+            continue;
+        }
+
+        var openMatch = token.match(/^<\s*([a-zA-Z][\w:-]*)([\s\S]*?)>$/);
+        if (!openMatch) {
+            appendText(token);
+            continue;
+        }
+
+        var tag = openMatch[1].toLowerCase();
+        var rawAttributes = openMatch[2] || '';
+        var selfClosing = isVoidElement(tag) || /\/\s*>$/.test(token);
+        var element = {
+            type: 'element',
+            tag: tag,
+            attrs: parseAttributes(rawAttributes),
+            children: [],
+            parent: currentParent(),
+            order: order++
+        };
+
+        currentParent().children.push(element);
+
+        if (isRawTextElement(tag) && !selfClosing) {
+            var closeStart = lowerHtml.indexOf('</' + tag, tokenRegex.lastIndex);
+            if (closeStart !== -1) {
+                var closeEnd = lowerHtml.indexOf('>', closeStart);
+                if (closeEnd !== -1) {
+                    var rawText = source.slice(tokenRegex.lastIndex, closeStart);
+                    if (rawText) {
+                        element.children.push({
+                            type: 'text',
+                            text: rawText,
+                            parent: element,
+                            order: order++
+                        });
+                    }
+                    tokenRegex.lastIndex = closeEnd + 1;
+                    lastIndex = tokenRegex.lastIndex;
+                }
+            }
+            continue;
+        }
+
+        if (!selfClosing) {
+            stack.push(element);
+        }
+    }
+
+    appendText(source.slice(lastIndex));
+    return root;
+}
+
+function closeElement(tag, stack) {
+    for (var i = stack.length - 1; i > 0; i--) {
+        if (stack[i].tag === tag) {
+            stack.length = i;
+            return;
+        }
+    }
+}
+
+function isVoidElement(tag) {
+    return /^(area|base|br|col|embed|hr|img|input|link|meta|param|source|track|wbr)$/i.test(tag);
+}
+
+function isRawTextElement(tag) {
+    return /^(script|style|textarea|title)$/i.test(tag);
+}
+
+function getElementChildren(node) {
+    return (node.children || []).filter(function(child) {
+        return child.type === 'element';
+    });
+}
+
+function getDescendantElements(node) {
+    var result = [];
+
+    function visit(current) {
+        (current.children || []).forEach(function(child) {
+            if (child.type !== 'element') return;
+            result.push(child);
+            visit(child);
+        });
+    }
+
+    visit(node);
+    return result;
+}
+
+function getElementText(node) {
+    var parts = [];
+
+    function visit(current) {
+        (current.children || []).forEach(function(child) {
+            if (child.type === 'text') {
+                parts.push(child.text);
+                return;
+            }
+            if (child.type === 'element') {
+                visit(child);
+            }
+        });
+    }
+
+    visit(node);
+    return parts.join('').trim();
+}
+
+function uniqueElements(elements) {
+    var seen = new Set();
+    var result = [];
+    elements.forEach(function(element) {
+        if (!seen.has(element.order)) {
+            seen.add(element.order);
+            result.push(element);
+        }
+    });
+    return result;
+}
+
+function findElementsInContext(context, segment) {
+    var candidates = segment.axis === 'child'
+        ? getElementChildren(context)
+        : getDescendantElements(context);
+    var tagged = candidates.filter(function(element) {
+        return segment.tag === '*' || element.tag === segment.tag;
+    });
+    return tagged.filter(function(element, index) {
+        return matchesXPathPredicates(element, segment.predicates, index + 1);
+    });
+}
+
+function parseCssSelector(selector) {
+    var text = selector.trim();
+    if (!text) return null;
+
+    var tagMatch = text.match(/^(\*|[a-zA-Z][\w:-]*)/);
+    var tag = tagMatch ? tagMatch[1].toLowerCase() : '*';
+    var idMatch = text.match(/#([\w:-]+)/);
+    var classes = [];
+    var classRegex = /\.([\w:-]+)/g;
+    var classMatch;
+    while ((classMatch = classRegex.exec(text)) !== null) {
+        classes.push(classMatch[1]);
+    }
+
+    var attrs = [];
+    var attrRegex = /\[([^\]=~|^$*\s]+)(?:\s*([*^$|~]?=)\s*(?:"([^"]*)"|'([^']*)'|([^\]"'\s]+)))?\]/g;
+    var attrMatch;
+    while ((attrMatch = attrRegex.exec(text)) !== null) {
+        attrs.push({
+            name: attrMatch[1].toLowerCase(),
+            operator: attrMatch[2] || 'exists',
+            value: attrMatch[3] || attrMatch[4] || attrMatch[5] || ''
+        });
+    }
+
+    return { tag: tag, id: idMatch ? idMatch[1] : null, classes: classes, attrs: attrs };
+}
+
+function matchesCssCriteria(element, criteria) {
+    if (criteria.tag !== '*' && element.tag !== criteria.tag) return false;
+    if (criteria.id && element.attrs.id !== criteria.id) return false;
+
+    if (criteria.classes.length) {
+        var classList = String(element.attrs.class || '').split(/\s+/);
+        for (var i = 0; i < criteria.classes.length; i++) {
+            if (classList.indexOf(criteria.classes[i]) === -1) return false;
+        }
+    }
+
+    for (var j = 0; j < criteria.attrs.length; j++) {
+        if (!matchesAttributeSelector(element.attrs, criteria.attrs[j])) return false;
+    }
+
+    return true;
+}
+
+function matchesAttributeSelector(attrs, selector) {
+    if (!Object.prototype.hasOwnProperty.call(attrs, selector.name)) return false;
+    if (selector.operator === 'exists') return true;
+
+    var actual = String(attrs[selector.name]);
+    var expected = String(selector.value);
+    switch (selector.operator) {
+        case '=':
+            return actual === expected;
+        case '*=':
+            return actual.indexOf(expected) !== -1;
+        case '^=':
+            return actual.startsWith(expected);
+        case '$=':
+            return actual.endsWith(expected);
+        case '~=':
+            return actual.split(/\s+/).indexOf(expected) !== -1;
+        case '|=':
+            return actual === expected || actual.startsWith(expected + '-');
+        default:
+            return false;
+    }
+}
+
+function parseXPath(xpath) {
+    var output = null;
+    var expression = xpath;
+    var outputMatch = expression.match(/\/(text\(\)|@[\w:-]+)$/);
+    if (outputMatch) {
+        output = outputMatch[1] === 'text()'
+            ? 'text'
+            : { type: 'attr', name: outputMatch[1].substring(1).toLowerCase() };
+        expression = expression.slice(0, -outputMatch[0].length);
+    }
+
+    var segments = [];
+    var index = 0;
+
+    while (index < expression.length) {
+        var axis = null;
+        if (expression.slice(index, index + 2) === '//') {
+            axis = 'descendant';
+            index += 2;
+        } else if (expression[index] === '/') {
+            axis = 'child';
+            index += 1;
+        } else {
+            return null;
+        }
+
+        var segmentStart = index;
+        var quote = null;
+        var bracketDepth = 0;
+        while (index < expression.length) {
+            var char = expression[index];
+
+            if (quote) {
+                if (char === quote && expression[index - 1] !== '\\') {
+                    quote = null;
+                }
+                index += 1;
+                continue;
+            }
+
+            if (char === '"' || char === "'") {
+                quote = char;
+                index += 1;
+                continue;
+            }
+
+            if (char === '[') {
+                bracketDepth += 1;
+                index += 1;
+                continue;
+            }
+
+            if (char === ']') {
+                bracketDepth = Math.max(0, bracketDepth - 1);
+                index += 1;
+                continue;
+            }
+
+            if (char === '/' && bracketDepth === 0) {
+                break;
+            }
+
+            index += 1;
+        }
+
+        var segmentText = expression.slice(segmentStart, index).trim();
+        if (!segmentText) return null;
+
+        var segment = parseXPathSegment(segmentText);
+        if (!segment) return null;
+        segment.axis = axis;
+        segments.push(segment);
+    }
+
+    return segments.length ? { segments: segments, output: output } : null;
+}
+
+function parseXPathSegment(segment) {
+    var tagMatch = segment.match(/^(\*|[\w:-]+)/);
+    if (!tagMatch) return null;
+    var predicates = [];
+    var predicateRegex = /\[([^\]]+)\]/g;
+    var predicateMatch;
+    while ((predicateMatch = predicateRegex.exec(segment)) !== null) {
+        predicates.push(predicateMatch[1].trim());
+    }
+    return { tag: tagMatch[1].toLowerCase(), predicates: predicates, axis: 'descendant' };
+}
+
+function selectXPathElements(html, segments) {
+    var contexts = [parseHtmlTree(html)];
+    segments.forEach(function(segment) {
+        var next = [];
+        contexts.forEach(function(context) {
+            next.push.apply(next, findElementsInContext(context, segment));
+        });
+        contexts = uniqueElements(next);
+    });
+    return contexts;
+}
+
+function findElementsByTag(html, tag) {
+    return getDescendantElements(parseHtmlTree(html)).filter(function(element) {
+        return tag === '*' || element.tag === tag;
+    });
+}
+
+function matchesXPathPredicates(element, predicates, position) {
+    for (var i = 0; i < predicates.length; i++) {
+        if (!matchesXPathPredicate(element, predicates[i], position)) return false;
+    }
+    return true;
+}
+
+function matchesXPathPredicate(element, predicate, position) {
+    if (/^\d+$/.test(predicate)) {
+        return position === Number(predicate);
+    }
+
+    var attrExists = predicate.match(/^@([\w:-]+)$/);
+    if (attrExists) {
+        return Object.prototype.hasOwnProperty.call(element.attrs, attrExists[1].toLowerCase());
+    }
+
+    var attrEquals = predicate.match(/^@([\w:-]+)\s*=\s*["']([^"']+)["']$/);
+    if (attrEquals) {
+        return String(element.attrs[attrEquals[1].toLowerCase()] || '') === attrEquals[2];
+    }
+
+    var attrContains = predicate.match(/^contains\(@([\w:-]+),\s*["']([^"']+)["']\)$/);
+    if (attrContains) {
+        return String(element.attrs[attrContains[1].toLowerCase()] || '').indexOf(attrContains[2]) !== -1;
+    }
+
+    var text = getElementText(element);
+    var textEquals = predicate.match(/^text\(\)\s*=\s*["']([^"']+)["']$/);
+    if (textEquals) {
+        return text === textEquals[1];
+    }
+
+    var textContains = predicate.match(/^contains\(text\(\),\s*["']([^"']+)["']\)$/);
+    if (textContains) {
+        return text.indexOf(textContains[1]) !== -1;
+    }
+
+    var normalizeEquals = predicate.match(/^normalize-space\(\)\s*=\s*["']([^"']+)["']$/);
+    if (normalizeEquals) {
+        return text.replace(/\s+/g, ' ').trim() === normalizeEquals[1];
+    }
+
+    return false;
+}
+
+function buildElement(tag, rawAttributes, content, outerHtml) {
+    return {
+        type: 'element',
+        tag: String(tag || '').toLowerCase(),
+        attrs: parseAttributes(rawAttributes || ''),
+        children: [{ type: 'text', text: stripTags(content || '') }],
+        content: content || '',
+        outerHtml: outerHtml || '',
+        order: 0
+    };
+}
+
+function parseAttributes(rawAttributes) {
+    var attrs = {};
+    var attrRegex = /([^\s=\/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
+    var match;
+    while ((match = attrRegex.exec(rawAttributes)) !== null) {
+        attrs[String(match[1]).toLowerCase()] = match[2] !== undefined
+            ? match[2]
+            : match[3] !== undefined
+                ? match[3]
+                : match[4] !== undefined
+                    ? match[4]
+                    : '';
+    }
+    return attrs;
+}
+
+function uniqueValues(values) {
+    var seen = new Set();
+    var result = [];
+    values.forEach(function(value) {
+        if (!seen.has(value)) {
+            seen.add(value);
+            result.push(value);
+        }
+    });
+    return result;
 }
 
 function escapeRegex(str) {
