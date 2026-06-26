@@ -5,11 +5,12 @@ XML to JSON parser with XPath support for Maitask.
 ## Features
 
 - XML to JSON conversion
-- Basic XPath queries
+- XPath queries with absolute/relative paths, descendant axis, predicates, text output, and attribute output
 - Attribute preservation
 - CDATA handling
 - Self-closing tags
 - Comment stripping
+- Namespace-prefixed element and attribute names
 
 ## Usage
 
@@ -22,7 +23,7 @@ echo '<root><item id="1">Value</item></root>' | maitask run @maitask/xml-parser
 ### XPath Query
 
 ```bash
-echo '<root><item>A</item><item>B</item></root>' | maitask run @maitask/xml-parser --options '{"operation":"query","xpath":"root/item"}'
+echo '<root><item id="1">A</item><item id="2">B</item></root>' | maitask run @maitask/xml-parser --options '{"operation":"query","xpath":"//item[@id=\"2\"]/text()"}'
 ```
 
 ## Operations
@@ -38,10 +39,19 @@ Convert XML to JSON structure:
 
 ### Query
 
-Basic XPath support:
-- `/path/to/element` - Direct path
-- `*` - All children
-- `**` - All descendants
+Supported XPath patterns:
+- `root/item` - Relative path from the parsed root
+- `/root/item` - Absolute-style path that can include the parsed root element
+- `//item` - Descendant search
+- `//item[1]` - 1-based position within the current matching tag set
+- `//item[@id]` - Attribute presence predicate
+- `//item[@id="2"]` - Attribute equality predicate
+- `//item[contains(@class,"featured")]` - Attribute substring predicate
+- `//item[text()="A"]` - Text equality predicate
+- `//item[contains(text(),"A")]` - Text substring predicate
+- `//book[price>30]/title` - Child text comparison predicate
+- `//item/text()` - Text output
+- `//item/@id` - Attribute output
 
 ## Example
 
@@ -63,10 +73,14 @@ Output:
   "_children": [
     {
       "_tag": "title",
+      "_attributes": {},
+      "_children": [],
       "_text": "Example"
     },
     {
       "_tag": "author",
+      "_attributes": {},
+      "_children": [],
       "_text": "John Doe"
     }
   ]
@@ -82,6 +96,8 @@ Output:
 - Self-closing tags (`<tag />`)
 - Namespaces (`prefix:tag`)
 - Comments (stripped)
+- XML declarations and processing instructions
+- Doctype declarations, including internal subsets
 
 ## Use Cases
 

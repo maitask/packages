@@ -1,33 +1,18 @@
 /**
  * @maitask/xml-parser
- * XML to JSON parser with XPath support
- *
- * Features:
- * - XML to JSON conversion
- * - Basic XPath queries
- * - Attribute handling
- * - Namespace support
- * - CDATA handling
+ * XML to JSON parser with XPath support.
  *
  * @version 0.1.0
  * @author Maitask Team
  * @license MIT
  */
 
-/**
- * Main execution function
- * @param {Object} input - Input XML string
- * @param {Object} options - Parser options
- * @param {Object} context - Execution context
- * @returns {Object} Parsed XML data
- */
 function execute(input, options = {}, context = {}) {
     try {
         const xml = ensureXml(input);
         const operation = options.operation || 'parse';
-
+        const parsed = parseXml(xml, options);
         let result;
-        const parsed = parseXml(xml);
 
         switch (operation) {
             case 'parse':
@@ -68,11 +53,6 @@ function execute(input, options = {}, context = {}) {
     }
 }
 
-execute;
-
-/**
- * Ensure input is XML string
- */
 function ensureXml(input) {
     if (typeof input === 'string') {
         return input.trim();
@@ -89,240 +69,402 @@ function ensureXml(input) {
     throw new Error('Invalid input: XML string expected');
 }
 
-/**
- * Parse XML to JSON
- */
-function parseXml(xml) {
-    xml = xml.replace(/<!--[\s\S]*?-->/g, '');
-    xml = xml.replace(/<\?xml[^?]*\?>/g, '');
+function parseXml(xml, options = {}) {
+    const preserveWhitespace = options.preserveWhitespace === true;
+    const source = String(xml || '');
+    const documentNode = createXmlNode('#document', {});
+    const stack = [documentNode];
+    let index = 0;
 
-    const tokens = tokenizeXml(xml);
-    const result = buildTree(tokens, 0);
-
-    return result.node;
-}
-
-/**
- * Tokenize XML string
- */
-function tokenizeXml(xml) {
-    const tokens = [];
-    let i = 0;
-
-    while (i < xml.length) {
-        if (xml[i] === '<') {
-            const closeIndex = xml.indexOf('>', i);
-
-            if (closeIndex === -1) {
-                throw new Error('Unclosed tag');
-            }
-
-            const tag = xml.slice(i + 1, closeIndex);
-
-            if (tag.startsWith('/')) {
-                tokens.push({
-                    type: 'close',
-                    name: tag.slice(1).trim()
-                });
-            } else if (tag.endsWith('/')) {
-                const { name, attributes } = parseTag(tag.slice(0, -1));
-                tokens.push({
-                    type: 'self-closing',
-                    name,
-                    attributes
-                });
-            } else if (tag.startsWith('![CDATA[')) {
-                const cdataEnd = xml.indexOf(']]>', i);
-                const content = xml.slice(i + 9, cdataEnd);
-                tokens.push({
-                    type: 'cdata',
-                    content
-                });
-                i = cdataEnd + 3;
-                continue;
-            } else {
-                const { name, attributes } = parseTag(tag);
-                tokens.push({
-                    type: 'open',
-                    name,
-                    attributes
-                });
-            }
-
-            i = closeIndex + 1;
-        } else {
-            const nextTag = xml.indexOf('<', i);
-            const text = xml.slice(i, nextTag === -1 ? undefined : nextTag).trim();
-
-            if (text) {
-                tokens.push({
-                    type: 'text',
-                    content: text
-                });
-            }
-
-            i = nextTag === -1 ? xml.length : nextTag;
+    while (index < source.length) {
+        if (source[index] !== '<') {
+            const next = source.indexOf('<', index);
+            appendText(stack[stack.length - 1], source.slice(index, next === -1 ? source.length : next), preserveWhitespace);
+            index = next === -1 ? source.length : next;
+            continue;
         }
+
+        if (source.startsWith('<!--', index)) {
+            const end = source.indexOf('-->', index + 4);
+            if (end === -1) throw new Error('Unclosed XML comment');
+            index = end + 3;
+            continue;
+        }
+
+        if (source.startsWith('<![CDATA[', index)) {
+            const end = source.indexOf(']]>', index + 9);
+            if (end === -1) throw new Error('Unclosed XML CDATA section');
+            appendText(stack[stack.length - 1], source.slice(index + 9, end), true);
+            index = end + 3;
+            continue;
+        }
+
+        if (source.startsWith('<?', index)) {
+            const end = source.indexOf('?>', index + 2);
+            if (end === -1) throw new Error('Unclosed XML processing instruction');
+            index = end + 2;
+            continue;
+        }
+
+        if (source.startsWith('<!', index)) {
+            const end = findDeclarationEnd(source, index + 2);
+            if (end === -1) throw new Error('Unclosed XML declaration');
+            index = end + 1;
+            continue;
+        }
+
+        const close = findTagEnd(source, index + 1);
+        if (close === -1) throw new Error('Unclosed XML tag');
+
+        const raw = source.slice(index + 1, close).trim();
+        if (raw.startsWith('/')) {
+            const closingName = raw.slice(1).trim();
+            const current = stack.pop();
+            if (!current || current._tag !== closingName) {
+                throw new Error(`Mismatched XML closing tag: ${closingName}`);
+            }
+            index = close + 1;
+            continue;
+        }
+
+        const selfClosing = /\/\s*$/.test(raw);
+        const tagSource = selfClosing ? raw.replace(/\/\s*$/, '') : raw;
+        const parsedTag = parseTag(tagSource);
+        const node = createXmlNode(parsedTag.name, parsedTag.attributes);
+        stack[stack.length - 1]._children.push(node);
+
+        if (!selfClosing) {
+            stack.push(node);
+        }
+
+        index = close + 1;
     }
 
-    return tokens;
-}
-
-/**
- * Parse tag name and attributes
- */
-function parseTag(tag) {
-    const spaceIndex = tag.search(/\s/);
-
-    if (spaceIndex === -1) {
-        return { name: tag.trim(), attributes: {} };
+    if (stack.length !== 1) {
+        throw new Error(`Unclosed XML tag: ${stack[stack.length - 1]._tag}`);
     }
 
-    const name = tag.slice(0, spaceIndex).trim();
-    const attrString = tag.slice(spaceIndex).trim();
-    const attributes = parseAttributes(attrString);
-
-    return { name, attributes };
+    return documentNode._children.length === 1 ? documentNode._children[0] : documentNode;
 }
 
-/**
- * Parse XML attributes
- */
-function parseAttributes(attrString) {
+function createXmlNode(tag, attributes) {
+    return {
+        _tag: tag,
+        _attributes: attributes || {},
+        _children: []
+    };
+}
+
+function appendText(node, text, preserveWhitespace) {
+    if (!text) return;
+    const value = preserveWhitespace ? text : text.replace(/\s+/g, ' ').trim();
+    if (!value) return;
+    node._text = (node._text || '') + decodeXml(value);
+}
+
+function findTagEnd(source, start) {
+    let quote = null;
+    for (let i = start; i < source.length; i++) {
+        const char = source[i];
+        if (quote) {
+            if (char === quote && source[i - 1] !== '\\') quote = null;
+            continue;
+        }
+        if (char === '"' || char === "'") {
+            quote = char;
+            continue;
+        }
+        if (char === '>') return i;
+    }
+    return -1;
+}
+
+function findDeclarationEnd(source, start) {
+    let bracketDepth = 0;
+    for (let i = start; i < source.length; i++) {
+        if (source[i] === '[') bracketDepth++;
+        if (source[i] === ']') bracketDepth = Math.max(0, bracketDepth - 1);
+        if (source[i] === '>' && bracketDepth === 0) return i;
+    }
+    return -1;
+}
+
+function parseTag(tagSource) {
+    const nameMatch = tagSource.match(/^([A-Za-z_][\w:.-]*)/);
+    if (!nameMatch) throw new Error(`Invalid XML tag: ${tagSource}`);
+
+    return {
+        name: nameMatch[1],
+        attributes: parseAttributes(tagSource.slice(nameMatch[1].length))
+    };
+}
+
+function parseAttributes(attrSource) {
     const attributes = {};
-    const regex = /(\w+(?::\w+)?)=["']([^"']+)["']/g;
+    const regex = /([A-Za-z_][\w:.-]*)\s*=\s*("([^"]*)"|'([^']*)')/g;
     let match;
 
-    while ((match = regex.exec(attrString)) !== null) {
-        attributes[match[1]] = match[2];
+    while ((match = regex.exec(attrSource)) !== null) {
+        attributes[match[1]] = decodeXml(match[3] !== undefined ? match[3] : match[4]);
     }
 
     return attributes;
 }
 
-/**
- * Build tree from tokens
- */
-function buildTree(tokens, start) {
-    let i = start;
-
-    if (i >= tokens.length) {
-        return { node: null, nextIndex: i };
-    }
-
-    const token = tokens[i];
-
-    if (token.type === 'open') {
-        const node = {
-            _tag: token.name,
-            _attributes: token.attributes,
-            _children: []
-        };
-
-        i++;
-
-        while (i < tokens.length) {
-            const current = tokens[i];
-
-            if (current.type === 'close' && current.name === token.name) {
-                i++;
-                break;
-            }
-
-            if (current.type === 'text') {
-                node._text = current.content;
-                i++;
-            } else if (current.type === 'cdata') {
-                node._text = current.content;
-                i++;
-            } else {
-                const child = buildTree(tokens, i);
-                node._children.push(child.node);
-                i = child.nextIndex;
-            }
-        }
-
-        return { node, nextIndex: i };
-    }
-
-    if (token.type === 'self-closing') {
-        return {
-            node: {
-                _tag: token.name,
-                _attributes: token.attributes,
-                _children: []
-            },
-            nextIndex: i + 1
-        };
-    }
-
-    return { node: null, nextIndex: i + 1 };
-}
-
-/**
- * Query XML tree using basic XPath
- */
 function queryXPath(tree, xpath) {
     if (!xpath || xpath === '/') {
         return tree;
     }
 
-    const parts = xpath.split('/').filter(p => p);
-    return traversePath(tree, parts, 0);
+    const parsed = parseXPath(xpath);
+    const nodes = selectXPathNodes(tree, parsed.segments);
+    const values = parsed.output ? nodes.map(node => extractXPathOutput(node, parsed.output)).filter(value => value !== null) : nodes;
+
+    return values.length === 1 ? values[0] : values;
 }
 
-/**
- * Traverse tree following path
- */
-function traversePath(node, parts, index) {
-    if (index >= parts.length) {
-        return node;
+function parseXPath(xpath) {
+    let expression = String(xpath || '').trim();
+    let output = null;
+    const outputMatch = expression.match(/\/(text\(\)|@[\w:.-]+)$/);
+
+    if (outputMatch) {
+        output = outputMatch[1] === 'text()'
+            ? { type: 'text' }
+            : { type: 'attribute', name: outputMatch[1].slice(1) };
+        expression = expression.slice(0, -outputMatch[0].length);
     }
 
-    const part = parts[index];
+    const segments = [];
+    let index = 0;
 
-    if (part === '*') {
-        return node._children || [];
-    }
-
-    if (part === '**') {
-        return findAllDescendants(node);
-    }
-
-    const matches = [];
-
-    if (node._tag === part) {
-        const result = traversePath(node, parts, index + 1);
-        if (result) return result;
-    }
-
-    if (node._children) {
-        for (const child of node._children) {
-            if (child._tag === part) {
-                const result = traversePath(child, parts, index + 1);
-                if (result) matches.push(result);
-            }
+    while (index < expression.length) {
+        let axis = null;
+        if (expression.slice(index, index + 2) === '//') {
+            axis = 'descendant';
+            index += 2;
+        } else if (expression[index] === '/') {
+            axis = segments.length === 0 ? 'self-or-child' : 'child';
+            index += 1;
+        } else if (segments.length === 0) {
+            axis = 'self-or-child';
+        } else {
+            return invalidXPath(expression);
         }
+
+        const start = index;
+        let quote = null;
+        let bracketDepth = 0;
+        while (index < expression.length) {
+            const char = expression[index];
+            if (quote) {
+                if (char === quote && expression[index - 1] !== '\\') quote = null;
+                index++;
+                continue;
+            }
+            if (char === '"' || char === "'") {
+                quote = char;
+                index++;
+                continue;
+            }
+            if (char === '[') {
+                bracketDepth++;
+                index++;
+                continue;
+            }
+            if (char === ']') {
+                bracketDepth = Math.max(0, bracketDepth - 1);
+                index++;
+                continue;
+            }
+            if (char === '/' && bracketDepth === 0) break;
+            index++;
+        }
+
+        const rawSegment = expression.slice(start, index).trim();
+        if (!rawSegment) return invalidXPath(expression);
+        segments.push(parseXPathSegment(rawSegment, axis));
     }
 
-    return matches.length === 1 ? matches[0] : matches;
+    if (!segments.length) return invalidXPath(expression);
+    return { segments, output };
 }
 
-/**
- * Find all descendants matching tag
- */
-function findAllDescendants(node) {
+function parseXPathSegment(segment, axis) {
+    const nameMatch = segment.match(/^(\*|[A-Za-z_][\w:.-]*)/);
+    if (!nameMatch) throw new Error(`Invalid XPath segment: ${segment}`);
+
+    const predicates = [];
+    const regex = /\[([^\]]+)\]/g;
+    let match;
+    while ((match = regex.exec(segment)) !== null) {
+        predicates.push(match[1].trim());
+    }
+
+    return { tag: nameMatch[1], axis, predicates };
+}
+
+function selectXPathNodes(root, segments) {
+    let contexts = [root];
+
+    segments.forEach((segment, segmentIndex) => {
+        const next = [];
+        contexts.forEach(context => {
+            const candidates = getXPathCandidates(context, segment, segmentIndex);
+            const tagged = candidates.filter(node => segment.tag === '*' || node._tag === segment.tag);
+            tagged.forEach((node, index) => {
+                if (matchesPredicates(node, segment.predicates, index + 1)) {
+                    next.push(node);
+                }
+            });
+        });
+        contexts = uniqueNodes(next);
+    });
+
+    return contexts;
+}
+
+function getXPathCandidates(context, segment, segmentIndex) {
+    if (segment.axis === 'descendant') {
+        return getDescendants(context);
+    }
+    if (segment.axis === 'self-or-child' && segmentIndex === 0) {
+        return [context].concat(context._children || []);
+    }
+    return context._children || [];
+}
+
+function matchesPredicates(node, predicates, position) {
+    for (const predicate of predicates) {
+        if (!matchesPredicate(node, predicate, position)) return false;
+    }
+    return true;
+}
+
+function matchesPredicate(node, predicate, position) {
+    if (/^\d+$/.test(predicate)) {
+        return position === Number(predicate);
+    }
+
+    const attrExists = predicate.match(/^@([\w:.-]+)$/);
+    if (attrExists) {
+        return Object.prototype.hasOwnProperty.call(node._attributes || {}, attrExists[1]);
+    }
+
+    const attrCompare = predicate.match(/^@([\w:.-]+)\s*(=|!=)\s*["']([^"']*)["']$/);
+    if (attrCompare) {
+        const actual = String((node._attributes || {})[attrCompare[1]] ?? '');
+        return attrCompare[2] === '=' ? actual === attrCompare[3] : actual !== attrCompare[3];
+    }
+
+    const attrContains = predicate.match(/^contains\(@([\w:.-]+),\s*["']([^"']*)["']\)$/);
+    if (attrContains) {
+        return String((node._attributes || {})[attrContains[1]] ?? '').includes(attrContains[2]);
+    }
+
+    const textCompare = predicate.match(/^text\(\)\s*(=|!=)\s*["']([^"']*)["']$/);
+    if (textCompare) {
+        const text = getNodeText(node);
+        return textCompare[1] === '=' ? text === textCompare[2] : text !== textCompare[2];
+    }
+
+    const textContains = predicate.match(/^contains\(text\(\),\s*["']([^"']*)["']\)$/);
+    if (textContains) {
+        return getNodeText(node).includes(textContains[1]);
+    }
+
+    const childCompare = predicate.match(/^([A-Za-z_][\w:.-]*)\s*(=|!=|>=|<=|>|<)\s*["']?([^"']+)["']?$/);
+    if (childCompare) {
+        const child = (node._children || []).find(item => item._tag === childCompare[1]);
+        if (!child) return false;
+        return compareValues(getNodeText(child), childCompare[3], childCompare[2]);
+    }
+
+    return false;
+}
+
+function compareValues(left, right, operator) {
+    const leftNumber = Number(left);
+    const rightNumber = Number(right);
+    const numeric = Number.isFinite(leftNumber) && Number.isFinite(rightNumber);
+    const a = numeric ? leftNumber : String(left);
+    const b = numeric ? rightNumber : String(right);
+
+    switch (operator) {
+        case '=':
+            return a === b;
+        case '!=':
+            return a !== b;
+        case '>':
+            return a > b;
+        case '<':
+            return a < b;
+        case '>=':
+            return a >= b;
+        case '<=':
+            return a <= b;
+        default:
+            return false;
+    }
+}
+
+function extractXPathOutput(node, output) {
+    if (output.type === 'text') {
+        return getNodeText(node);
+    }
+    if (output.type === 'attribute') {
+        return Object.prototype.hasOwnProperty.call(node._attributes || {}, output.name)
+            ? node._attributes[output.name]
+            : null;
+    }
+    return node;
+}
+
+function getNodeText(node) {
+    const parts = [];
+    if (node._text) parts.push(node._text);
+    (node._children || []).forEach(child => {
+        const text = getNodeText(child);
+        if (text) parts.push(text);
+    });
+    return parts.join('').trim();
+}
+
+function getDescendants(node) {
     const result = [];
-
-    function traverse(n) {
-        result.push(n);
-        if (n._children) {
-            for (const child of n._children) {
-                traverse(child);
-            }
-        }
+    function visit(current) {
+        (current._children || []).forEach(child => {
+            result.push(child);
+            visit(child);
+        });
     }
-
-    traverse(node);
+    visit(node);
     return result;
 }
+
+function uniqueNodes(nodes) {
+    const seen = new Set();
+    const result = [];
+    nodes.forEach(node => {
+        if (!seen.has(node)) {
+            seen.add(node);
+            result.push(node);
+        }
+    });
+    return result;
+}
+
+function decodeXml(value) {
+    return String(value)
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&apos;/g, "'")
+        .replace(/&amp;/g, '&');
+}
+
+function invalidXPath(expression) {
+    throw new Error(`Invalid XPath expression: ${expression}`);
+}
+
+execute;
