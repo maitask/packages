@@ -225,7 +225,7 @@ async function sendEmail(provider, emailData, config) {
         case 'mailgun':
             return await sendViaMailgun(emailData, config);
         case 'smtp':
-            return sendViaSMTP(emailData, config);
+            return await sendViaSMTP(emailData, config);
         default:
             throw new Error('Unsupported email provider: ' + provider);
     }
@@ -348,7 +348,7 @@ async function sendViaMailgun(emailData, config) {
     };
 }
 
-function sendViaSMTP(emailData, config) {
+async function sendViaSMTP(emailData, config) {
     if (!config.smtp_config || !config.smtp_config.host) {
         throw new Error('SMTP configuration with host is required');
     }
@@ -360,9 +360,226 @@ function sendViaSMTP(emailData, config) {
         throw new Error('SMTP port is required');
     }
 
-    // Note: JavaScript runtime doesn't have built-in SMTP client
-    // This would require a proper SMTP library or implementation
-    throw new Error('SMTP sending requires a proper SMTP client library. Use SendGrid or Mailgun for cloud email sending.');
+    var net;
+    var tls;
+    try {
+        net = await import('node:net');
+        tls = await import('node:tls');
+    } catch (error) {
+        throw new Error('SMTP provider requires a Node.js-compatible runtime with node:net and node:tls support');
+    }
+
+    var port = Number(smtpConfig.port);
+    var implicitTls = smtpConfig.secure === true && port === 465;
+    var useStartTls = smtpConfig.starttls === true || (smtpConfig.secure === true && !implicitTls);
+    var timeoutMs = Number(smtpConfig.timeout_ms || smtpConfig.timeout || 30000);
+    var host = smtpConfig.host;
+    var socket = implicitTls
+        ? tls.connect({ host: host, port: port, servername: host, rejectUnauthorized: smtpConfig.reject_unauthorized !== false })
+        : net.connect({ host: host, port: port });
+
+    var client = createSmtpConnection(socket, timeoutMs);
+    var messageId = buildMessageId(config.from.email);
+
+    try {
+        await client.expect([220]);
+        await client.command('EHLO ' + (smtpConfig.helo || 'maitask.local'), [250]);
+
+        if (useStartTls) {
+            await client.command('STARTTLS', [220]);
+            socket = tls.connect({
+                socket: socket,
+                servername: host,
+                rejectUnauthorized: smtpConfig.reject_unauthorized !== false
+            });
+            client = createSmtpConnection(socket, timeoutMs);
+            await client.command('EHLO ' + (smtpConfig.helo || 'maitask.local'), [250]);
+        }
+
+        if (smtpConfig.username || smtpConfig.user) {
+            var username = smtpConfig.username || smtpConfig.user;
+            var password = smtpConfig.password || smtpConfig.pass;
+            if (!password) {
+                throw new Error('SMTP password is required when username is provided');
+            }
+            await client.command('AUTH LOGIN', [334]);
+            await client.command(base64Encode(username), [334]);
+            await client.command(base64Encode(password), [235]);
+        }
+
+        await client.command('MAIL FROM:<' + config.from.email + '>', [250]);
+
+        var recipients = config.to.map(function(recipient) {
+            return typeof recipient === 'string' ? recipient : recipient.email;
+        });
+        for (var i = 0; i < recipients.length; i++) {
+            await client.command('RCPT TO:<' + recipients[i] + '>', [250, 251]);
+        }
+
+        await client.command('DATA', [354]);
+        await client.command(buildMimeMessage(config, emailData, messageId), [250], true);
+        await client.command('QUIT', [221]).catch(function() {});
+
+        return {
+            message_id: messageId,
+            provider_response: 'smtp:' + host + ':' + port
+        };
+    } finally {
+        client.close();
+    }
+}
+
+function createSmtpConnection(socket, timeoutMs) {
+    var buffer = '';
+    var pending = [];
+    var closed = false;
+
+    socket.setTimeout(timeoutMs);
+    socket.on('data', function(chunk) {
+        buffer += chunk.toString('utf8');
+        flush();
+    });
+    socket.on('error', function(error) {
+        fail(error);
+    });
+    socket.on('timeout', function() {
+        fail(new Error('SMTP connection timed out'));
+        socket.destroy();
+    });
+    socket.on('close', function() {
+        closed = true;
+        flush();
+    });
+
+    function flush() {
+        while (pending.length > 0) {
+            var response = readResponse();
+            if (!response) {
+                if (closed) {
+                    pending.shift().reject(new Error('SMTP connection closed before response'));
+                }
+                return;
+            }
+            pending.shift().resolve(response);
+        }
+    }
+
+    function fail(error) {
+        while (pending.length > 0) {
+            pending.shift().reject(error);
+        }
+    }
+
+    function readResponse() {
+        var lines = buffer.split(/\r?\n/);
+        var completeIndex = -1;
+        for (var i = 0; i < lines.length; i++) {
+            if (/^\d{3}\s/.test(lines[i])) {
+                completeIndex = i;
+                break;
+            }
+        }
+        if (completeIndex === -1) return null;
+
+        var responseLines = lines.slice(0, completeIndex + 1);
+        buffer = lines.slice(completeIndex + 1).join('\n');
+        var lastLine = responseLines[responseLines.length - 1];
+        return {
+            code: Number(lastLine.slice(0, 3)),
+            message: responseLines.join('\n')
+        };
+    }
+
+    function nextResponse() {
+        return new Promise(function(resolve, reject) {
+            pending.push({ resolve: resolve, reject: reject });
+            flush();
+        });
+    }
+
+    return {
+        expect: async function(expectedCodes) {
+            var response = await nextResponse();
+            if (expectedCodes.indexOf(response.code) === -1) {
+                throw new Error('Unexpected SMTP response ' + response.code + ': ' + response.message);
+            }
+            return response;
+        },
+        command: async function(command, expectedCodes, rawData) {
+            socket.write(rawData ? dotStuff(command) + '\r\n.\r\n' : command + '\r\n');
+            return this.expect(expectedCodes);
+        },
+        close: function() {
+            if (!socket.destroyed) socket.end();
+        }
+    };
+}
+
+function buildMimeMessage(config, emailData, messageId) {
+    var from = formatAddress(config.from);
+    var to = config.to.map(formatAddress).join(', ');
+    var headers = [
+        'From: ' + from,
+        'To: ' + to,
+        'Subject: ' + encodeHeader(config.subject),
+        'Date: ' + new Date().toUTCString(),
+        'Message-ID: <' + messageId + '>',
+        'MIME-Version: 1.0'
+    ];
+
+    if (emailData.html && emailData.text) {
+        var boundary = 'maitask-' + Math.random().toString(16).slice(2);
+        headers.push('Content-Type: multipart/alternative; boundary="' + boundary + '"');
+        return headers.join('\r\n') + '\r\n\r\n' +
+            '--' + boundary + '\r\n' +
+            'Content-Type: text/plain; charset=UTF-8\r\n' +
+            'Content-Transfer-Encoding: 8bit\r\n\r\n' +
+            emailData.text + '\r\n' +
+            '--' + boundary + '\r\n' +
+            'Content-Type: text/html; charset=UTF-8\r\n' +
+            'Content-Transfer-Encoding: 8bit\r\n\r\n' +
+            emailData.html + '\r\n' +
+            '--' + boundary + '--';
+    }
+
+    if (emailData.html) {
+        headers.push('Content-Type: text/html; charset=UTF-8');
+        headers.push('Content-Transfer-Encoding: 8bit');
+        return headers.join('\r\n') + '\r\n\r\n' + emailData.html;
+    }
+
+    headers.push('Content-Type: text/plain; charset=UTF-8');
+    headers.push('Content-Transfer-Encoding: 8bit');
+    return headers.join('\r\n') + '\r\n\r\n' + (emailData.text || '');
+}
+
+function formatAddress(address) {
+    if (typeof address === 'string') return address;
+    return address.name ? encodeHeader(address.name) + ' <' + address.email + '>' : address.email;
+}
+
+function encodeHeader(value) {
+    if (/^[\x00-\x7F]*$/.test(value)) return value;
+    return '=?UTF-8?B?' + base64Encode(value) + '?=';
+}
+
+function buildMessageId(fromEmail) {
+    var domain = String(fromEmail || 'maitask.local').split('@')[1] || 'maitask.local';
+    return Date.now().toString(36) + '.' + Math.random().toString(36).slice(2) + '@' + domain;
+}
+
+function dotStuff(message) {
+    return String(message).replace(/^\./gm, '..');
+}
+
+function base64Encode(value) {
+    if (typeof Buffer !== 'undefined') {
+        return Buffer.from(String(value), 'utf8').toString('base64');
+    }
+    if (typeof btoa === 'function') {
+        return btoa(unescape(encodeURIComponent(String(value))));
+    }
+    throw new Error('Base64 encoding is not available in this runtime');
 }
 
 function mergeObjects(base, extra) {
