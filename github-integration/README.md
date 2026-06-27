@@ -1,176 +1,200 @@
 # @maitask/github-integration
 
-GitHub REST API integration for repositories and users.
+GitHub REST API integration for repositories, issues, pull requests, users, and custom API calls.
 
 ## Features
 
-- List repositories for a user or organization
-- Get detailed information about a specific repository
-- List issues in a repository
-- Create new issues
-- Get user profile information
-- GitHub API authentication support
+- List repositories for a user, organization, or authenticated account.
+- Get repository details.
+- List and create issues.
+- List, get, and create pull requests.
+- Get public or authenticated user profiles.
+- Execute custom GitHub REST API calls with `method`, `path`, `query`, and `json` body.
+- Supports public GET calls without a token and authenticated writes with a token.
+- Supports GitHub Enterprise through `baseUrl`.
+- Provides rate-limit metadata and standardized `items` / `summary` fields without removing legacy action-specific fields.
 
-## Configuration
+## Authentication
 
-### Required Options
+Read-only public calls can run without a token. Authenticated calls use one of:
 
-- `token`: GitHub personal access token with required scopes
+- `token`
+- `apiKey` / `api_key`
+- `context.secrets.GITHUB_TOKEN`
+- `context.secrets.GH_TOKEN`
+- `context.env.GITHUB_TOKEN`
 
-### Optional Options
+## Actions
 
-- `action`: Action to perform ('list-repos', 'get-repo', 'list-issues', 'create-issue', 'get-user') - default: 'list-repos'
-- `owner`: GitHub username or organization name (required for repo-specific actions)
-- `repo`: Repository name (required for repo-specific actions)
-- `username`: Username for user-specific actions (defaults to owner)
-- `per_page`: Number of items per page (max 100) - default: 30
-- `title`: Issue title (for create-issue action)
-- `body`: Issue body (for create-issue action)
-- `labels`: Issue labels (for create-issue action)
+Legacy actions are still supported:
 
-## Usage Examples
+- `list-repos`
+- `get-repo`
+- `list-issues`
+- `create-issue`
+- `get-user`
 
-### List Repositories
+Additional actions:
 
-```javascript
+- `list-pulls`
+- `get-pull`
+- `create-pull`
+- `request`
+
+Dot-notation aliases are also supported:
+
+- `repos.list`
+- `repos.get`
+- `issues.list`
+- `issues.create`
+- `pulls.list`
+- `pulls.get`
+- `pulls.create`
+- `users.get`
+- `rest.request`
+
+## Examples
+
+### List Public Repositories
+
+```json
 {
-  "token": "your_github_token",
-  "action": "list-repos",
-  "owner": "octocat",
-  "per_page": 20
+  "package": "@maitask/github-integration",
+  "input": {
+    "operation": "repos.list",
+    "owner": "octocat",
+    "per_page": 20
+  }
 }
 ```
 
 ### Get Repository Details
 
-```javascript
+```json
 {
-  "token": "your_github_token",
-  "action": "get-repo",
-  "owner": "microsoft",
-  "repo": "typescript"
+  "package": "@maitask/github-integration",
+  "input": {
+    "operation": "repos.get",
+    "owner": "microsoft",
+    "repo": "typescript"
+  }
 }
 ```
 
-### List Repository Issues
+### List Issues
 
-```javascript
+```json
 {
-  "token": "your_github_token",
-  "action": "list-issues",
-  "owner": "facebook",
-  "repo": "react",
-  "per_page": 15
+  "package": "@maitask/github-integration",
+  "input": {
+    "operation": "issues.list",
+    "owner": "facebook",
+    "repo": "react",
+    "state": "open",
+    "labels": ["bug"],
+    "per_page": 15
+  }
 }
 ```
 
-### Create New Issue
+### Create Issue
 
-```javascript
+```json
 {
-  "token": "your_github_token",
-  "action": "create-issue",
-  "owner": "octocat",
-  "repo": "hello-world",
-  "title": "New feature request",
-  "body": "This is the issue description",
-  "labels": ["bug", "feature-request"]
+  "package": "@maitask/github-integration",
+  "input": {
+    "operation": "issues.create",
+    "token": "$GITHUB_TOKEN",
+    "owner": "octocat",
+    "repo": "hello-world",
+    "title": "New feature request",
+    "body": "This is the issue description",
+    "labels": ["feature-request"]
+  }
 }
 ```
 
-### Get User Information
+### Create Pull Request
 
-```javascript
+```json
 {
-  "token": "your_github_token",
-  "action": "get-user",
-  "username": "octocat"
+  "package": "@maitask/github-integration",
+  "input": {
+    "operation": "pulls.create",
+    "token": "$GITHUB_TOKEN",
+    "owner": "octocat",
+    "repo": "hello-world",
+    "title": "Merge feature branch",
+    "head": "feature-branch",
+    "base": "main",
+    "body": "Ready for review"
+  }
 }
 ```
 
-## Return Value
+### Custom REST Request
 
-Success response structure varies by action:
+```json
+{
+  "package": "@maitask/github-integration",
+  "input": {
+    "operation": "rest.request",
+    "token": "$GITHUB_TOKEN",
+    "method": "GET",
+    "path": "/repos/owner/repo/actions/runs",
+    "query": {
+      "per_page": 10
+    }
+  }
+}
+```
 
-### List Repositories Response
+## Common Options
 
-```javascript
+- `baseUrl`: GitHub API base URL. Default: `https://api.github.com`.
+- `timeoutMs` / `timeout`: Request timeout in milliseconds. Default: `30000`.
+- `owner`: Repository owner or organization.
+- `repo`: Repository name.
+- `per_page` / `perPage` / `limit`: Page size, max `100`.
+- `page`: Page number.
+- `state`: Issue or pull state.
+- `sort`: Sort field.
+- `direction`: Sort direction.
+
+## Response Contract
+
+Action-specific fields remain available, and every successful response also includes `items` and `summary`.
+
+```json
 {
   "success": true,
-  "message": "GitHub list-repos completed successfully",
   "data": {
-    "repositories": [
-      {
-        "id": 123,
-        "name": "repo-name",
-        "full_name": "owner/repo-name",
-        "description": "Repository description",
-        "private": true,
-        "html_url": "https://github.com/owner/repo-name",
-        "clone_url": "https://github.com/owner/repo-name.git",
-        "ssh_url": "git@github.com:owner/repo-name.git",
-        "language": "JavaScript",
-        "forks_count": 5,
-        "stargazers_count": 50,
-        "watchers_count": 50,
-        "size": 1000,
-        "default_branch": "main",
-        "open_issues_count": 3,
-        "created_at": "2021-01-01T00:00:00Z",
-        "updated_at": "2021-12-01T00:00:00Z",
-        "pushed_at": "2021-11-30T00:00:00Z"
-      }
-    ],
-    "total": 1
+    "repositories": [],
+    "total": 0,
+    "rateLimit": {
+      "limit": 60,
+      "remaining": 59,
+      "reset": 1234567890,
+      "used": 1,
+      "resource": "core"
+    },
+    "items": [],
+    "summary": {
+      "total": 0,
+      "successCount": 0,
+      "failureCount": 0
+    }
   },
   "metadata": {
+    "package": "@maitask/github-integration",
+    "version": "0.2.0",
+    "provider": "github",
     "action": "list-repos",
-    "executedAt": "2025-01-27T10:30:00.000Z",
-    "rateLimit": {
-      "limit": 5000,
-      "remaining": 4999,
-      "reset": 1234567890,
-      "used": 1
-    }
+    "operation": "repos.list",
+    "executionMs": 42,
+    "rateLimit": {}
   }
 }
 ```
 
-### Create Issue Response
-
-```javascript
-{
-  "success": true,
-  "message": "GitHub create-issue completed successfully",
-  "data": {
-    "issue": {
-      "id": 123,
-      "number": 1,
-      "title": "New issue title",
-      "body": "Issue body",
-      "state": "open",
-      "html_url": "https://github.com/owner/repo/issues/1",
-      "created_at": "2025-01-27T10:30:00.000Z"
-    }
-  }
-}
-```
-
-Error response:
-
-```javascript
-{
-  "success": false,
-  "message": "GitHub API error: error message",
-  "error": "error details"
-}
-```
-
-## Response Contract (Current)
-
-The package uses a standardized envelope:
-
-- Success: `{ success: true, data: {...}, metadata: {...} }`
-- Failure: `{ success: false, error: { message, code, type }, metadata: {...} }`
-
-Legacy `message` and string `error` fields are deprecated.
+Failures use `{ success: false, error: { message, code, type, status, details }, metadata }`.

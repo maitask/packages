@@ -1,7 +1,7 @@
 {
   "name": "@maitask/github-integration",
-  "version": "0.1.0",
-  "description": "GitHub API integration for repositories and users",
+  "version": "0.2.0",
+  "description": "GitHub REST API integration for repositories, issues, pull requests, users, and custom REST calls",
   "main": "index.js",
   "types": "index.d.ts",
   "type": "module",
