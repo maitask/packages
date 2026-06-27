@@ -8,7 +8,9 @@ Every package exposes one async-compatible entry point:
 execute(input, options, context)
 ```
 
-The function must return a JSON-serializable `PackageExecutionResult`.
+The function must return a JSON-serializable value. Runtime canonicalizes that
+value into `PackageExecutionResult` before it reaches Plane, adapters, or the
+frontend.
 
 ## Input
 
@@ -32,7 +34,8 @@ Packages must not mutate `input`, `options`, or `context`.
 
 ## Output
 
-All packages must return exactly this top-level shape:
+All package executions are exposed at the Runtime boundary with this top-level
+shape:
 
 ```json
 {
@@ -109,8 +112,8 @@ Failure output:
 - Package-specific per-item diagnostics belong in `item.metadata`.
 - Execution and delivery metadata belongs in top-level `metadata`.
 - Source references belong in top-level `citations`, and items may point to them through `citationIds`.
-- Packages must not return legacy aliases such as top-level `result`, `rows`, `repositories`, `message`, `parser`, or `statistics`.
-- Runtime enforces this contract at the execution boundary. Plane and frontend consume only the standard output.
+- Public consumers must not depend on package-specific top-level aliases such as `result`, `rows`, `repositories`, `message`, `parser`, or `statistics`.
+- Runtime enforces this contract at the execution boundary. Plane, adapters, and the frontend consume only the standard output.
 
 ## Runtime HTTP Execute Response
 

@@ -12,7 +12,7 @@ GitHub REST API integration for repositories, issues, pull requests, users, and 
 - Execute custom GitHub REST API calls with `method`, `path`, `query`, and `json` body.
 - Supports public GET calls without a token and authenticated writes with a token.
 - Supports GitHub Enterprise through `baseUrl`.
-- Provides rate-limit metadata and standardized `items` / `summary` fields without removing legacy action-specific fields.
+- Provides rate-limit metadata that Runtime exposes through standardized `items` and `summary` output.
 
 ## Authentication
 
@@ -26,7 +26,7 @@ Read-only public calls can run without a token. Authenticated calls use one of:
 
 ## Actions
 
-Legacy actions are still supported:
+Action names:
 
 - `list-repos`
 - `get-repo`

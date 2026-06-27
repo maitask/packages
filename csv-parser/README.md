@@ -100,7 +100,6 @@ const result = execute({ base64: base64Csv });
   format: "csv" | "tsv" | "csv-semicolon" | "csv-pipe",
   headers: string[],           // Column headers
   rows: object[],             // Data rows as objects
-  data: object[],             // Alias for rows (compatibility)
   statistics: {
     totalRows: number,         // Number of data rows
     totalColumns: number,      // Number of columns

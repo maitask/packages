@@ -128,7 +128,7 @@ function buildSlackPayload(config) {
         payload.blocks = config.blocks;
     }
 
-    // Attachments (legacy but still supported)
+    // Slack attachment blocks
     if (config.attachments) {
         payload.attachments = config.attachments;
     }

@@ -211,5 +211,3 @@ The package uses a standardized envelope:
 
 - Success: `{ success: true, data: { status, headers, body, ... }, metadata: {...} }`
 - Failure: `{ success: false, error: { message, code, type }, metadata: {...} }`
-
-Legacy top-level `status/statusText/body` fields are deprecated.

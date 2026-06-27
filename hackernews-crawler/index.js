@@ -182,12 +182,12 @@ async function requestJson(url, requestOptions) {
     }
 
     if (typeof httpGet === 'function') {
-        var legacy = httpGet(url, requestOptions || {});
-        validateHttpResponse(legacy, url);
-        if (legacy.data !== undefined) {
-            return legacy.data;
+        var fallback = httpGet(url, requestOptions || {});
+        validateHttpResponse(fallback, url);
+        if (fallback.data !== undefined) {
+            return fallback.data;
         }
-        return parseJson(legacy.body, url);
+        return parseJson(fallback.body, url);
     }
 
     if (typeof fetch === 'function') {

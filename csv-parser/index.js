@@ -49,7 +49,6 @@ function execute(input, options = {}, context = {}) {
             format: detectFormat(config.delimiter),
             headers,
             rows: validatedData.rows,
-            data: validatedData.rows, // Alias for compatibility
             statistics: {
                 totalRows: validatedData.rows.length,
                 totalColumns: headers.length,

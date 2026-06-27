@@ -7,7 +7,7 @@
  * - Timeout handling with abort support
  * - Query parameters, authentication helpers, JSON, form, multipart, and raw bodies
  * - Response parsing for JSON, text, blob, arraybuffer, and base64
- * - Backward-compatible response fields plus standardized items/summary metadata
+ * - Runtime-standardized items and summary metadata at the execution boundary
  */
 
 const PACKAGE_NAME = '@maitask/http-request';

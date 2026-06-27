@@ -6,7 +6,7 @@ Send notifications and messages to Slack channels via incoming webhooks.
 
 - **Simple Text Messages**: Quick notifications with plain text
 - **Block Kit Support**: Rich messages with modern Slack layouts
-- **Attachments**: Legacy format with colors and fields
+- **Attachments**: Slack attachment payloads with colors and fields
 - **Thread Replies**: Reply to existing messages in threads
 - **Markdown Formatting**: Bold, italic, code, and links
 - **Custom Bot**: Configure bot name and icon
@@ -63,7 +63,7 @@ maitask run @maitask/slack-notifier --input notification.json
 | `webhook_url` | string | Yes | Slack incoming webhook URL |
 | `text` | string | No | Message text (fallback for blocks) |
 | `blocks` | array | No | Block Kit layout objects |
-| `attachments` | array | No | Legacy attachments |
+| `attachments` | array | No | Slack attachment payloads |
 | `thread_ts` | string | No | Thread timestamp for replies |
 | `username` | string | No | Bot display name (default: "Maitask Bot") |
 | `icon_emoji` | string | No | Bot emoji icon (default: ":robot_face:") |

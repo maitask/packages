@@ -11,7 +11,7 @@ Production-grade HTTP client wrapper for Maitask Runtime.
 - JSON, URL-encoded form, multipart form, raw string, Blob, ArrayBuffer, and FormData request bodies.
 - JSON, text, Blob, ArrayBuffer, and Base64 response parsing.
 - Status validation with retryable status controls.
-- Backward-compatible response fields plus standardized `items` and `summary`.
+- Runtime-standardized `items` and `summary` metadata at the execution boundary.
 
 ## Usage
 

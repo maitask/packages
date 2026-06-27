@@ -104,7 +104,7 @@ Output:
 - RSS feed parsing
 - SOAP API integration
 - Configuration file processing
-- Legacy system data extraction
+- Enterprise system data extraction
 - SVG parsing
 
 ## License
