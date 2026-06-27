@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Convert between file formats: JSON, CSV, XML, YAML, TOML",
   "main": "index.js",
-  "type": "module",
+  "type": "commonjs",
   "author": "Maitask Team <team@maitask.com>",
   "license": "MIT",
   "keywords": [

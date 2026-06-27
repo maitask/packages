@@ -355,4 +355,7 @@ function bytesToUtf8(bytes) {
     return result;
 }
 
+if (typeof module !== "undefined") {
+  module.exports = { execute };
+}
 execute;

@@ -4,7 +4,7 @@
   "description": "Comprehensive data validation and quality assurance",
   "main": "index.js",
   "types": "index.d.ts",
-  "type": "module",
+  "type": "commonjs",
   "author": "Maitask Team <team@maitask.com>",
   "license": "MIT",
   "homepage": "https://github.com/maitask/packages/tree/main/data-validator",

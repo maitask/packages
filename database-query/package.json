@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Execute SQL queries against PostgreSQL, MySQL, or SQLite via HTTP data APIs",
   "main": "index.js",
-  "type": "module",
+  "type": "commonjs",
   "author": "Maitask Team <team@maitask.com>",
   "license": "MIT",
   "keywords": [

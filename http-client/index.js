@@ -83,6 +83,9 @@ async function execute(input, options = {}, context = {}) {
   }
 }
 
+if (typeof module !== "undefined") {
+  module.exports = { execute };
+}
 execute;
 
 async function fetchWithTimeout(url, { method, headers, body, timeoutMs }) {

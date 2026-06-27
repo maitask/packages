@@ -41,6 +41,9 @@ async function execute(input, options = {}, context = {}) {
   }
 }
 
+if (typeof module !== "undefined") {
+  module.exports = { execute };
+}
 execute;
 
 async function callProvider({ provider, apiKey, prompt, language, model, timeoutMs }) {

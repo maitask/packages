@@ -4,7 +4,7 @@
   "description": "GitHub REST API integration for repositories, issues, pull requests, users, and custom REST calls",
   "main": "index.js",
   "types": "index.d.ts",
-  "type": "module",
+  "type": "commonjs",
   "author": "Maitask Team <team@maitask.com>",
   "license": "MIT",
   "keywords": [

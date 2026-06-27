@@ -191,4 +191,7 @@ function estimateFileSize(data, headers) {
     return 3000 + headerSize * 10 + dataSize * 2;
 }
 
+if (typeof module !== "undefined") {
+  module.exports = { execute };
+}
 execute;

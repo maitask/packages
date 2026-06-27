@@ -427,4 +427,7 @@ function inferValue(value) {
     return trimmed;
 }
 
+if (typeof module !== "undefined") {
+  module.exports = { execute };
+}
 execute;

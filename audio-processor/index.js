@@ -346,4 +346,7 @@ async function generateAudioWithIndexTTS(input, options, apiKey) {
     };
 }
 
+if (typeof module !== "undefined") {
+  module.exports = { execute };
+}
 execute;

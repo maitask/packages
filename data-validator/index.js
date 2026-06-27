@@ -730,4 +730,7 @@ function mergeObjects(base, extra) {
     return result;
 }
 
+if (typeof module !== "undefined") {
+  module.exports = { execute };
+}
 execute;

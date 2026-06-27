@@ -4,7 +4,7 @@
   "description": "Send messages to Telegram users and groups via Bot API",
   "main": "index.js",
   "types": "index.d.ts",
-  "type": "module",
+  "type": "commonjs",
   "author": "Maitask Team <team@maitask.com>",
   "license": "MIT",
   "homepage": "https://github.com/maitask/packages/tree/main/telegram-bot",

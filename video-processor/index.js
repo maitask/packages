@@ -226,4 +226,7 @@ async function processWithOpenAI(videoData, prompt, model, input, apiKey) {
     };
 }
 
+if (typeof module !== "undefined") {
+  module.exports = { execute };
+}
 execute;

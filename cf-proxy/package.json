@@ -4,7 +4,7 @@
   "description": "Cloudflare Worker proxy for GitHub and Docker registry acceleration with intelligent redirect handling",
   "main": "index.js",
   "types": "index.d.ts",
-  "type": "module",
+  "type": "commonjs",
   "author": "Maitask Team <team@maitask.com>",
   "license": "MIT",
   "homepage": "https://github.com/maitask/packages/tree/main/cf-proxy",

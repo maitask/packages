@@ -905,4 +905,7 @@ function buildError(error, code, type) {
   };
 }
 
+if (typeof module !== "undefined") {
+  module.exports = { execute };
+}
 execute;

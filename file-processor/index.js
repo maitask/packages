@@ -1193,4 +1193,7 @@ function indexOfValue(list, value) {
     return -1;
 }
 
+if (typeof module !== "undefined") {
+  module.exports = { execute };
+}
 execute;

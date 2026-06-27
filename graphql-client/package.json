@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Execute GraphQL queries and mutations against any GraphQL endpoint",
   "main": "index.js",
-  "type": "module",
+  "type": "commonjs",
   "author": "Maitask Team <team@maitask.com>",
   "license": "MIT",
   "keywords": [

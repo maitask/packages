@@ -494,4 +494,7 @@ function decodeBase64ToBytes(base64) {
     return bytes;
 }
 
+if (typeof module !== "undefined") {
+  module.exports = { execute };
+}
 execute;

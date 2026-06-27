@@ -603,4 +603,7 @@ function ensureFetch(packageName) {
     }
 }
 
+if (typeof module !== "undefined") {
+  module.exports = { execute };
+}
 execute;

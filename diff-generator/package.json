@@ -4,7 +4,7 @@
   "description": "Data difference comparison and patch generation",
   "main": "index.js",
   "types": "index.d.ts",
-  "type": "module",
+  "type": "commonjs",
   "author": "Maitask Team <team@maitask.com>",
   "license": "MIT",
   "homepage": "https://github.com/maitask/packages/tree/main/diff-generator",

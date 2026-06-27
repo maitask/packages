@@ -52,6 +52,9 @@ async function execute(input, options = {}, context = {}) {
   }
 }
 
+if (typeof module !== "undefined") {
+  module.exports = { execute };
+}
 execute;
 
 async function fetchJson(url, { method, headers, body, timeoutMs }) {

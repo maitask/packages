@@ -57,6 +57,9 @@ async function execute(input, options = {}, context = {}) {
   }
 }
 
+if (typeof module !== "undefined") {
+  module.exports = { execute };
+}
 execute;
 
 function normalizeOperation(value) {

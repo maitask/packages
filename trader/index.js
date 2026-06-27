@@ -562,4 +562,4 @@ function clamp(value, min, max, fallback) {
     return Math.min(max, Math.max(min, value));
 }
 
-execute;
+export { execute };

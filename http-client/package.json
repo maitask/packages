@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "HTTP client with retry, timeout, and auth support",
   "main": "index.js",
-  "type": "module",
+  "type": "commonjs",
   "author": "Maitask Team <team@maitask.com>",
   "license": "MIT",
   "keywords": [

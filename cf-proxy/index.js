@@ -272,4 +272,7 @@ function ensureFetch() {
   }
 }
 
+if (typeof module !== "undefined") {
+  module.exports = { execute };
+}
 execute;

@@ -4,7 +4,7 @@
   "description": "Text sentiment analysis using AI models for Maitask",
   "main": "index.js",
   "types": "index.d.ts",
-  "type": "module",
+  "type": "commonjs",
   "author": "Maitask Team <team@maitask.com>",
   "license": "MIT",
   "keywords": [

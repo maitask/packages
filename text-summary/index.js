@@ -182,4 +182,7 @@ Return only the summary text, no additional commentary.`;
     }
 }
 
+if (typeof module !== "undefined") {
+  module.exports = { execute };
+}
 execute;

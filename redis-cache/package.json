@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Redis cache operations via HTTP - get, set, delete, expire",
   "main": "index.js",
-  "type": "module",
+  "type": "commonjs",
   "author": "Maitask Team <team@maitask.com>",
   "license": "MIT",
   "keywords": [

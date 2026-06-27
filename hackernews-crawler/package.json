@@ -4,7 +4,7 @@
   "description": "Crawl and extract stories from Hacker News using official API",
   "main": "index.js",
   "types": "index.d.ts",
-  "type": "module",
+  "type": "commonjs",
   "author": "Maitask Team <team@maitask.com>",
   "license": "MIT",
   "keywords": [

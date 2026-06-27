@@ -146,4 +146,7 @@ function estimateStreamSize(data) {
     }, 0);
 }
 
+if (typeof module !== "undefined") {
+  module.exports = { execute };
+}
 execute;

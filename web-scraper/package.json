@@ -4,7 +4,7 @@
   "description": "Extract data from web pages with HTML parsing, CSS selectors, and XPath queries",
   "main": "index.js",
   "types": "index.d.ts",
-  "type": "module",
+  "type": "commonjs",
   "author": "Maitask Team <team@maitask.com>",
   "license": "MIT",
   "homepage": "https://github.com/maitask/packages/tree/main/web-scraper",

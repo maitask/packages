@@ -467,4 +467,7 @@ function invalidXPath(expression) {
     throw new Error(`Invalid XPath expression: ${expression}`);
 }
 
+if (typeof module !== "undefined") {
+  module.exports = { execute };
+}
 execute;

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Answer questions about documents using AI",
   "main": "index.js",
-  "type": "module",
+  "type": "commonjs",
   "author": "Maitask Team <team@maitask.com>",
   "license": "MIT",
   "keywords": [
