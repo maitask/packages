@@ -1,4 +1,5 @@
 async function execute(input, options = {}, context = {}) {
+    const startedAt = Date.now();
     try {
         ensureFetch('web-scraper');
         const targets = normalizeTargets(input);
@@ -21,35 +22,68 @@ async function execute(input, options = {}, context = {}) {
             }
         }
 
-        const successCount = results.filter((item) => item.success).length;
+        const success_count = results.filter((item) => item.success).length;
 
         return {
-            success: successCount > 0,
+            success: success_count > 0,
             data: {
-                total: results.length,
-                successCount,
-                failureCount: results.length - successCount,
-                results
+                items: results.map((item, index) => ({
+                    index,
+                    id: item.url || String(index),
+                    data: item,
+                    metadata: {
+                        status: item.status || null,
+                        success: item.success === true
+                    }
+                })),
+                summary: {
+                    total: results.length,
+                    success_count,
+                    failure_count: results.length - success_count
+                }
+            },
+            error: success_count > 0 ? null : {
+                message: 'No targets were scraped successfully',
+                code: 'WEB_SCRAPER_NO_SUCCESSFUL_TARGETS',
+                type: 'WebScraperError',
+                details: { total: results.length }
             },
             metadata: {
+                contract_version: '2026-06-27',
                 package: '@maitask/web-scraper',
                 version: '0.1.0',
+                execution_id: context?.execution_id || null,
+                execution_ms: Date.now() - startedAt,
                 timestamp: new Date().toISOString()
-            }
+            },
+            citations: []
         };
     } catch (error) {
         return {
             success: false,
+            data: {
+                items: [],
+                summary: {
+                    total: 0,
+                    success_count: 0,
+                    failure_count: 1
+                }
+            },
             error: {
                 message: error.message || 'Web scraping failed',
                 code: 'WEB_SCRAPER_ERROR',
-                type: error.name || 'WebScraperError'
+                type: error.name || 'WebScraperError',
+                details: null
             },
             metadata: {
+                contract_version: '2026-06-27',
                 package: '@maitask/web-scraper',
                 version: '0.1.0',
+                execution_id: context?.execution_id || null,
+                execution_ms: Date.now() - startedAt,
                 timestamp: new Date().toISOString()
-            }
+            },
+            citations: []
         };
     }
 }

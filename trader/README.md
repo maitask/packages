@@ -41,7 +41,7 @@ Adding a venue is as simple as dropping a file into `providers/` and registering
 | `performance`                | Live metrics (`dailyLoss`, `drawdown`, `equity`) used for guardrails.                                                                                        |
 | `exchange`                   | `{ provider: 'binance' \\ 'aster' \\ 'okx' \\ 'paper', market?, apiKey, apiSecret, testnet?, passphrase? }`. Keys can also live in `context.secrets`.        |
 | `exchange.market`            | Market flavor per provider (`'futures'`, `'spot'`, `'swap'`). Defaults to `'futures'` for Binance, `'swap'` for OKX, and is ignored for the paper simulator. |
-| `stream`                     | Streaming preferences `{ channel, interval, limit, durationMs }` used by the `stream` action.                                                                |
+| `stream`                     | Streaming preferences `{ channel, interval, limit, duration_ms }` used by the `stream` action.                                                                |
 | `paperState`                 | Persisted simulator state from the previous invocation (positions, balance, equity curve).                                                                   |
 | `backtest`                   | Optional `{ candles, capital }` override for the `backtest` action.                                                                                          |
 
@@ -163,7 +163,7 @@ Capture live ticks via provider WebSocket feeds. The task connects for a bounded
   "stream": {
     "channel": "bookTicker",
     "limit": 25,
-    "durationMs": 8000
+    "duration_ms": 8000
   },
   "exchange": {
     "provider": "binance",

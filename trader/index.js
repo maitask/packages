@@ -29,6 +29,7 @@ const PACKAGE_VERSION = '0.1.0';
 async function execute(input = {}, options = {}, context = {}) {
     ensureFetch();
     ensureCrypto();
+    const startedAt = Date.now();
 
     try {
         const config = buildConfig(input, options, context);
@@ -58,44 +59,79 @@ async function execute(input = {}, options = {}, context = {}) {
                 throw new Error(`Unsupported action: ${config.action}`);
         }
 
-        return successResponse(payload, config, exchange);
+        return successResponse(payload, config, exchange, context, startedAt);
     } catch (error) {
-        return errorResponse(error, input, options);
+        return errorResponse(error, input, options, context, startedAt);
     }
 }
 
-function successResponse(payload, config, exchange) {
+function successResponse(payload, config, exchange, context, startedAt) {
     return {
         success: true,
-        data: payload,
+        data: {
+            items: [
+                {
+                    index: 0,
+                    data: payload,
+                },
+            ],
+            summary: {
+                total: 1,
+                success_count: 1,
+                failure_count: 0,
+                metrics: {
+                    action: config.action,
+                    provider: config.exchange?.provider,
+                    mode: exchange?.mode || null,
+                },
+            },
+        },
+        error: null,
         metadata: {
+            contract_version: '2026-06-27',
             package: PACKAGE_NAME,
             version: PACKAGE_VERSION,
+            execution_id: context?.execution_id || null,
+            execution_ms: Date.now() - startedAt,
             action: config.action,
             symbol: config.symbol,
             provider: config.exchange?.provider,
             mode: exchange?.mode || null,
             timestamp: new Date().toISOString(),
         },
+        citations: [],
     };
 }
 
-function errorResponse(error, input = {}, options = {}) {
+function errorResponse(error, input = {}, options = {}, context = {}, startedAt = Date.now()) {
     const source = mergeObjects(options, input);
     return {
         success: false,
+        data: {
+            items: [],
+            summary: {
+                total: 0,
+                success_count: 0,
+                failure_count: 1,
+            },
+        },
         error: {
             message: error?.message || 'Unknown trader error',
             code: error?.code || 'TRADER_ERROR',
             type: error?.name || 'TraderError',
+            details: null,
         },
         metadata: {
+            contract_version: '2026-06-27',
             package: PACKAGE_NAME,
             version: PACKAGE_VERSION,
+            execution_id: context?.execution_id || null,
+            execution_ms: Date.now() - startedAt,
             action: source.action || 'analyze',
             symbol: source.symbol || 'BTCUSDT',
             timestamp: new Date().toISOString(),
         },
+        citations: [],
     };
 }
 
@@ -273,8 +309,8 @@ async function performStream(config, exchange) {
     const streamOptions = {
         channel: config.stream?.channel || 'bookTicker',
         interval: config.stream?.interval || config.interval || '1m',
-        limit: config.stream?.limit || config.stream?.messageLimit || 20,
-        durationMs: config.stream?.durationMs || config.stream?.windowMs || 5000,
+        limit: config.stream?.limit || config.stream?.message_limit || 20,
+        duration_ms: config.stream?.duration_ms || config.stream?.window_ms || 5000,
     };
 
     const stream = await exchange.streamMarket(config.symbol, streamOptions);
@@ -285,8 +321,8 @@ async function performStream(config, exchange) {
         metadata: {
             provider: config.exchange.provider,
             channel: streamOptions.channel,
-            messageLimit: streamOptions.limit,
-            durationMs: streamOptions.durationMs,
+            message_limit: streamOptions.limit,
+            duration_ms: streamOptions.duration_ms,
         },
     };
 }

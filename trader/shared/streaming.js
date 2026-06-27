@@ -27,7 +27,7 @@ export async function streamBinanceFeed({
     channel = 'bookTicker',
     interval = '1m',
     limit = 20,
-    durationMs = 5000,
+    duration_ms = 5000,
     market = 'futures',
     endpointOverride,
 }) {
@@ -43,8 +43,8 @@ export async function streamBinanceFeed({
 
     const samples = await collectWebSocketFeed({
         url,
-        messageLimit: limit,
-        durationMs,
+        message_limit: limit,
+        duration_ms,
         transform: (raw) => {
             const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
             return {
@@ -66,7 +66,7 @@ export async function streamBinanceFeed({
         samples,
         stats: {
             count: samples.length,
-            durationMs,
+            duration_ms,
         },
     };
 }
@@ -75,7 +75,7 @@ export async function streamOkxFeed({
     symbol,
     channel = 'tickers',
     limit = 20,
-    durationMs = 5000,
+    duration_ms = 5000,
     market = 'swap',
 }) {
     const upper = symbol.toUpperCase();
@@ -93,8 +93,8 @@ export async function streamOkxFeed({
 
     const samples = await collectWebSocketFeed({
         url: OKX_PUBLIC_WS,
-        messageLimit: limit,
-        durationMs,
+        message_limit: limit,
+        duration_ms,
         onOpen: (ws) => {
             ws.send(
                 JSON.stringify({
@@ -129,7 +129,7 @@ export async function streamOkxFeed({
         samples: flattened,
         stats: {
             count: flattened.length,
-            durationMs,
+            duration_ms,
         },
     };
 }

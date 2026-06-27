@@ -113,41 +113,49 @@ async function performRequest(config) {
 
 function buildResponseData(response, body) {
     const headers = Object.fromEntries(response.headers.entries());
-    const data = {
-        status: response.status,
-        statusText: response.statusText,
-        headers,
-        body
+    return {
+        items: [{
+            index: 0,
+            data: {
+                status: response.status,
+                status_text: response.statusText,
+                headers,
+                body
+            },
+            metadata: {
+                ok: response.ok,
+                status: response.status
+            }
+        }],
+        summary: {
+            total: 1,
+            success_count: response.ok ? 1 : 0,
+            failure_count: response.ok ? 0 : 1,
+            metrics: {
+                status: response.status
+            }
+        }
     };
-    data.items = [{
-        status: response.status,
-        statusText: response.statusText,
-        headers,
-        body
-    }];
-    data.summary = {
-        total: 1,
-        successCount: response.ok ? 1 : 0,
-        failureCount: response.ok ? 0 : 1,
-        status: response.status
-    };
-    return data;
 }
 
 function buildSuccess(config, responseData, attempts, startedAt) {
     return {
         success: true,
         data: responseData,
+        error: null,
         metadata: {
+            contract_version: '2026-06-27',
             package: PACKAGE_NAME,
             version: PACKAGE_VERSION,
+            execution_id: null,
             url: config.url,
             method: config.method,
             attempt: attempts,
             attempts,
-            executionMs: Date.now() - startedAt,
+            execution_ms: Date.now() - startedAt,
             timestamp: new Date().toISOString()
-        }
+        },
+        citations: []
     };
 }
 
@@ -159,8 +167,8 @@ function buildFailure(config, error, attempts, startedAt) {
             items: [],
             summary: {
                 total: 0,
-                successCount: 0,
-                failureCount: 1
+                success_count: 0,
+                failure_count: 1
             }
         },
         error: {
@@ -170,14 +178,17 @@ function buildFailure(config, error, attempts, startedAt) {
             details
         },
         metadata: {
+            contract_version: '2026-06-27',
             package: PACKAGE_NAME,
             version: PACKAGE_VERSION,
+            execution_id: null,
             url: config.url || null,
             method: config.method || null,
             attempts,
-            executionMs: Date.now() - startedAt,
+            execution_ms: Date.now() - startedAt,
             timestamp: new Date().toISOString()
-        }
+        },
+        citations: []
     };
 }
 

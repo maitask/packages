@@ -144,8 +144,8 @@ var TraderPackage = (() => {
   async function collectWebSocketFeed({
     url,
     protocols,
-    messageLimit = 20,
-    durationMs = 5e3,
+    message_limit = 20,
+    duration_ms = 5e3,
     onOpen,
     transform,
     shouldInclude
@@ -183,7 +183,7 @@ var TraderPackage = (() => {
       };
       const timeout = setTimeout(() => {
         resolveWith(messages);
-      }, durationMs);
+      }, duration_ms);
       attach("open", () => {
         if (typeof onOpen === "function") {
           try {
@@ -204,7 +204,7 @@ var TraderPackage = (() => {
             return;
           }
           messages.push(transformed);
-          if (messages.length >= messageLimit) {
+          if (messages.length >= message_limit) {
             resolveWith(messages);
           }
         } catch (err) {
@@ -243,7 +243,7 @@ var TraderPackage = (() => {
     channel = "bookTicker",
     interval = "1m",
     limit = 20,
-    durationMs = 5e3,
+    duration_ms = 5e3,
     market = "futures",
     endpointOverride
   }) {
@@ -252,8 +252,8 @@ var TraderPackage = (() => {
     const url = `${baseWs}/${streamName}`;
     const samples = await collectWebSocketFeed({
       url,
-      messageLimit: limit,
-      durationMs,
+      message_limit: limit,
+      duration_ms,
       transform: (raw) => {
         const parsed = typeof raw === "string" ? JSON.parse(raw) : raw;
         return {
@@ -274,7 +274,7 @@ var TraderPackage = (() => {
       samples,
       stats: {
         count: samples.length,
-        durationMs
+        duration_ms
       }
     };
   }
@@ -282,7 +282,7 @@ var TraderPackage = (() => {
     symbol,
     channel = "tickers",
     limit = 20,
-    durationMs = 5e3,
+    duration_ms = 5e3,
     market = "swap"
   }) {
     const upper = symbol.toUpperCase();
@@ -299,8 +299,8 @@ var TraderPackage = (() => {
     ];
     const samples = await collectWebSocketFeed({
       url: OKX_PUBLIC_WS,
-      messageLimit: limit,
-      durationMs,
+      message_limit: limit,
+      duration_ms,
       onOpen: (ws) => {
         ws.send(
           JSON.stringify({
@@ -330,7 +330,7 @@ var TraderPackage = (() => {
       samples: flattened,
       stats: {
         count: flattened.length,
-        durationMs
+        duration_ms
       }
     };
   }
@@ -432,7 +432,7 @@ var TraderPackage = (() => {
           channel: options.channel,
           interval: options.interval,
           limit: options.limit,
-          durationMs: options.durationMs,
+          duration_ms: options.duration_ms,
           market: "futures"
         });
       }
@@ -521,7 +521,7 @@ var TraderPackage = (() => {
           channel: options.channel,
           interval: options.interval,
           limit: options.limit,
-          durationMs: options.durationMs,
+          duration_ms: options.duration_ms,
           market: "spot"
         });
       }
@@ -630,7 +630,7 @@ var TraderPackage = (() => {
           channel: options.channel,
           interval: options.interval,
           limit: options.limit,
-          durationMs: options.durationMs,
+          duration_ms: options.duration_ms,
           market: "aster",
           endpointOverride: "wss://fstream.asterdex.com/ws"
         });
@@ -823,7 +823,7 @@ var TraderPackage = (() => {
           symbol,
           channel: options.channel || "tickers",
           limit: options.limit,
-          durationMs: options.durationMs,
+          duration_ms: options.duration_ms,
           market
         });
       }
@@ -961,7 +961,7 @@ var TraderPackage = (() => {
       },
       async streamMarket(symbol, options = {}) {
         const limit = options.limit || 20;
-        const intervalMs = Math.max((options.durationMs || 5e3) / limit, 50);
+        const interval_ms = Math.max((options.duration_ms || 5e3) / limit, 50);
         const samples = [];
         let last = state.marks?.[symbol] ?? state.lastMarkPrice ?? 1e3;
         for (let i = 0; i < limit; i++) {
@@ -974,7 +974,7 @@ var TraderPackage = (() => {
             bestAsk: Number((last + 0.5 * Math.abs(delta)).toFixed(4))
           });
         }
-        await new Promise((resolve) => setTimeout(resolve, intervalMs * limit));
+        await new Promise((resolve) => setTimeout(resolve, interval_ms * limit));
         return {
           provider: "paper",
           channel: options.channel || "simulated",
@@ -982,7 +982,7 @@ var TraderPackage = (() => {
           samples,
           stats: {
             count: samples.length,
-            durationMs: intervalMs * limit
+            duration_ms: interval_ms * limit
           }
         };
       }
@@ -1014,6 +1014,7 @@ var TraderPackage = (() => {
   async function execute(input = {}, options = {}, context = {}) {
     ensureFetch();
     ensureCrypto();
+    const startedAt = Date.now();
     try {
       const config = buildConfig(input, options, context);
       const exchange = await createExchangeClient(config);
@@ -1040,42 +1041,77 @@ var TraderPackage = (() => {
         default:
           throw new Error(`Unsupported action: ${config.action}`);
       }
-      return successResponse(payload, config, exchange);
+      return successResponse(payload, config, exchange, context, startedAt);
     } catch (error) {
-      return errorResponse(error, input, options);
+      return errorResponse(error, input, options, context, startedAt);
     }
   }
-  function successResponse(payload, config, exchange) {
+  function successResponse(payload, config, exchange, context, startedAt) {
     return {
       success: true,
-      data: payload,
+      data: {
+        items: [
+          {
+            index: 0,
+            data: payload
+          }
+        ],
+        summary: {
+          total: 1,
+          success_count: 1,
+          failure_count: 0,
+          metrics: {
+            action: config.action,
+            provider: config.exchange?.provider,
+            mode: exchange?.mode || null
+          }
+        }
+      },
+      error: null,
       metadata: {
+        contract_version: "2026-06-27",
         package: PACKAGE_NAME,
         version: PACKAGE_VERSION,
+        execution_id: context?.execution_id || null,
+        execution_ms: Date.now() - startedAt,
         action: config.action,
         symbol: config.symbol,
         provider: config.exchange?.provider,
         mode: exchange?.mode || null,
         timestamp: (/* @__PURE__ */ new Date()).toISOString()
-      }
+      },
+      citations: []
     };
   }
-  function errorResponse(error, input = {}, options = {}) {
+  function errorResponse(error, input = {}, options = {}, context = {}, startedAt = Date.now()) {
     const source = mergeObjects(options, input);
     return {
       success: false,
+      data: {
+        items: [],
+        summary: {
+          total: 0,
+          success_count: 0,
+          failure_count: 1
+        }
+      },
       error: {
         message: error?.message || "Unknown trader error",
         code: error?.code || "TRADER_ERROR",
-        type: error?.name || "TraderError"
+        type: error?.name || "TraderError",
+        details: null
       },
       metadata: {
+        contract_version: "2026-06-27",
         package: PACKAGE_NAME,
         version: PACKAGE_VERSION,
+        execution_id: context?.execution_id || null,
+        execution_ms: Date.now() - startedAt,
         action: source.action || "analyze",
         symbol: source.symbol || "BTCUSDT",
         timestamp: (/* @__PURE__ */ new Date()).toISOString()
-      }
+      },
+      citations: []
     };
   }
   function buildConfig(input, options, context) {
@@ -1233,8 +1269,8 @@ var TraderPackage = (() => {
     const streamOptions = {
       channel: config.stream?.channel || "bookTicker",
       interval: config.stream?.interval || config.interval || "1m",
-      limit: config.stream?.limit || config.stream?.messageLimit || 20,
-      durationMs: config.stream?.durationMs || config.stream?.windowMs || 5e3
+      limit: config.stream?.limit || config.stream?.message_limit || 20,
+      duration_ms: config.stream?.duration_ms || config.stream?.window_ms || 5e3
     };
     const stream = await exchange.streamMarket(config.symbol, streamOptions);
     return {
@@ -1243,8 +1279,8 @@ var TraderPackage = (() => {
       metadata: {
         provider: config.exchange.provider,
         channel: streamOptions.channel,
-        messageLimit: streamOptions.limit,
-        durationMs: streamOptions.durationMs
+        message_limit: streamOptions.limit,
+        duration_ms: streamOptions.duration_ms
       }
     };
   }

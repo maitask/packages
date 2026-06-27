@@ -101,7 +101,7 @@ export function createAsterClient(config) {
                 channel: options.channel,
                 interval: options.interval,
                 limit: options.limit,
-                durationMs: options.durationMs,
+                duration_ms: options.duration_ms,
                 market: 'aster',
                 endpointOverride: 'wss://fstream.asterdex.com/ws',
             });

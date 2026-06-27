@@ -129,8 +129,8 @@ Existing fields are preserved:
     ],
     "summary": {
       "total": 1,
-      "successCount": 1,
-      "failureCount": 0,
+      "success_count": 1,
+      "failure_count": 0,
       "status": 201
     }
   },
@@ -141,7 +141,7 @@ Existing fields are preserved:
     "method": "POST",
     "attempt": 1,
     "attempts": 1,
-    "executionMs": 42,
+    "execution_ms": 42,
     "timestamp": "2026-06-27T10:00:00.000Z"
   }
 }

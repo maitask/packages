@@ -146,8 +146,8 @@ Success response:
   "success": true,
   "data": {
     "total": 1,
-    "successCount": 1,
-    "failureCount": 0,
+    "success_count": 1,
+    "failure_count": 0,
     "results": [
       {
         "url": "https://example.com",
@@ -196,8 +196,8 @@ Error response (for individual URL):
   "success": true,
   "data": {
     "total": 1,
-    "successCount": 0,
-    "failureCount": 1,
+    "success_count": 0,
+    "failure_count": 1,
     "results": [
       {
         "url": "https://example.com",
@@ -261,5 +261,5 @@ MIT
 
 The package uses a standardized envelope:
 
-- Success: `{ success: true, data: { total, successCount, failureCount, results }, metadata: {...} }`
+- Success: `{ success: true, data: { total, success_count, failure_count, results }, metadata: {...} }`
 - Failure: `{ success: false, error: { message, code, type }, metadata: {...} }`

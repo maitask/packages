@@ -16,7 +16,7 @@ frontend.
 
 `input` is the task payload. It may be any JSON value, but each package must validate the shape it supports and return a structured error when invalid.
 
-`options` is execution configuration. Packages should keep operational settings here, such as `timeoutMs`, `retries`, `format`, `headers`, or provider-specific flags.
+`options` is execution configuration. Packages should keep operational settings here, such as `timeout_ms`, `retries`, `format`, `headers`, or provider-specific flags.
 
 `context` is runtime-provided execution context. Packages may read secrets and environment values from:
 
@@ -24,9 +24,9 @@ frontend.
 {
   "secrets": {},
   "env": {},
-  "workspacePath": "...",
-  "executionId": "...",
-  "userId": "..."
+  "workspace_path": "...",
+  "execution_id": "...",
+  "user_id": "..."
 }
 ```
 
@@ -47,23 +47,23 @@ shape:
         "id": "optional-stable-id",
         "data": {},
         "metadata": {},
-        "citationIds": []
+        "citation_ids": []
       }
     ],
     "summary": {
       "total": 1,
-      "successCount": 1,
-      "failureCount": 0,
+      "success_count": 1,
+      "failure_count": 0,
       "metrics": {}
     }
   },
   "error": null,
   "metadata": {
-    "contractVersion": "2026-06-27",
+    "contract_version": "2026-06-27",
     "package": "@maitask/package-name",
     "version": "1.0.0",
-    "executionId": "runtime-execution-id",
-    "executionMs": 42,
+    "execution_id": "runtime-execution-id",
+    "execution_ms": 42,
     "timestamp": "2026-06-27T10:00:00.000Z"
   },
   "citations": []
@@ -79,8 +79,8 @@ Failure output:
     "items": [],
     "summary": {
       "total": 0,
-      "successCount": 0,
-      "failureCount": 1
+      "success_count": 0,
+      "failure_count": 1
     }
   },
   "error": {
@@ -90,11 +90,11 @@ Failure output:
     "details": {}
   },
   "metadata": {
-    "contractVersion": "2026-06-27",
+    "contract_version": "2026-06-27",
     "package": "@maitask/package-name",
     "version": "1.0.0",
-    "executionId": "runtime-execution-id",
-    "executionMs": 42,
+    "execution_id": "runtime-execution-id",
+    "execution_ms": 42,
     "timestamp": "2026-06-27T10:00:00.000Z"
   },
   "citations": []
@@ -111,7 +111,7 @@ Failure output:
 - Package-specific statistics belong in `data.summary.metrics`.
 - Package-specific per-item diagnostics belong in `item.metadata`.
 - Execution and delivery metadata belongs in top-level `metadata`.
-- Source references belong in top-level `citations`, and items may point to them through `citationIds`.
+- Source references belong in top-level `citations`, and items may point to them through `citation_ids`.
 - Public consumers must not depend on package-specific top-level aliases such as `result`, `rows`, `repositories`, `message`, `parser`, or `statistics`.
 - Runtime enforces this contract at the execution boundary. Plane, adapters, and the frontend consume only the standard output.
 
@@ -126,9 +126,9 @@ Runtime wraps the package output with execution metadata:
     "execution": {
       "id": "runtime-execution-id",
       "status": "completed",
-      "durationMs": 42,
-      "creditsConsumed": null,
-      "loadBalanced": false,
+      "duration_ms": 42,
+      "credits_consumed": null,
+      "load_balanced": false,
       "timestamp": "2026-06-27T10:00:00.000Z"
     },
     "output": {
@@ -137,8 +137,8 @@ Runtime wraps the package output with execution metadata:
         "items": [],
         "summary": {
           "total": 0,
-          "successCount": 0,
-          "failureCount": 0
+          "success_count": 0,
+          "failure_count": 0
         }
       },
       "error": null,

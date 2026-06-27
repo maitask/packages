@@ -181,8 +181,8 @@ Action-specific fields remain available, and every successful response also incl
     "items": [],
     "summary": {
       "total": 0,
-      "successCount": 0,
-      "failureCount": 0
+      "success_count": 0,
+      "failure_count": 0
     }
   },
   "metadata": {
@@ -191,7 +191,7 @@ Action-specific fields remain available, and every successful response also incl
     "provider": "github",
     "action": "list-repos",
     "operation": "repos.list",
-    "executionMs": 42,
+    "execution_ms": 42,
     "rateLimit": {}
   }
 }

@@ -39,7 +39,7 @@ export interface TraderStreamConfig {
     channel?: 'bookTicker' | 'ticker' | 'miniTicker' | 'trade' | 'kline';
     interval?: string;
     limit?: number;
-    durationMs?: number;
+    duration_ms?: number;
 }
 
 export interface TraderPaperState {

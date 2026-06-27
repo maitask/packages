@@ -108,7 +108,7 @@ function createFuturesClient(config) {
                 channel: options.channel,
                 interval: options.interval,
                 limit: options.limit,
-                durationMs: options.durationMs,
+                duration_ms: options.duration_ms,
                 market: 'futures',
             });
         },
@@ -205,7 +205,7 @@ function createSpotClient(config) {
                 channel: options.channel,
                 interval: options.interval,
                 limit: options.limit,
-                durationMs: options.durationMs,
+                duration_ms: options.duration_ms,
                 market: 'spot',
             });
         },

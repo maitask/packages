@@ -36,8 +36,8 @@ function normalizeMessageData(data) {
 export async function collectWebSocketFeed({
     url,
     protocols,
-    messageLimit = 20,
-    durationMs = 5000,
+    message_limit = 20,
+    duration_ms = 5000,
     onOpen,
     transform,
     shouldInclude,
@@ -80,7 +80,7 @@ export async function collectWebSocketFeed({
         };
         const timeout = setTimeout(() => {
             resolveWith(messages);
-        }, durationMs);
+        }, duration_ms);
 
         attach('open', () => {
             if (typeof onOpen === 'function') {
@@ -104,7 +104,7 @@ export async function collectWebSocketFeed({
                     return;
                 }
                 messages.push(transformed);
-                if (messages.length >= messageLimit) {
+                if (messages.length >= message_limit) {
                     resolveWith(messages);
                 }
             } catch (err) {

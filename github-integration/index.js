@@ -52,20 +52,7 @@ async function execute(input = {}, options = {}, context = {}) {
                 throw validationError(`Unknown action: ${config.action}`);
         }
 
-        return {
-            success: true,
-            data: result,
-            metadata: {
-                package: PACKAGE_NAME,
-                version: PACKAGE_VERSION,
-                provider: 'github',
-                action: config.action,
-                operation: config.operation,
-                executedAt: new Date().toISOString(),
-                executionMs: Date.now() - startedAt,
-                rateLimit: result.rateLimit || null
-            }
-        };
+        return buildSuccessResponse(result, config, context, startedAt);
     } catch (error) {
         return {
             success: false,
@@ -73,8 +60,8 @@ async function execute(input = {}, options = {}, context = {}) {
                 items: [],
                 summary: {
                     total: 0,
-                    successCount: 0,
-                    failureCount: 1
+                    success_count: 0,
+                    failure_count: 1
                 }
             },
             error: {
@@ -85,15 +72,18 @@ async function execute(input = {}, options = {}, context = {}) {
                 details: error.details || null
             },
             metadata: {
+                contract_version: '2026-06-27',
                 package: PACKAGE_NAME,
                 version: PACKAGE_VERSION,
+                execution_id: context?.execution_id || null,
                 provider: 'github',
                 action: config?.action || input?.action || options?.action || 'list-repos',
                 operation: config?.operation || input?.operation || options?.operation || null,
-                executedAt: new Date().toISOString(),
-                executionMs: Date.now() - startedAt,
-                rateLimit: error.rateLimit || null
-            }
+                executed_at: new Date().toISOString(),
+                execution_ms: Date.now() - startedAt,
+                rate_limit: error.rateLimit || null
+            },
+            citations: []
         };
     }
 }
@@ -102,6 +92,52 @@ if (typeof module !== "undefined") {
   module.exports = { execute };
 }
 execute;
+
+function buildSuccessResponse(result, config, context, startedAt) {
+    const rawItems = Array.isArray(result?.items)
+        ? result.items
+        : result?.item == null
+            ? []
+            : [result.item];
+    const items = rawItems.map((item, index) => ({
+        index,
+        id: item?.id == null ? undefined : String(item.id),
+        data: item
+    }));
+    const summary = result?.summary && typeof result.summary === 'object'
+        ? {
+            total: Number(result.summary.total ?? items.length),
+            success_count: Number(result.summary.success_count ?? items.length),
+            failure_count: Number(result.summary.failure_count ?? 0)
+        }
+        : {
+            total: items.length,
+            success_count: items.length,
+            failure_count: 0
+        };
+
+    return {
+        success: true,
+        data: {
+            items,
+            summary
+        },
+        error: null,
+        metadata: {
+            contract_version: '2026-06-27',
+            package: PACKAGE_NAME,
+            version: PACKAGE_VERSION,
+            execution_id: context?.execution_id || null,
+            provider: 'github',
+            action: config.action,
+            operation: config.operation,
+            executed_at: new Date().toISOString(),
+            execution_ms: Date.now() - startedAt,
+            rate_limit: result?.rateLimit || null
+        },
+        citations: []
+    };
+}
 
 function buildConfig(input, options, context) {
     const source = mergeObjects(options || {}, input || {});
@@ -398,8 +434,8 @@ async function customRequest(config) {
         items,
         summary: {
             total: items.length,
-            successCount: 1,
-            failureCount: 0
+            success_count: 1,
+            failure_count: 0
         },
         rateLimit: response.rateLimit,
         request: {
@@ -645,8 +681,8 @@ function withCollection(result, items) {
         items,
         summary: {
             total: items.length,
-            successCount: items.length,
-            failureCount: 0
+            success_count: items.length,
+            failure_count: 0
         }
     });
 }
@@ -656,8 +692,8 @@ function withSingle(result, item) {
         items: item == null ? [] : [item],
         summary: {
             total: item == null ? 0 : 1,
-            successCount: item == null ? 0 : 1,
-            failureCount: 0
+            success_count: item == null ? 0 : 1,
+            failure_count: 0
         }
     });
 }

@@ -202,7 +202,7 @@ export function createOkxClient(config) {
                 symbol,
                 channel: options.channel || 'tickers',
                 limit: options.limit,
-                durationMs: options.durationMs,
+                duration_ms: options.duration_ms,
                 market,
             });
         },

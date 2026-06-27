@@ -132,7 +132,7 @@ export function createPaperClient(config) {
         },
         async streamMarket(symbol, options = {}) {
             const limit = options.limit || 20;
-            const intervalMs = Math.max((options.durationMs || 5000) / limit, 50);
+            const interval_ms = Math.max((options.duration_ms || 5000) / limit, 50);
             const samples = [];
             let last = state.marks?.[symbol] ?? state.lastMarkPrice ?? 1000;
 
@@ -147,7 +147,7 @@ export function createPaperClient(config) {
                 });
             }
 
-            await new Promise((resolve) => setTimeout(resolve, intervalMs * limit));
+            await new Promise((resolve) => setTimeout(resolve, interval_ms * limit));
 
             return {
                 provider: 'paper',
@@ -156,7 +156,7 @@ export function createPaperClient(config) {
                 samples,
                 stats: {
                     count: samples.length,
-                    durationMs: intervalMs * limit,
+                    duration_ms: interval_ms * limit,
                 },
             };
         },
