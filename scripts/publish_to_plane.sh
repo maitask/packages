@@ -12,6 +12,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PLANE_URL="${PLANE_URL:-http://127.0.0.1:18881}"
 TOKEN="${TOKEN:-}"
 PACKAGES_DIR="${PACKAGES_DIR:-$ROOT}"
+PUBLISH_TMP_DIR=""
 
 usage() {
   cat <<'EOF'
@@ -150,7 +151,8 @@ main() {
 
   local tmp_dir
   tmp_dir="$(mktemp -d)"
-  trap 'rm -rf "$tmp_dir"' EXIT
+  PUBLISH_TMP_DIR="$tmp_dir"
+  trap 'rm -rf -- "$PUBLISH_TMP_DIR"' EXIT
 
   local published=0
   local failed=0
