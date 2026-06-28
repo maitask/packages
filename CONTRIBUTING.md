@@ -16,6 +16,7 @@ Thank you for helping improve the official Maitask package collection. All contr
 - `npm install` and `npm run lint` (if available).
 - `npm test` or relevant script (if applicable).
 - `npm pack` to confirm the publish artifact.
+- `scripts/publish_to_plane.sh <package-dir>` for registry publish dry-runs against a development Plane instance when changing package metadata or artifacts.
 - Manual smoke test via Maitask Engine:
   ```bash
   cd ../../engine
@@ -29,6 +30,6 @@ Thank you for helping improve the official Maitask package collection. All contr
 ## 5. Submit a Pull Request
 - Run `npm pack` and attach the generated tarball in the PR description when possible.
 - Reference the tracking issue and outline testing performed.
-- A maintainer will review, run additional checks, and handle publication.
+- A maintainer will review, run additional checks, and publish through `scripts/publish_to_plane.sh` so registry metadata and tarball storage remain consistent.
 
 You can reach the maintainers at `team@maitask.com` for coordination around major releases.
