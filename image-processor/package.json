@@ -20,7 +20,32 @@
   "display_name": "Image Processor",
   "category": "Media & Multimodal Processing",
   "maitask": {
-    "display_name": "Image Processor",
-    "category": "Media & Multimodal Processing"
+    "locales": {
+      "en": {
+        "display_name": "Image Processor",
+        "description": "Image analysis and processing using AI vision models for Maitask",
+        "category": "Media & Multimodal Processing",
+        "keywords": [
+          "maitask",
+          "ai",
+          "image",
+          "vision",
+          "analysis"
+        ]
+      },
+      "zh": {
+        "display_name": "图像处理器",
+        "description": "使用 AI 视觉模型进行图像分析与处理，适合识别、理解和多模态流程。",
+        "category": "媒体与多模态处理",
+        "keywords": [
+          "图像处理",
+          "视觉",
+          "AI",
+          "分析",
+          "多模态",
+          "识别"
+        ]
+      }
+    }
   }
 }

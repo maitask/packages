@@ -21,7 +21,33 @@
   "display_name": "DeepSeek",
   "category": "AI & Cognitive Services",
   "maitask": {
-    "display_name": "DeepSeek",
-    "category": "AI & Cognitive Services"
+    "locales": {
+      "en": {
+        "display_name": "DeepSeek",
+        "description": "DeepSeek AI models integration for Maitask",
+        "category": "AI & Cognitive Services",
+        "keywords": [
+          "maitask",
+          "ai",
+          "deepseek",
+          "llm",
+          "chat",
+          "reasoning"
+        ]
+      },
+      "zh": {
+        "display_name": "DeepSeek",
+        "description": "DeepSeek AI 模型集成，用于聊天、推理、文本生成和智能处理任务。",
+        "category": "AI 与认知服务",
+        "keywords": [
+          "AI",
+          "DeepSeek",
+          "大语言模型",
+          "聊天",
+          "推理",
+          "文本生成"
+        ]
+      }
+    }
   }
 }

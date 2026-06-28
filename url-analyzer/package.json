@@ -35,7 +35,33 @@
   "display_name": "URL Analyzer",
   "category": "Web & API Integration",
   "maitask": {
-    "display_name": "URL Analyzer",
-    "category": "Web & API Integration"
+    "locales": {
+      "en": {
+        "display_name": "URL Analyzer",
+        "description": "URL parsing, validation, and analysis",
+        "category": "Web & API Integration",
+        "keywords": [
+          "maitask",
+          "url",
+          "parser",
+          "validation",
+          "analysis",
+          "uri"
+        ]
+      },
+      "zh": {
+        "display_name": "URL 分析器",
+        "description": "进行 URL 解析、校验和分析，适合链接检查、规范化和 URI 处理。",
+        "category": "Web 与 API 集成",
+        "keywords": [
+          "URL",
+          "URI",
+          "解析器",
+          "校验",
+          "分析",
+          "链接"
+        ]
+      }
+    }
   }
 }

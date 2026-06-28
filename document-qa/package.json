@@ -19,7 +19,32 @@
   "display_name": "Document QA",
   "category": "AI & Cognitive Services",
   "maitask": {
-    "display_name": "Document QA",
-    "category": "AI & Cognitive Services"
+    "locales": {
+      "en": {
+        "display_name": "Document QA",
+        "description": "Answer questions about documents using AI",
+        "category": "AI & Cognitive Services",
+        "keywords": [
+          "maitask",
+          "ai",
+          "document",
+          "qa",
+          "rag"
+        ]
+      },
+      "zh": {
+        "display_name": "文档问答",
+        "description": "使用 AI 对文档内容进行问答，适合知识库、资料检索和 RAG 工作流。",
+        "category": "AI 与认知服务",
+        "keywords": [
+          "文档问答",
+          "RAG",
+          "AI",
+          "知识库",
+          "文档",
+          "检索"
+        ]
+      }
+    }
   }
 }

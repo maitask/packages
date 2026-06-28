@@ -38,7 +38,37 @@
   "display_name": "Excel Exporter",
   "category": "Export & Storage",
   "maitask": {
-    "display_name": "Excel Exporter",
-    "category": "Export & Storage"
+    "locales": {
+      "en": {
+        "display_name": "Excel Exporter",
+        "description": "Export data to Excel spreadsheets with automatic formatting",
+        "category": "Export & Storage",
+        "keywords": [
+          "maitask",
+          "excel",
+          "xlsx",
+          "export",
+          "spreadsheet",
+          "report",
+          "data-export",
+          "office",
+          "tabular"
+        ]
+      },
+      "zh": {
+        "display_name": "Excel 导出器",
+        "description": "将数据导出为带自动格式化的 Excel 电子表格，适合报表、数据导出和 Office 工作流。",
+        "category": "导出与存储",
+        "keywords": [
+          "Excel",
+          "XLSX",
+          "导出",
+          "电子表格",
+          "报表",
+          "Office",
+          "表格数据"
+        ]
+      }
+    }
   }
 }

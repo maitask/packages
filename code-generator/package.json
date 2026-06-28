@@ -20,7 +20,33 @@
   "display_name": "Code Generator",
   "category": "AI & Cognitive Services",
   "maitask": {
-    "display_name": "Code Generator",
-    "category": "AI & Cognitive Services"
+    "locales": {
+      "en": {
+        "display_name": "Code Generator",
+        "description": "AI-powered code generation using OpenAI or Claude",
+        "category": "AI & Cognitive Services",
+        "keywords": [
+          "maitask",
+          "ai",
+          "code",
+          "generation",
+          "openai",
+          "claude"
+        ]
+      },
+      "zh": {
+        "display_name": "代码生成器",
+        "description": "基于 OpenAI 或 Claude 的 AI 代码生成能力，适合生成、改写和辅助实现代码片段。",
+        "category": "AI 与认知服务",
+        "keywords": [
+          "代码生成",
+          "AI",
+          "OpenAI",
+          "Claude",
+          "开发",
+          "编程"
+        ]
+      }
+    }
   }
 }

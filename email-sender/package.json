@@ -38,7 +38,37 @@
   "display_name": "Email Sender",
   "category": "Communications & Automation",
   "maitask": {
-    "display_name": "Email Sender",
-    "category": "Communications & Automation"
+    "locales": {
+      "en": {
+        "display_name": "Email Sender",
+        "description": "Powerful email sending service with multiple providers and templates",
+        "category": "Communications & Automation",
+        "keywords": [
+          "maitask",
+          "email",
+          "smtp",
+          "sendgrid",
+          "mailgun",
+          "notification",
+          "messaging",
+          "templates",
+          "communication"
+        ]
+      },
+      "zh": {
+        "display_name": "邮件发送器",
+        "description": "支持多服务商和模板的邮件发送能力，适用于通知、营销邮件和自动化消息。",
+        "category": "通信与自动化",
+        "keywords": [
+          "邮件",
+          "SMTP",
+          "SendGrid",
+          "Mailgun",
+          "通知",
+          "模板",
+          "消息"
+        ]
+      }
+    }
   }
 }

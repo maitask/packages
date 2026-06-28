@@ -20,7 +20,32 @@
   "display_name": "Text Summary",
   "category": "AI & Cognitive Services",
   "maitask": {
-    "display_name": "Text Summary",
-    "category": "AI & Cognitive Services"
+    "locales": {
+      "en": {
+        "display_name": "Text Summary",
+        "description": "Text summarization using AI models for Maitask",
+        "category": "AI & Cognitive Services",
+        "keywords": [
+          "maitask",
+          "ai",
+          "summary",
+          "nlp",
+          "text"
+        ]
+      },
+      "zh": {
+        "display_name": "文本摘要",
+        "description": "使用 AI 模型生成文本摘要，适合长文压缩、要点提取和内容概览。",
+        "category": "AI 与认知服务",
+        "keywords": [
+          "文本摘要",
+          "AI",
+          "NLP",
+          "要点",
+          "总结",
+          "内容处理"
+        ]
+      }
+    }
   }
 }

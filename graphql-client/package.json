@@ -19,7 +19,32 @@
   "display_name": "GraphQL Client",
   "category": "Web & API Integration",
   "maitask": {
-    "display_name": "GraphQL Client",
-    "category": "Web & API Integration"
+    "locales": {
+      "en": {
+        "display_name": "GraphQL Client",
+        "description": "Execute GraphQL queries and mutations against any GraphQL endpoint",
+        "category": "Web & API Integration",
+        "keywords": [
+          "maitask",
+          "graphql",
+          "api",
+          "query",
+          "mutation"
+        ]
+      },
+      "zh": {
+        "display_name": "GraphQL 客户端",
+        "description": "对任意 GraphQL 端点执行查询和变更，适合 API 聚合和数据访问流程。",
+        "category": "Web 与 API 集成",
+        "keywords": [
+          "GraphQL",
+          "API",
+          "查询",
+          "Mutation",
+          "客户端",
+          "数据访问"
+        ]
+      }
+    }
   }
 }

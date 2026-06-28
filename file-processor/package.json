@@ -38,7 +38,36 @@
   "display_name": "File Processor",
   "category": "Data Processing & Transformation",
   "maitask": {
-    "display_name": "File Processor",
-    "category": "Data Processing & Transformation"
+    "locales": {
+      "en": {
+        "display_name": "File Processor",
+        "description": "Powerful data processing and transformation engine",
+        "category": "Data Processing & Transformation",
+        "keywords": [
+          "maitask",
+          "processor",
+          "data",
+          "transformation",
+          "pipeline",
+          "filter",
+          "aggregate",
+          "etl",
+          "processing"
+        ]
+      },
+      "zh": {
+        "display_name": "文件处理器",
+        "description": "通用数据处理与转换引擎，支持过滤、聚合、管道处理和 ETL 流程。",
+        "category": "数据处理与转换",
+        "keywords": [
+          "文件处理",
+          "数据转换",
+          "管道",
+          "过滤",
+          "聚合",
+          "ETL"
+        ]
+      }
+    }
   }
 }

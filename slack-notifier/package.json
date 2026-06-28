@@ -37,7 +37,35 @@
   "display_name": "Slack Notifier",
   "category": "Communications & Automation",
   "maitask": {
-    "display_name": "Slack Notifier",
-    "category": "Communications & Automation"
+    "locales": {
+      "en": {
+        "display_name": "Slack Notifier",
+        "description": "Send notifications and messages to Slack channels via incoming webhooks",
+        "category": "Communications & Automation",
+        "keywords": [
+          "maitask",
+          "slack",
+          "webhook",
+          "notification",
+          "messaging",
+          "integration",
+          "bot",
+          "alerts"
+        ]
+      },
+      "zh": {
+        "display_name": "Slack 通知器",
+        "description": "通过 Incoming Webhook 向 Slack 频道发送通知和消息，适合告警与协作提醒。",
+        "category": "通信与自动化",
+        "keywords": [
+          "Slack",
+          "Webhook",
+          "通知",
+          "消息",
+          "告警",
+          "机器人"
+        ]
+      }
+    }
   }
 }

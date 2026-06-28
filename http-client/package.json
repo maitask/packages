@@ -19,7 +19,33 @@
   "display_name": "HTTP Client",
   "category": "Web & API Integration",
   "maitask": {
-    "display_name": "HTTP Client",
-    "category": "Web & API Integration"
+    "locales": {
+      "en": {
+        "display_name": "HTTP Client",
+        "description": "HTTP client with retry, timeout, and auth support",
+        "category": "Web & API Integration",
+        "keywords": [
+          "maitask",
+          "http",
+          "request",
+          "api",
+          "client"
+        ]
+      },
+      "zh": {
+        "display_name": "HTTP 客户端",
+        "description": "带重试、超时和认证支持的 HTTP 客户端，适合稳定调用外部 API。",
+        "category": "Web 与 API 集成",
+        "keywords": [
+          "HTTP",
+          "请求",
+          "API",
+          "客户端",
+          "重试",
+          "超时",
+          "认证"
+        ]
+      }
+    }
   }
 }

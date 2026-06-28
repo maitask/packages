@@ -19,7 +19,32 @@
   "display_name": "Redis Cache",
   "category": "Export & Storage",
   "maitask": {
-    "display_name": "Redis Cache",
-    "category": "Export & Storage"
+    "locales": {
+      "en": {
+        "display_name": "Redis Cache",
+        "description": "Redis cache operations via HTTP - get, set, delete, expire",
+        "category": "Export & Storage",
+        "keywords": [
+          "maitask",
+          "redis",
+          "cache",
+          "storage",
+          "key-value"
+        ]
+      },
+      "zh": {
+        "display_name": "Redis 缓存",
+        "description": "通过 HTTP 执行 Redis 缓存操作，包括获取、设置、删除和过期时间管理。",
+        "category": "导出与存储",
+        "keywords": [
+          "Redis",
+          "缓存",
+          "键值",
+          "存储",
+          "过期",
+          "HTTP"
+        ]
+      }
+    }
   }
 }

@@ -39,7 +39,37 @@
   "display_name": "Stream Publisher",
   "category": "Communications & Automation",
   "maitask": {
-    "display_name": "Stream Publisher",
-    "category": "Communications & Automation"
+    "locales": {
+      "en": {
+        "display_name": "Stream Publisher",
+        "description": "Publish data streams via HTTP chunked transfer or Server-Sent Events",
+        "category": "Communications & Automation",
+        "keywords": [
+          "maitask",
+          "stream",
+          "http",
+          "sse",
+          "server-sent-events",
+          "chunked",
+          "real-time",
+          "streaming",
+          "ndjson",
+          "websocket-alternative"
+        ]
+      },
+      "zh": {
+        "display_name": "流发布器",
+        "description": "通过 HTTP 分块传输或 Server-Sent Events 发布数据流，适合实时输出和流式处理。",
+        "category": "通信与自动化",
+        "keywords": [
+          "流",
+          "SSE",
+          "Server-Sent Events",
+          "分块传输",
+          "实时",
+          "NDJSON"
+        ]
+      }
+    }
   }
 }

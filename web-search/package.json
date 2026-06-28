@@ -20,7 +20,32 @@
   "display_name": "Web Search",
   "category": "Web & API Integration",
   "maitask": {
-    "display_name": "Web Search",
-    "category": "Web & API Integration"
+    "locales": {
+      "en": {
+        "display_name": "Web Search",
+        "description": "Search the web using multiple search engines",
+        "category": "Web & API Integration",
+        "keywords": [
+          "maitask",
+          "search",
+          "google",
+          "bing",
+          "web"
+        ]
+      },
+      "zh": {
+        "display_name": "网页搜索",
+        "description": "使用多个搜索引擎搜索网页内容，适合资料检索和信息收集。",
+        "category": "Web 与 API 集成",
+        "keywords": [
+          "网页搜索",
+          "搜索引擎",
+          "Google",
+          "Bing",
+          "检索",
+          "信息收集"
+        ]
+      }
+    }
   }
 }

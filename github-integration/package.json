@@ -20,7 +20,32 @@
   "display_name": "GitHub Integration",
   "category": "Web & API Integration",
   "maitask": {
-    "display_name": "GitHub Integration",
-    "category": "Web & API Integration"
+    "locales": {
+      "en": {
+        "display_name": "GitHub Integration",
+        "description": "GitHub REST API integration for repositories, issues, pull requests, users, and custom REST calls",
+        "category": "Web & API Integration",
+        "keywords": [
+          "maitask",
+          "github",
+          "api",
+          "git",
+          "repository"
+        ]
+      },
+      "zh": {
+        "display_name": "GitHub 集成",
+        "description": "GitHub REST API 集成，支持仓库、Issue、Pull Request、用户和自定义 REST 调用。",
+        "category": "Web 与 API 集成",
+        "keywords": [
+          "GitHub",
+          "API",
+          "Git",
+          "仓库",
+          "Issue",
+          "Pull Request"
+        ]
+      }
+    }
   }
 }

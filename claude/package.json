@@ -21,7 +21,33 @@
   "display_name": "Claude",
   "category": "AI & Cognitive Services",
   "maitask": {
-    "display_name": "Claude",
-    "category": "AI & Cognitive Services"
+    "locales": {
+      "en": {
+        "display_name": "Claude",
+        "description": "Anthropic Claude AI models integration for Maitask",
+        "category": "AI & Cognitive Services",
+        "keywords": [
+          "maitask",
+          "ai",
+          "anthropic",
+          "claude",
+          "llm",
+          "chat"
+        ]
+      },
+      "zh": {
+        "display_name": "Claude",
+        "description": "Anthropic Claude AI 模型集成，用于对话、文本生成、推理和内容处理任务。",
+        "category": "AI 与认知服务",
+        "keywords": [
+          "AI",
+          "Claude",
+          "Anthropic",
+          "大语言模型",
+          "聊天",
+          "推理"
+        ]
+      }
+    }
   }
 }

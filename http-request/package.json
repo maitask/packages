@@ -20,7 +20,34 @@
   "display_name": "HTTP Request",
   "category": "Web & API Integration",
   "maitask": {
-    "display_name": "HTTP Request",
-    "category": "Web & API Integration"
+    "locales": {
+      "en": {
+        "display_name": "HTTP Request",
+        "description": "Advanced HTTP client for Maitask with retries, timeouts, and validation",
+        "category": "Web & API Integration",
+        "keywords": [
+          "maitask",
+          "http",
+          "request",
+          "api",
+          "rest",
+          "fetch"
+        ]
+      },
+      "zh": {
+        "display_name": "HTTP 请求",
+        "description": "面向 Maitask 的高级 HTTP 客户端，支持重试、超时和请求校验。",
+        "category": "Web 与 API 集成",
+        "keywords": [
+          "HTTP",
+          "REST",
+          "请求",
+          "Fetch",
+          "API",
+          "重试",
+          "校验"
+        ]
+      }
+    }
   }
 }

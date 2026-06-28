@@ -20,7 +20,33 @@
   "display_name": "S3 Storage",
   "category": "Export & Storage",
   "maitask": {
-    "display_name": "S3 Storage",
-    "category": "Export & Storage"
+    "locales": {
+      "en": {
+        "display_name": "S3 Storage",
+        "description": "S3-compatible storage operations: upload, download, list, delete",
+        "category": "Export & Storage",
+        "keywords": [
+          "maitask",
+          "s3",
+          "storage",
+          "aws",
+          "upload",
+          "download"
+        ]
+      },
+      "zh": {
+        "display_name": "S3 存储",
+        "description": "兼容 S3 的存储操作，支持上传、下载、列表和删除对象。",
+        "category": "导出与存储",
+        "keywords": [
+          "S3",
+          "存储",
+          "AWS",
+          "上传",
+          "下载",
+          "对象存储"
+        ]
+      }
+    }
   }
 }

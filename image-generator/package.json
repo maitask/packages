@@ -20,7 +20,33 @@
   "display_name": "Image Generator",
   "category": "Media & Multimodal Processing",
   "maitask": {
-    "display_name": "Image Generator",
-    "category": "Media & Multimodal Processing"
+    "locales": {
+      "en": {
+        "display_name": "Image Generator",
+        "description": "AI image generation using DALL-E or Stable Diffusion",
+        "category": "Media & Multimodal Processing",
+        "keywords": [
+          "maitask",
+          "ai",
+          "image",
+          "generation",
+          "dalle",
+          "stable-diffusion"
+        ]
+      },
+      "zh": {
+        "display_name": "图像生成器",
+        "description": "使用 DALL-E 或 Stable Diffusion 进行 AI 图像生成，适合创意生成和视觉资产制作。",
+        "category": "媒体与多模态处理",
+        "keywords": [
+          "图像生成",
+          "AI",
+          "DALL-E",
+          "Stable Diffusion",
+          "视觉",
+          "图片"
+        ]
+      }
+    }
   }
 }

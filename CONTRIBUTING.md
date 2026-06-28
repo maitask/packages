@@ -10,6 +10,7 @@ Thank you for helping improve the official Maitask package collection. All contr
 - Duplicate an existing package as a starting point if needed.
 - Implement changes with TypeScript definitions when appropriate.
 - Provide usage examples under `examples/` when introducing new behaviour.
+- Define display metadata under `maitask.locales.<locale>`. Official packages must include `en` and `zh`; if a package only has one neutral label set, use flat `maitask.locales.display_name`, `description`, `category`, and `keywords` as the default fallback.
 
 ## 3. Validation Checklist
 - `npm install` and `npm run lint` (if available).

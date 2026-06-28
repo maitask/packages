@@ -37,7 +37,35 @@
   "display_name": "Data Validator",
   "category": "Data Processing & Transformation",
   "maitask": {
-    "display_name": "Data Validator",
-    "category": "Data Processing & Transformation"
+    "locales": {
+      "en": {
+        "display_name": "Data Validator",
+        "description": "Comprehensive data validation and quality assurance",
+        "category": "Data Processing & Transformation",
+        "keywords": [
+          "maitask",
+          "validation",
+          "schema",
+          "data-quality",
+          "json-schema",
+          "data-integrity",
+          "quality-assurance",
+          "verification"
+        ]
+      },
+      "zh": {
+        "display_name": "数据验证器",
+        "description": "完整的数据校验与质量保障工具，支持 Schema、完整性检查和数据质量验证。",
+        "category": "数据处理与转换",
+        "keywords": [
+          "数据验证",
+          "Schema",
+          "数据质量",
+          "完整性",
+          "校验",
+          "JSON Schema"
+        ]
+      }
+    }
   }
 }

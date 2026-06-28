@@ -20,7 +20,33 @@
   "display_name": "Database Query",
   "category": "Web & API Integration",
   "maitask": {
-    "display_name": "Database Query",
-    "category": "Web & API Integration"
+    "locales": {
+      "en": {
+        "display_name": "Database Query",
+        "description": "Execute SQL queries against PostgreSQL, MySQL, or SQLite via HTTP data APIs",
+        "category": "Web & API Integration",
+        "keywords": [
+          "maitask",
+          "database",
+          "sql",
+          "postgresql",
+          "mysql",
+          "query"
+        ]
+      },
+      "zh": {
+        "display_name": "数据库查询",
+        "description": "通过 HTTP 数据 API 执行 PostgreSQL、MySQL 或 SQLite 查询，适合数据库读取和自动化查询流程。",
+        "category": "Web 与 API 集成",
+        "keywords": [
+          "数据库",
+          "SQL",
+          "PostgreSQL",
+          "MySQL",
+          "SQLite",
+          "查询"
+        ]
+      }
+    }
   }
 }

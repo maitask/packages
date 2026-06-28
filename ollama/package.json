@@ -21,7 +21,33 @@
   "display_name": "Ollama",
   "category": "AI & Cognitive Services",
   "maitask": {
-    "display_name": "Ollama",
-    "category": "AI & Cognitive Services"
+    "locales": {
+      "en": {
+        "display_name": "Ollama",
+        "description": "Ollama local AI models integration for Maitask",
+        "category": "AI & Cognitive Services",
+        "keywords": [
+          "maitask",
+          "ai",
+          "ollama",
+          "llm",
+          "local",
+          "llama"
+        ]
+      },
+      "zh": {
+        "display_name": "Ollama",
+        "description": "Ollama 本地 AI 模型集成，适合本地大语言模型调用和私有化 AI 工作流。",
+        "category": "AI 与认知服务",
+        "keywords": [
+          "Ollama",
+          "本地模型",
+          "AI",
+          "大语言模型",
+          "Llama",
+          "私有化"
+        ]
+      }
+    }
   }
 }

@@ -35,7 +35,33 @@
   "display_name": "Cron Parser",
   "category": "Developer Utilities",
   "maitask": {
-    "display_name": "Cron Parser",
-    "category": "Developer Utilities"
+    "locales": {
+      "en": {
+        "display_name": "Cron Parser",
+        "description": "Cron expression parser and scheduler",
+        "category": "Developer Utilities",
+        "keywords": [
+          "maitask",
+          "cron",
+          "parser",
+          "scheduler",
+          "schedule",
+          "timing"
+        ]
+      },
+      "zh": {
+        "display_name": "Cron 解析器",
+        "description": "解析 Cron 表达式并计算调度时间，适用于定时任务、计划任务和自动化触发。",
+        "category": "开发者工具",
+        "keywords": [
+          "Cron",
+          "解析器",
+          "调度",
+          "计划任务",
+          "定时",
+          "自动化"
+        ]
+      }
+    }
   }
 }

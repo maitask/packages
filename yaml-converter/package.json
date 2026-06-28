@@ -35,7 +35,33 @@
   "display_name": "YAML Converter",
   "category": "Data Processing & Transformation",
   "maitask": {
-    "display_name": "YAML Converter",
-    "category": "Data Processing & Transformation"
+    "locales": {
+      "en": {
+        "display_name": "YAML Converter",
+        "description": "YAML to JSON bidirectional converter",
+        "category": "Data Processing & Transformation",
+        "keywords": [
+          "maitask",
+          "yaml",
+          "json",
+          "converter",
+          "parser",
+          "serializer"
+        ]
+      },
+      "zh": {
+        "display_name": "YAML 转换器",
+        "description": "YAML 与 JSON 双向转换工具，适合配置文件处理和序列化转换。",
+        "category": "数据处理与转换",
+        "keywords": [
+          "YAML",
+          "JSON",
+          "转换器",
+          "解析器",
+          "序列化",
+          "配置"
+        ]
+      }
+    }
   }
 }

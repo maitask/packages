@@ -21,7 +21,33 @@
   "display_name": "Video Processor",
   "category": "Media & Multimodal Processing",
   "maitask": {
-    "display_name": "Video Processor",
-    "category": "Media & Multimodal Processing"
+    "locales": {
+      "en": {
+        "display_name": "Video Processor",
+        "description": "Video analysis and processing using AI vision models for Maitask",
+        "category": "Media & Multimodal Processing",
+        "keywords": [
+          "maitask",
+          "ai",
+          "video",
+          "vision",
+          "analysis",
+          "multimodal"
+        ]
+      },
+      "zh": {
+        "display_name": "视频处理器",
+        "description": "使用 AI 视觉模型进行视频分析与处理，适合多模态理解和媒体自动化。",
+        "category": "媒体与多模态处理",
+        "keywords": [
+          "视频处理",
+          "视觉",
+          "AI",
+          "分析",
+          "多模态",
+          "媒体"
+        ]
+      }
+    }
   }
 }

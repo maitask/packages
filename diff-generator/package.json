@@ -35,7 +35,33 @@
   "display_name": "Diff Generator",
   "category": "Data Processing & Transformation",
   "maitask": {
-    "display_name": "Diff Generator",
-    "category": "Data Processing & Transformation"
+    "locales": {
+      "en": {
+        "display_name": "Diff Generator",
+        "description": "Data difference comparison and patch generation",
+        "category": "Data Processing & Transformation",
+        "keywords": [
+          "maitask",
+          "diff",
+          "comparison",
+          "patch",
+          "change",
+          "tracking"
+        ]
+      },
+      "zh": {
+        "display_name": "差异生成器",
+        "description": "比较数据差异并生成补丁，适用于变更追踪、内容对比和同步检查。",
+        "category": "数据处理与转换",
+        "keywords": [
+          "差异",
+          "对比",
+          "补丁",
+          "变更追踪",
+          "比较",
+          "数据"
+        ]
+      }
+    }
   }
 }

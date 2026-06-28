@@ -29,7 +29,37 @@
   "display_name": "Trader",
   "category": "Finance & Trading",
   "maitask": {
-    "display_name": "Trader",
-    "category": "Finance & Trading"
+    "locales": {
+      "en": {
+        "display_name": "Trader",
+        "description": "Trader orchestration across Binance futures, Binance spot, and paper modes inside Maitask",
+        "category": "Finance & Trading",
+        "keywords": [
+          "maitask",
+          "trading",
+          "binance",
+          "aster",
+          "okx",
+          "futures",
+          "websocket",
+          "risk",
+          "automation"
+        ]
+      },
+      "zh": {
+        "display_name": "交易器",
+        "description": "在 Maitask 内编排 Binance 合约、Binance 现货和模拟交易模式，支持交易自动化。",
+        "category": "金融与交易",
+        "keywords": [
+          "交易",
+          "Binance",
+          "合约",
+          "现货",
+          "模拟交易",
+          "风控",
+          "自动化"
+        ]
+      }
+    }
   }
 }

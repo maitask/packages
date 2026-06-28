@@ -19,7 +19,33 @@
   "display_name": "File Transformer",
   "category": "Data Processing & Transformation",
   "maitask": {
-    "display_name": "File Transformer",
-    "category": "Data Processing & Transformation"
+    "locales": {
+      "en": {
+        "display_name": "File Transformer",
+        "description": "Convert between file formats: JSON, CSV, XML, YAML, TOML",
+        "category": "Data Processing & Transformation",
+        "keywords": [
+          "maitask",
+          "file",
+          "convert",
+          "transform",
+          "format"
+        ]
+      },
+      "zh": {
+        "display_name": "文件转换器",
+        "description": "在 JSON、CSV、XML、YAML、TOML 等文件格式之间进行转换。",
+        "category": "数据处理与转换",
+        "keywords": [
+          "文件转换",
+          "格式转换",
+          "JSON",
+          "CSV",
+          "XML",
+          "YAML",
+          "TOML"
+        ]
+      }
+    }
   }
 }

@@ -20,7 +20,32 @@
   "display_name": "Hacker News Crawler",
   "category": "Web & API Integration",
   "maitask": {
-    "display_name": "Hacker News Crawler",
-    "category": "Web & API Integration"
+    "locales": {
+      "en": {
+        "display_name": "Hacker News Crawler",
+        "description": "Crawl and extract stories from Hacker News using official API",
+        "category": "Web & API Integration",
+        "keywords": [
+          "maitask",
+          "hackernews",
+          "ycombinator",
+          "crawler",
+          "api"
+        ]
+      },
+      "zh": {
+        "display_name": "Hacker News 抓取器",
+        "description": "使用官方 API 抓取并提取 Hacker News 故事，适合内容收集和资讯分析。",
+        "category": "Web 与 API 集成",
+        "keywords": [
+          "Hacker News",
+          "抓取",
+          "爬虫",
+          "API",
+          "资讯",
+          "内容收集"
+        ]
+      }
+    }
   }
 }

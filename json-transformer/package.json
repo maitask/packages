@@ -36,7 +36,34 @@
   "display_name": "JSON Transformer",
   "category": "Data Processing & Transformation",
   "maitask": {
-    "display_name": "JSON Transformer",
-    "category": "Data Processing & Transformation"
+    "locales": {
+      "en": {
+        "display_name": "JSON Transformer",
+        "description": "JSONPath query and data transformation",
+        "category": "Data Processing & Transformation",
+        "keywords": [
+          "maitask",
+          "json",
+          "transform",
+          "jsonpath",
+          "query",
+          "mapping",
+          "data"
+        ]
+      },
+      "zh": {
+        "display_name": "JSON 转换器",
+        "description": "支持 JSONPath 查询和数据转换，适合字段映射、结构调整和数据清洗。",
+        "category": "数据处理与转换",
+        "keywords": [
+          "JSON",
+          "转换",
+          "JSONPath",
+          "查询",
+          "映射",
+          "数据清洗"
+        ]
+      }
+    }
   }
 }

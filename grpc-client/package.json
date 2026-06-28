@@ -19,7 +19,32 @@
   "display_name": "gRPC Client",
   "category": "Web & API Integration",
   "maitask": {
-    "display_name": "gRPC Client",
-    "category": "Web & API Integration"
+    "locales": {
+      "en": {
+        "display_name": "gRPC Client",
+        "description": "gRPC client via HTTP/JSON transcoding - call gRPC services over HTTP",
+        "category": "Web & API Integration",
+        "keywords": [
+          "maitask",
+          "grpc",
+          "rpc",
+          "api",
+          "protobuf"
+        ]
+      },
+      "zh": {
+        "display_name": "gRPC 客户端",
+        "description": "通过 HTTP/JSON 转码调用 gRPC 服务，支持以 HTTP 方式访问 gRPC 接口。",
+        "category": "Web 与 API 集成",
+        "keywords": [
+          "gRPC",
+          "RPC",
+          "API",
+          "Protobuf",
+          "HTTP",
+          "转码"
+        ]
+      }
+    }
   }
 }

@@ -20,7 +20,32 @@
   "display_name": "NocoDB Importer",
   "category": "Export & Storage",
   "maitask": {
-    "display_name": "NocoDB Importer",
-    "category": "Export & Storage"
+    "locales": {
+      "en": {
+        "display_name": "NocoDB Importer",
+        "description": "Import data to NocoDB with authentication",
+        "category": "Export & Storage",
+        "keywords": [
+          "maitask",
+          "nocodb",
+          "database",
+          "import",
+          "api"
+        ]
+      },
+      "zh": {
+        "display_name": "NocoDB 导入器",
+        "description": "通过 API 将数据导入 NocoDB，并支持认证配置，适合低代码数据同步。",
+        "category": "导出与存储",
+        "keywords": [
+          "NocoDB",
+          "导入",
+          "数据库",
+          "API",
+          "数据同步",
+          "低代码"
+        ]
+      }
+    }
   }
 }

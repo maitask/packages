@@ -20,7 +20,32 @@
   "display_name": "Sentiment Analysis",
   "category": "AI & Cognitive Services",
   "maitask": {
-    "display_name": "Sentiment Analysis",
-    "category": "AI & Cognitive Services"
+    "locales": {
+      "en": {
+        "display_name": "Sentiment Analysis",
+        "description": "Text sentiment analysis using AI models for Maitask",
+        "category": "AI & Cognitive Services",
+        "keywords": [
+          "maitask",
+          "ai",
+          "sentiment",
+          "nlp",
+          "analysis"
+        ]
+      },
+      "zh": {
+        "display_name": "情感分析",
+        "description": "使用 AI 模型进行文本情感分析，适合评论、反馈和舆情分析。",
+        "category": "AI 与认知服务",
+        "keywords": [
+          "情感分析",
+          "AI",
+          "NLP",
+          "文本",
+          "评论",
+          "舆情"
+        ]
+      }
+    }
   }
 }

@@ -21,7 +21,33 @@
   "display_name": "Audio Processor",
   "category": "Media & Multimodal Processing",
   "maitask": {
-    "display_name": "Audio Processor",
-    "category": "Media & Multimodal Processing"
+    "locales": {
+      "en": {
+        "display_name": "Audio Processor",
+        "description": "Audio processing and transcription using AI models for Maitask",
+        "category": "Media & Multimodal Processing",
+        "keywords": [
+          "maitask",
+          "ai",
+          "audio",
+          "transcription",
+          "whisper",
+          "speech-to-text"
+        ]
+      },
+      "zh": {
+        "display_name": "音频处理器",
+        "description": "使用 AI 模型进行音频处理与转写，适用于语音转文本、会议记录和音频分析流程。",
+        "category": "媒体与多模态处理",
+        "keywords": [
+          "音频",
+          "转写",
+          "语音转文本",
+          "Whisper",
+          "AI",
+          "语音"
+        ]
+      }
+    }
   }
 }

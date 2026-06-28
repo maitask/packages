@@ -35,7 +35,33 @@
   "display_name": "Telegram Bot",
   "category": "Communications & Automation",
   "maitask": {
-    "display_name": "Telegram Bot",
-    "category": "Communications & Automation"
+    "locales": {
+      "en": {
+        "display_name": "Telegram Bot",
+        "description": "Send messages to Telegram users and groups via Bot API",
+        "category": "Communications & Automation",
+        "keywords": [
+          "maitask",
+          "telegram",
+          "bot",
+          "messaging",
+          "notification",
+          "api"
+        ]
+      },
+      "zh": {
+        "display_name": "Telegram 机器人",
+        "description": "通过 Bot API 向 Telegram 用户和群组发送消息，适合通知和自动化互动。",
+        "category": "通信与自动化",
+        "keywords": [
+          "Telegram",
+          "机器人",
+          "消息",
+          "通知",
+          "Bot API",
+          "群组"
+        ]
+      }
+    }
   }
 }

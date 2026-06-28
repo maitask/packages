@@ -19,7 +19,32 @@
   "display_name": "Data Analyst",
   "category": "AI & Cognitive Services",
   "maitask": {
-    "display_name": "Data Analyst",
-    "category": "AI & Cognitive Services"
+    "locales": {
+      "en": {
+        "display_name": "Data Analyst",
+        "description": "AI-powered data analysis and insights generation",
+        "category": "AI & Cognitive Services",
+        "keywords": [
+          "maitask",
+          "ai",
+          "data",
+          "analysis",
+          "insights"
+        ]
+      },
+      "zh": {
+        "display_name": "数据分析师",
+        "description": "使用 AI 生成数据分析、洞察和摘要，适合报表解释、趋势识别和数据问答。",
+        "category": "AI 与认知服务",
+        "keywords": [
+          "数据分析",
+          "洞察",
+          "AI",
+          "报表",
+          "趋势",
+          "摘要"
+        ]
+      }
+    }
   }
 }

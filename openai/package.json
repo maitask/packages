@@ -21,7 +21,33 @@
   "display_name": "OpenAI",
   "category": "AI & Cognitive Services",
   "maitask": {
-    "display_name": "OpenAI",
-    "category": "AI & Cognitive Services"
+    "locales": {
+      "en": {
+        "display_name": "OpenAI",
+        "description": "OpenAI GPT models integration for Maitask",
+        "category": "AI & Cognitive Services",
+        "keywords": [
+          "maitask",
+          "ai",
+          "openai",
+          "gpt",
+          "llm",
+          "chat"
+        ]
+      },
+      "zh": {
+        "display_name": "OpenAI",
+        "description": "OpenAI GPT 模型集成，用于聊天、文本生成、推理和智能自动化。",
+        "category": "AI 与认知服务",
+        "keywords": [
+          "OpenAI",
+          "GPT",
+          "AI",
+          "大语言模型",
+          "聊天",
+          "文本生成"
+        ]
+      }
+    }
   }
 }

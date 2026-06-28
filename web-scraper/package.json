@@ -35,7 +35,33 @@
   "display_name": "Web Scraper",
   "category": "Web & API Integration",
   "maitask": {
-    "display_name": "Web Scraper",
-    "category": "Web & API Integration"
+    "locales": {
+      "en": {
+        "display_name": "Web Scraper",
+        "description": "Extract data from web pages with HTML parsing, CSS selectors, and XPath queries",
+        "category": "Web & API Integration",
+        "keywords": [
+          "maitask",
+          "web-scraping",
+          "html-parser",
+          "cheerio-style",
+          "css-selector",
+          "data-extraction"
+        ]
+      },
+      "zh": {
+        "display_name": "网页抓取器",
+        "description": "使用 HTML 解析、CSS 选择器和 XPath 查询从网页中提取数据。",
+        "category": "Web 与 API 集成",
+        "keywords": [
+          "网页抓取",
+          "HTML",
+          "CSS 选择器",
+          "XPath",
+          "数据提取",
+          "爬虫"
+        ]
+      }
+    }
   }
 }

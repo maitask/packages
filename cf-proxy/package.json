@@ -38,7 +38,37 @@
   "display_name": "Cloudflare Proxy",
   "category": "Web & API Integration",
   "maitask": {
-    "display_name": "Cloudflare Proxy",
-    "category": "Web & API Integration"
+    "locales": {
+      "en": {
+        "display_name": "Cloudflare Proxy",
+        "description": "Cloudflare Worker proxy for GitHub and Docker registry acceleration with intelligent redirect handling",
+        "category": "Web & API Integration",
+        "keywords": [
+          "maitask",
+          "cloudflare",
+          "proxy",
+          "cdn",
+          "github",
+          "docker",
+          "registry",
+          "acceleration",
+          "mirror"
+        ]
+      },
+      "zh": {
+        "display_name": "Cloudflare 代理",
+        "description": "基于 Cloudflare Worker 的 GitHub 与 Docker Registry 加速代理，支持智能重定向与镜像加速。",
+        "category": "Web 与 API 集成",
+        "keywords": [
+          "Cloudflare",
+          "代理",
+          "加速",
+          "GitHub",
+          "Docker",
+          "镜像",
+          "Registry"
+        ]
+      }
+    }
   }
 }

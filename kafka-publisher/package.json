@@ -19,7 +19,32 @@
   "display_name": "Kafka Publisher",
   "category": "Communications & Automation",
   "maitask": {
-    "display_name": "Kafka Publisher",
-    "category": "Communications & Automation"
+    "locales": {
+      "en": {
+        "display_name": "Kafka Publisher",
+        "description": "Publish messages to Kafka topics via REST proxy",
+        "category": "Communications & Automation",
+        "keywords": [
+          "maitask",
+          "kafka",
+          "messaging",
+          "events",
+          "streaming"
+        ]
+      },
+      "zh": {
+        "display_name": "Kafka 发布器",
+        "description": "通过 REST Proxy 向 Kafka Topic 发布消息，适合事件流和消息集成。",
+        "category": "通信与自动化",
+        "keywords": [
+          "Kafka",
+          "消息",
+          "事件",
+          "流式",
+          "Topic",
+          "发布"
+        ]
+      }
+    }
   }
 }

@@ -35,7 +35,33 @@
   "display_name": "Image Metadata",
   "category": "Media & Multimodal Processing",
   "maitask": {
-    "display_name": "Image Metadata",
-    "category": "Media & Multimodal Processing"
+    "locales": {
+      "en": {
+        "display_name": "Image Metadata",
+        "description": "Image metadata extraction from headers",
+        "category": "Media & Multimodal Processing",
+        "keywords": [
+          "maitask",
+          "image",
+          "metadata",
+          "exif",
+          "dimensions",
+          "format"
+        ]
+      },
+      "zh": {
+        "display_name": "图像元数据",
+        "description": "从图像文件头提取格式、尺寸、EXIF 等元数据，适合媒体识别和文件检查。",
+        "category": "媒体与多模态处理",
+        "keywords": [
+          "图像",
+          "元数据",
+          "EXIF",
+          "尺寸",
+          "格式",
+          "图片"
+        ]
+      }
+    }
   }
 }

@@ -10,6 +10,7 @@
 - 如有需要，可复制现有包作为起点。
 - 根据需要提供 TypeScript 类型定义。
 - 新功能请在 `examples/` 中附带示例数据或说明。
+- 展示元数据统一写在 `maitask.locales.<locale>` 下。官方包必须包含 `en` 与 `zh`；如果只有一组中性展示文案，则使用扁平的 `maitask.locales.display_name`、`description`、`category`、`keywords` 作为默认兜底。
 
 ## 3. 验证清单
 - 执行 `npm install` 并确保 lint/测试通过（如项目提供脚本）。

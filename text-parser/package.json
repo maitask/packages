@@ -38,7 +38,36 @@
   "display_name": "Text Parser",
   "category": "Data Processing & Transformation",
   "maitask": {
-    "display_name": "Text Parser",
-    "category": "Data Processing & Transformation"
+    "locales": {
+      "en": {
+        "display_name": "Text Parser",
+        "description": "High-performance text and markdown parser",
+        "category": "Data Processing & Transformation",
+        "keywords": [
+          "maitask",
+          "parser",
+          "text",
+          "markdown",
+          "plaintext",
+          "document",
+          "processing",
+          "utf8",
+          "base64"
+        ]
+      },
+      "zh": {
+        "display_name": "文本解析器",
+        "description": "高性能文本与 Markdown 解析器，支持纯文本、文档内容和编码处理。",
+        "category": "数据处理与转换",
+        "keywords": [
+          "文本解析",
+          "Markdown",
+          "纯文本",
+          "文档",
+          "UTF-8",
+          "Base64"
+        ]
+      }
+    }
   }
 }

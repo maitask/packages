@@ -35,7 +35,33 @@
   "display_name": "Markdown Renderer",
   "category": "Developer Utilities",
   "maitask": {
-    "display_name": "Markdown Renderer",
-    "category": "Developer Utilities"
+    "locales": {
+      "en": {
+        "display_name": "Markdown Renderer",
+        "description": "Markdown to HTML converter with template support",
+        "category": "Developer Utilities",
+        "keywords": [
+          "maitask",
+          "markdown",
+          "html",
+          "converter",
+          "renderer",
+          "template"
+        ]
+      },
+      "zh": {
+        "display_name": "Markdown 渲染器",
+        "description": "带模板支持的 Markdown 到 HTML 转换器，适合文档渲染和内容发布。",
+        "category": "开发者工具",
+        "keywords": [
+          "Markdown",
+          "HTML",
+          "渲染",
+          "转换器",
+          "模板",
+          "文档"
+        ]
+      }
+    }
   }
 }

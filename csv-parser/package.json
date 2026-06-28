@@ -38,7 +38,36 @@
   "display_name": "CSV Parser",
   "category": "Data Processing & Transformation",
   "maitask": {
-    "display_name": "CSV Parser",
-    "category": "Data Processing & Transformation"
+    "locales": {
+      "en": {
+        "display_name": "CSV Parser",
+        "description": "High-performance CSV parser with advanced features",
+        "category": "Data Processing & Transformation",
+        "keywords": [
+          "maitask",
+          "parser",
+          "csv",
+          "data",
+          "processing",
+          "tabular",
+          "spreadsheet",
+          "delimiter",
+          "rfc4180"
+        ]
+      },
+      "zh": {
+        "display_name": "CSV 解析器",
+        "description": "高性能 CSV 解析器，支持高级解析能力，适用于表格数据、分隔符文件和数据处理流程。",
+        "category": "数据处理与转换",
+        "keywords": [
+          "CSV",
+          "解析器",
+          "数据处理",
+          "表格",
+          "分隔符",
+          "电子表格"
+        ]
+      }
+    }
   }
 }
