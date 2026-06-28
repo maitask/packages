@@ -27,6 +27,9 @@ Env:
   PLANE_USERNAME  Username used to request a token when TOKEN is not set.
   PLANE_PASSWORD  Password used to request a token when TOKEN is not set.
   PACKAGES_DIR    Package directory root. Default: repository root.
+
+The script uses local npm when available. If npm is not installed but Docker is
+available, it runs npm pack through node:20-alpine.
 EOF
 }
 
@@ -35,6 +38,19 @@ require_cmd() {
     echo "Error: required command '$1' is not installed" >&2
     exit 1
   fi
+}
+
+require_pack_runner() {
+  if command -v npm >/dev/null 2>&1; then
+    return
+  fi
+
+  if command -v docker >/dev/null 2>&1; then
+    return
+  fi
+
+  echo "Error: required command 'npm' is not installed and Docker fallback is unavailable" >&2
+  exit 1
 }
 
 resolve_token() {
@@ -79,7 +95,20 @@ pack_package() {
   local pkg_dir="$1"
   local out_dir="$2"
   local pack_json
-  pack_json="$(cd "$pkg_dir" && npm pack --json --pack-destination "$out_dir")"
+
+  if command -v npm >/dev/null 2>&1; then
+    pack_json="$(cd "$pkg_dir" && npm pack --json --pack-destination "$out_dir")"
+  else
+    local pkg_abs out_abs
+    pkg_abs="$(cd "$pkg_dir" && pwd)"
+    out_abs="$(cd "$out_dir" && pwd)"
+    pack_json="$(docker run --rm \
+      -v "$pkg_abs:/pkg:ro" \
+      -v "$out_abs:/out" \
+      -w /pkg \
+      node:20-alpine npm pack --json --pack-destination /out)"
+  fi
+
   local filename
   filename="$(printf '%s' "$pack_json" | jq -er '.[0].filename')"
   printf '%s/%s' "$out_dir" "$filename"
@@ -116,7 +145,7 @@ main() {
 
   require_cmd curl
   require_cmd jq
-  require_cmd npm
+  require_pack_runner
   resolve_token
 
   local tmp_dir
