@@ -153,20 +153,15 @@ await execute('@maitask/cf-proxy', {
 });
 ```
 
-### 2. Docker Image Pull
+### 2. Signed Binary Artifact Download
 
 ```javascript
-// Get manifest
-const manifest = await execute('@maitask/cf-proxy', {
-  url: 'https://ghcr.io/v2/maitask/runtime/manifests/latest',
-  headers: {
-    'Accept': 'application/vnd.docker.distribution.manifest.v2+json'
+await execute('@maitask/cf-proxy', {
+  url: 'https://downloads.example.com/maitask/runtime/maitask-runtime-1.0.0-x86_64-unknown-linux-gnu.tar.zst',
+  config: {
+    allowedHosts: ['downloads.example.com'],
+    maxRedirects: 3
   }
-});
-
-// Get layer blob
-const layer = await execute('@maitask/cf-proxy', {
-  url: 'https://ghcr.io/v2/maitask/runtime/blobs/' + digest
 });
 ```
 
