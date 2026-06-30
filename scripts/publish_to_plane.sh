@@ -133,7 +133,7 @@ publish_tarball() {
   fi
 
   echo "Error: failed to publish $pkg_name (HTTP $http_code)" >&2
-  jq -r 'if type == "object" then (.error.message // .error // .message // .) else . end' \
+  jq -r 'if type == "object" then ((.error | if type == "object" then .message else . end) // .message // .) else . end' \
     "$response_file" >&2
   return 1
 }
