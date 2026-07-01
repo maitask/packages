@@ -32,6 +32,43 @@ frontend.
 
 Packages must not mutate `input`, `options`, or `context`.
 
+## Examples
+
+Every package must publish `example.json` in the package tarball. When
+`package.json` defines a `files` array, it must include `example.json`.
+
+The canonical single-example shape is:
+
+```json
+{
+  "name": "Optional example name",
+  "description": "Optional markdown description",
+  "input": {},
+  "options": {},
+  "context": {},
+  "expected_output": {}
+}
+```
+
+Packages with multiple examples must use:
+
+```json
+{
+  "examples": [
+    {
+      "name": "Small input",
+      "input": {},
+      "options": {}
+    }
+  ]
+}
+```
+
+If `example.json` contains any other JSON value, Plane treats the entire value
+as the package `input`. `options` and `context`, when present, must be JSON
+objects. Plane exposes normalized examples through the package descriptor API,
+and frontend surfaces consume only that normalized `examples` field.
+
 ## Output
 
 All package executions are exposed at the Runtime boundary with this top-level

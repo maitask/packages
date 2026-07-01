@@ -9,7 +9,7 @@
 ## 2. 本地开发
 - 如有需要，可复制现有包作为起点。
 - 根据需要提供 TypeScript 类型定义。
-- 新功能请在 `examples/` 中附带示例数据或说明。
+- 新功能必须提供生产可用的 `example.json`；如果 `package.json` 使用 `files` 白名单，也必须把 `example.json` 纳入发布产物。
 - 展示元数据统一写在 `maitask.locales.en` 与 `maitask.locales.zh` 下。如果只有一组中性展示文案，则使用扁平的 `maitask.locales.display_name`、`description`、`category`、`keywords` 作为默认兜底。
 
 ## 3. 验证清单

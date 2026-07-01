@@ -24,7 +24,8 @@
   "files": [
     "dist/index.cjs",
     "index.d.ts",
-    "README.md"
+    "README.md",
+    "example.json"
   ],
   "display_name": "Trader",
   "category": "Finance & Trading",

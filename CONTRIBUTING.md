@@ -9,7 +9,7 @@ Thank you for helping improve the official Maitask package collection. All contr
 ## 2. Local Development
 - Duplicate an existing package as a starting point if needed.
 - Implement changes with TypeScript definitions when appropriate.
-- Provide usage examples under `examples/` when introducing new behaviour.
+- Provide a production `example.json` and ensure it is included in `package.json.files` when that allowlist is present.
 - Define display metadata under `maitask.locales.en` and `maitask.locales.zh`. If a package only has one neutral label set, use flat `maitask.locales.display_name`, `description`, `category`, and `keywords` as the default fallback.
 
 ## 3. Validation Checklist
