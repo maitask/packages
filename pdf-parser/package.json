@@ -28,9 +28,9 @@
   ],
   "files": [
     "index.js",
+    "index.d.ts",
     "README.md",
-    "example.json",
-    "LICENSE"
+    "example.json"
   ],
   "engines": {
     "node": ">=18.0.0"

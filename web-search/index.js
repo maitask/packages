@@ -47,6 +47,12 @@ async function execute(input, options, context) {
 
 function buildConfig(input, options, context) {
     var source = mergeObjects(options || {}, input || {});
+    if (context && context.defaults && typeof context.defaults === 'object') {
+        source = mergeObjects(context.defaults, source);
+    }
+    if (context && context.env && typeof context.env === 'object' && context.env.WEB_SEARCH_BASE_URL && !source.baseUrl) {
+        source.baseUrl = context.env.WEB_SEARCH_BASE_URL;
+    }
 
     var limit = typeof source.limit === 'number' ? source.limit : 10;
     if (limit < 1) limit = 1;
@@ -69,7 +75,9 @@ function buildConfig(input, options, context) {
         includeSnippets: source.includeSnippets !== false,
         safeSearch: source.safeSearch || 'moderate',
         headers: source.headers || {},
-        nextPageToken: source.nextPageToken || null
+        nextPageToken: source.nextPageToken || null,
+        baseUrl: source.baseUrl ? normalizeBaseUrl(source.baseUrl) : null,
+        engineBaseUrls: normalizeEngineBaseUrls(source.engineBaseUrls)
     };
 }
 
@@ -106,7 +114,7 @@ async function searchDuckDuckGo(config) {
         params.s = config.offset;
     }
 
-    var url = 'https://duckduckgo.com/html/?' + buildQueryString(params);
+    var url = buildSearchUrl('duckduckgo', '/html/', params, config);
 
     try {
         var html = await fetchPage(url, config.headers);
@@ -147,7 +155,7 @@ async function searchBing(config) {
         params.first = config.offset + 1;  // Bing uses 1-based indexing
     }
 
-    var url = 'https://www.bing.com/search?' + buildQueryString(params);
+    var url = buildSearchUrl('bing', '/search', params, config);
 
     try {
         var html = await fetchPage(url, config.headers);
@@ -188,7 +196,7 @@ async function searchGoogle(config) {
         params.start = config.offset;
     }
 
-    var url = 'https://www.google.com/search?' + buildQueryString(params);
+    var url = buildSearchUrl('google', '/search', params, config);
 
     try {
         var html = await fetchPage(url, config.headers);
@@ -266,16 +274,16 @@ function parseDuckDuckGo(html, limit, includeSnippets) {
         var url = cleanUrl(urlMatch[1]);
 
         // Extract title
-        var titleMatch = block.match(/<h2[^>]*>(.*?)<\/h2>/);
+        var titleMatch = block.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
         if (!titleMatch) continue;
         var title = cleanText(titleMatch[1]);
 
         // Extract snippet
         var snippet = '';
         if (includeSnippets) {
-            var snippetMatch = block.match(/<a[^>]*>(.*?)<\/a>.*?<div[^>]*>(.*?)<\/div>|<div class="result__snippet"[^>]*>(.*?)<\/div>/);
+            var snippetMatch = block.match(/<a[^>]*>[\s\S]*?<\/a>[\s\S]*?<div[^>]*>([\s\S]*?)<\/div>|<div class="result__snippet"[^>]*>([\s\S]*?)<\/div>/i);
             if (snippetMatch) {
-                snippet = cleanText(snippetMatch[2] || snippetMatch[3] || snippetMatch[1] || '');
+                snippet = cleanText(snippetMatch[1] || snippetMatch[2] || '');
             }
         }
 
@@ -311,7 +319,7 @@ function parseBing(html, limit, includeSnippets) {
 
         // Extract URL - try different patterns
         var url = '';
-        var urlMatch = block.match(/<h2[^>]*>.*?<a[^>]+href="(https?:\/\/[^"]+)"/);
+        var urlMatch = block.match(/<h2[^>]*>[\s\S]*?<a[^>]+href="(https?:\/\/[^"]+)"/i);
         if (urlMatch) {
             url = cleanUrl(urlMatch[1]);
         } else {
@@ -327,10 +335,10 @@ function parseBing(html, limit, includeSnippets) {
 
         // Extract title
         var title = '';
-        var titleMatch = block.match(/<h2[^>]*>(.*?)<\/h2>/);
+        var titleMatch = block.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i);
         if (titleMatch) {
             // Extract from the anchor tag inside h2 to exclude other elements
-            var innerTitleMatch = titleMatch[1].match(/<a[^>]*>(.*?)<\/a>/);
+            var innerTitleMatch = titleMatch[1].match(/<a[^>]*>([\s\S]*?)<\/a>/i);
             if (innerTitleMatch) {
                 title = cleanText(innerTitleMatch[1]);
             } else {
@@ -342,7 +350,7 @@ function parseBing(html, limit, includeSnippets) {
         var snippet = '';
         if (includeSnippets) {
             // Look for snippets typically in <p> tags or <div class="b_paractl">
-            var snippetMatch = block.match(/<p[^>]*>(.*?)<\/p>|<div class="b_paractl"[^>]*>(.*?)<\/div>/);
+            var snippetMatch = block.match(/<p[^>]*>([\s\S]*?)<\/p>|<div class="b_paractl"[^>]*>([\s\S]*?)<\/div>/i);
             if (snippetMatch) {
                 snippet = cleanText(snippetMatch[1] || snippetMatch[2] || '');
             }
@@ -378,7 +386,7 @@ function parseGoogle(html, limit, includeSnippets) {
         var block = blocks[i];
 
         // Extract title and URL from the <h3> element and its <a> tag
-        var titleMatch = block.match(/<h3[^>]*>.*?<a[^>]+href="(https?:\/\/[^"]+)".*?>(.*?)<\/a>|<a[^>]+href="(https?:\/\/[^"]+)".*?<h3[^>]*>(.*?)<\/h3>/);
+        var titleMatch = block.match(/<h3[^>]*>[\s\S]*?<a[^>]+href="(https?:\/\/[^"]+)"[\s\S]*?>([\s\S]*?)<\/a>|<a[^>]+href="(https?:\/\/[^"]+)"[\s\S]*?<h3[^>]*>([\s\S]*?)<\/h3>/i);
         if (!titleMatch) continue;
 
         var url, title;
@@ -396,7 +404,7 @@ function parseGoogle(html, limit, includeSnippets) {
         var snippet = '';
         if (includeSnippets) {
             // Look for class with common snippet identifiers like yDYNvb or VwiC3b or MUxRK
-            var snippetMatch = block.match(/<span[^>]*class="[^"]*DUTUAc|yDYNvb|VwiC3b|MUxRK[^"]*"[^>]*>(.*?)<\/span>|<div[^>]*class="[^"]*VwiC3b|MUxRK[^"]*"[^>]*>(.*?)<\/div>/);
+            var snippetMatch = block.match(/<span[^>]*class="[^"]*(?:DUTUAc|yDYNvb|VwiC3b|MUxRK)[^"]*"[^>]*>([\s\S]*?)<\/span>|<div[^>]*class="[^"]*(?:VwiC3b|MUxRK)[^"]*"[^>]*>([\s\S]*?)<\/div>/i);
             if (snippetMatch) {
                 snippet = cleanText(snippetMatch[1] || snippetMatch[2] || '');
             } else if (!snippet) {
@@ -583,6 +591,46 @@ function buildQueryString(params) {
         }
     }
     return parts.join('&');
+}
+
+function buildSearchUrl(engine, path, params, config) {
+    var query = buildQueryString(params);
+    var baseUrl = config.engineBaseUrls[engine] || config.baseUrl;
+    if (baseUrl) {
+        return joinUrl(baseUrl, path) + (query ? '?' + query : '');
+    }
+
+    var defaultBases = {
+        duckduckgo: 'https://duckduckgo.com',
+        bing: 'https://www.bing.com',
+        google: 'https://www.google.com'
+    };
+    return joinUrl(defaultBases[engine], path) + (query ? '?' + query : '');
+}
+
+function normalizeBaseUrl(value) {
+    var text = String(value || '').trim();
+    if (!text) {
+        throw new Error('baseUrl must not be empty');
+    }
+    return text.replace(/\/+$/, '');
+}
+
+function normalizeEngineBaseUrls(value) {
+    var result = {};
+    if (!value || typeof value !== 'object') {
+        return result;
+    }
+    ['duckduckgo', 'bing', 'google'].forEach(function(engine) {
+        if (value[engine]) {
+            result[engine] = normalizeBaseUrl(value[engine]);
+        }
+    });
+    return result;
+}
+
+function joinUrl(baseUrl, path) {
+    return normalizeBaseUrl(baseUrl) + '/' + String(path || '').replace(/^\/+/, '');
 }
 
 

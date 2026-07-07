@@ -23,10 +23,8 @@
  */
 async function execute(input, options, context) {
     try {
-        ensureFetch();
-
         var config = buildConfig(input, options, context);
-        var ids = await fetchStoryIds(config.storyType);
+        var ids = await fetchStoryIds(config);
         if (!ids || !ids.length) {
             throw new Error('No story identifiers returned from Hacker News API');
         }
@@ -34,13 +32,13 @@ async function execute(input, options, context) {
         var limitedIds = ids.slice(0, config.limit);
         var stories = [];
         for (var i = 0; i < limitedIds.length; i++) {
-            var storyData = await fetchItem(limitedIds[i]);
+            var storyData = await fetchItem(limitedIds[i], config);
             if (!storyData || storyData.type !== 'story') {
                 continue;
             }
             var story = normalizeStory(storyData);
-            if (config.includeComments && Array.isArray(storyData.kids) && storyData.kids.length > 0) {
-                story.comments = await fetchComments(storyData.kids, config.commentLimit, config.commentDepth);
+            if (config.includeComments && config.commentLimit > 0 && config.commentDepth > 0 && Array.isArray(storyData.kids) && storyData.kids.length > 0) {
+                story.comments = await fetchComments(storyData.kids, config.commentLimit, config.commentDepth, config);
             }
             stories.push(story);
         }
@@ -90,6 +88,9 @@ function buildConfig(input, options, context) {
     if (context && isPlainObject(context.defaults)) {
         source = mergeObjects(context.defaults, source);
     }
+    if (context && isPlainObject(context.env) && context.env.HACKERNEWS_API_BASE_URL && !source.apiBaseUrl && !source.baseUrl) {
+        source.apiBaseUrl = context.env.HACKERNEWS_API_BASE_URL;
+    }
 
     var limit = typeof source.limit === 'number' ? source.limit : 30;
     if (limit < 1) {
@@ -99,17 +100,40 @@ function buildConfig(input, options, context) {
         limit = 100;
     }
 
+    var storyType = (source.storyType || 'top').toLowerCase();
+    var allowedStoryTypes = ['top', 'new', 'best', 'ask', 'show', 'job'];
+    if (allowedStoryTypes.indexOf(storyType) === -1) {
+        throw new Error('Unsupported storyType "' + storyType + '". Use one of: ' + allowedStoryTypes.join(', '));
+    }
+
+    var commentLimit = typeof source.commentLimit === 'number' ? source.commentLimit : 5;
+    if (commentLimit < 0) {
+        commentLimit = 0;
+    }
+    if (commentLimit > 100) {
+        commentLimit = 100;
+    }
+
+    var commentDepth = typeof source.commentDepth === 'number' ? source.commentDepth : 1;
+    if (commentDepth < 0) {
+        commentDepth = 0;
+    }
+    if (commentDepth > 10) {
+        commentDepth = 10;
+    }
+
     return {
-        storyType: (source.storyType || 'top').toLowerCase(),
+        storyType: storyType,
+        apiBaseUrl: normalizeBaseUrl(source.apiBaseUrl || source.baseUrl || 'https://hacker-news.firebaseio.com/v0'),
         limit: limit,
         includeComments: Boolean(source.includeComments),
-        commentLimit: typeof source.commentLimit === 'number' ? source.commentLimit : 5,
-        commentDepth: typeof source.commentDepth === 'number' ? source.commentDepth : 1
+        commentLimit: commentLimit,
+        commentDepth: commentDepth
     };
 }
 
-async function fetchStoryIds(type) {
-    var endpoint = 'https://hacker-news.firebaseio.com/v0/' + type + 'stories.json';
+async function fetchStoryIds(config) {
+    var endpoint = config.apiBaseUrl + '/' + config.storyType + 'stories.json';
     var response = await requestJson(endpoint, { headers: { Accept: 'application/json' } });
     if (!Array.isArray(response)) {
         throw new Error('Unexpected response when fetching story identifiers');
@@ -117,25 +141,28 @@ async function fetchStoryIds(type) {
     return response;
 }
 
-async function fetchItem(id) {
-    var endpoint = 'https://hacker-news.firebaseio.com/v0/item/' + id + '.json';
+async function fetchItem(id, config) {
+    var endpoint = config.apiBaseUrl + '/item/' + encodeURIComponent(String(id)) + '.json';
     return await requestJson(endpoint, { headers: { Accept: 'application/json' } });
 }
 
-async function fetchComments(ids, limit, depth) {
-    var effectiveLimit = typeof limit === 'number' && limit > 0 ? limit : ids.length;
-    var commentDepth = typeof depth === 'number' && depth > 0 ? depth : 1;
+async function fetchComments(ids, limit, depth, config) {
+    var effectiveLimit = typeof limit === 'number' && limit >= 0 ? limit : ids.length;
+    var commentDepth = typeof depth === 'number' && depth > 0 ? depth : 0;
+    if (effectiveLimit === 0 || commentDepth === 0) {
+        return [];
+    }
     var selected = ids.slice(0, effectiveLimit);
     var comments = [];
 
     for (var i = 0; i < selected.length; i++) {
-        var rawComment = await fetchItem(selected[i]);
+        var rawComment = await fetchItem(selected[i], config);
         if (!rawComment || rawComment.type !== 'comment') {
             continue;
         }
         var comment = normalizeComment(rawComment);
         if (commentDepth > 1 && Array.isArray(rawComment.kids) && rawComment.kids.length > 0) {
-            comment.children = await fetchComments(rawComment.kids, limit, commentDepth - 1);
+            comment.children = await fetchComments(rawComment.kids, limit, commentDepth - 1, config);
         }
         comments.push(comment);
     }
@@ -242,10 +269,12 @@ function isPlainObject(value) {
     return value && typeof value === 'object' && !Array.isArray(value);
 }
 
-function ensureFetch() {
-    if (typeof fetch !== 'function') {
-        throw new Error('Global fetch API is unavailable. Node.js 18+ is required.');
+function normalizeBaseUrl(value) {
+    var text = String(value || '').trim();
+    if (!text) {
+        throw new Error('apiBaseUrl must not be empty');
     }
+    return text.replace(/\/+$/, '');
 }
 
 if (typeof module !== "undefined") {
