@@ -517,6 +517,57 @@ test('intelligence-briefing consumes upstream Hacker News output and filters see
   assert.equal(result.data.nextDedupeState.seen.some(item => item.key === 'hackernews:1002'), true);
 });
 
+test('intelligence-briefing consumes Runtime-standardized Hacker News envelope', async () => {
+  const result = await executeIntelligenceBriefing({
+    data: {
+      items: [
+        {
+          data: {
+            stories: [
+              {
+                id: 2001,
+                source: 'hackernews',
+                title: 'Runtime envelope story',
+                score: 160,
+                commentCount: 24,
+                time: '2026-07-09T02:00:00Z',
+                url: 'https://example.com/runtime-envelope'
+              }
+            ],
+            storyType: 'top',
+            totalStories: 1
+          },
+          metadata: {
+            package: '@maitask/hackernews-crawler',
+            version: '0.1.0'
+          }
+        }
+      ],
+      summary: {
+        total: 1,
+        success_count: 1,
+        failure_count: 0
+      }
+    },
+    metadata: {
+      package: '@maitask/hackernews-crawler',
+      provider: 'hackernews'
+    },
+    analysis: {
+      profile: 'forecast',
+      targetLanguage: 'en'
+    },
+    ai: {
+      provider: 'extractive'
+    }
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.summary.total, 1);
+  assert.equal(result.data.summary.metrics.collected, 1);
+  assert.equal(result.data.items[0].id, 'hackernews:2001');
+});
+
 test('intelligence-briefing returns structured failure when AI credentials are missing', async () => {
   const result = await executeIntelligenceBriefing({
     sourceData: [

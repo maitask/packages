@@ -8,7 +8,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/intelligence-briefing';
-const PACKAGE_VERSION = '0.1.0';
+const PACKAGE_VERSION = '0.1.1';
 const CONTRACT_VERSION = '2026-06-27';
 
 async function execute(input = {}, options = {}, context = {}) {
@@ -293,26 +293,60 @@ async function collectStories(input, config) {
 }
 
 function extractInlineStories(input) {
-  const candidates = [];
-  if (Array.isArray(input)) candidates.push(input);
-  if (Array.isArray(input?.sourceData)) candidates.push(input.sourceData);
-  if (Array.isArray(input?.stories)) candidates.push(input.stories);
-  if (Array.isArray(input?.items)) candidates.push(input.items);
-  if (Array.isArray(input?.data?.stories)) candidates.push(input.data.stories);
-  if (Array.isArray(input?.data?.items)) candidates.push(input.data.items);
-  if (Array.isArray(input?.hackernews?.data?.stories)) candidates.push(input.hackernews.data.stories);
-
   const out = [];
-  for (const list of candidates) {
-    for (const item of list) {
-      if (isPlainObject(item) && item.data && isPlainObject(item.data)) {
-        out.push(item.data);
-      } else {
-        out.push(item);
+  const seen = new WeakSet();
+
+  const visit = value => {
+    if (Array.isArray(value)) {
+      for (const item of value) visit(item);
+      return;
+    }
+    if (!isPlainObject(value) || seen.has(value)) return;
+    seen.add(value);
+
+    let expanded = false;
+    const nestedArrays = [value.sourceData, value.stories];
+    if (!looksLikeStory(value)) nestedArrays.push(value.items);
+    if (isPlainObject(value.data)) {
+      nestedArrays.push(value.data.sourceData, value.data.stories, value.data.items);
+    }
+    if (isPlainObject(value.hackernews?.data)) {
+      nestedArrays.push(value.hackernews.data.stories, value.hackernews.data.items);
+    }
+
+    for (const list of nestedArrays) {
+      if (Array.isArray(list)) {
+        expanded = true;
+        visit(list);
       }
     }
-  }
+
+    if (isPlainObject(value.story)) {
+      expanded = true;
+      visit(value.story);
+    }
+    if (isPlainObject(value.data?.story)) {
+      expanded = true;
+      visit(value.data.story);
+    }
+
+    if (!expanded && isPlainObject(value.data) && looksLikeStory(value.data)) {
+      out.push(value.data);
+      return;
+    }
+
+    if (!expanded) out.push(value);
+  };
+
+  visit(input);
   return out;
+}
+
+function looksLikeStory(value) {
+  if (!isPlainObject(value)) return false;
+  const title = stringValue(value.title || value.name || value.headline);
+  if (!title) return false;
+  return Boolean(value.id || value.url || value.href || value.link || value.score || value.commentCount);
 }
 
 async function fetchHackerNewsSource(source) {
