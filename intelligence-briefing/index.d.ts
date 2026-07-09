@@ -20,6 +20,11 @@ export interface IntelligenceSource {
   commentDepth?: number;
   apiBaseUrl?: string;
   baseUrl?: string;
+  timeoutMs?: number;
+  timeout_ms?: number;
+  retries?: number;
+  retry_count?: number;
+  retryCount?: number;
   items?: unknown[];
   [key: string]: unknown;
 }
@@ -113,6 +118,8 @@ export interface BriefingEnrichmentConfig {
   max_article_chars?: number;
   timeoutMs?: number;
   timeout_ms?: number;
+  retries?: number;
+  retry_count?: number;
 }
 
 export interface BriefingOutputConfig {

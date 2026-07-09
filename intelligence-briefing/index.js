@@ -8,7 +8,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/intelligence-briefing';
-const PACKAGE_VERSION = '0.1.1';
+const PACKAGE_VERSION = '0.1.2';
 const CONTRACT_VERSION = '2026-06-27';
 
 async function execute(input = {}, options = {}, context = {}) {
@@ -172,7 +172,8 @@ function buildConfig(input, options, context) {
         500,
         20000
       ),
-      timeoutMs: boundedInt(enrichmentInput.timeoutMs ?? enrichmentInput.timeout_ms, 15000, 1000, 120000)
+      timeoutMs: boundedInt(enrichmentInput.timeoutMs ?? enrichmentInput.timeout_ms, 15000, 1000, 120000),
+      retries: boundedInt(enrichmentInput.retries ?? enrichmentInput.retry_count, 2, 0, 6)
     },
     dedupe: {
       enabled: dedupeInput.enabled !== false,
@@ -360,24 +361,26 @@ async function fetchHackerNewsSource(source) {
   const commentLimit = boundedInt(source.commentLimit ?? source.comment_limit, 5, 0, 100);
   const commentDepth = boundedInt(source.commentDepth ?? source.comment_depth, 1, 0, 10);
   const timeoutMs = boundedInt(source.timeoutMs ?? source.timeout_ms, 20000, 1000, 120000);
+  const retries = boundedInt(source.retries ?? source.retry_count ?? source.retryCount, 3, 0, 6);
   const stories = [];
 
   for (const storyType of storyTypes) {
     const normalizedType = normalizeStoryType(storyType);
-    const ids = await requestJson(`${apiBaseUrl}/${normalizedType}stories.json`, timeoutMs);
+    const ids = await requestJson(`${apiBaseUrl}/${normalizedType}stories.json`, timeoutMs, retries);
     if (!Array.isArray(ids)) {
       throw new Error(`Unexpected Hacker News ${normalizedType} story list response`);
     }
 
     const storyItems = await mapWithConcurrency(ids.slice(0, limit), 6, async id => {
-      const raw = await requestJson(`${apiBaseUrl}/item/${encodeURIComponent(String(id))}.json`, timeoutMs);
+      const raw = await requestJson(`${apiBaseUrl}/item/${encodeURIComponent(String(id))}.json`, timeoutMs, retries);
       if (!raw || raw.type !== 'story') return null;
       if (includeComments && commentLimit > 0 && commentDepth > 0 && Array.isArray(raw.kids)) {
         raw.comments = await fetchHackerNewsComments(raw.kids, {
           apiBaseUrl,
           commentLimit,
           commentDepth,
-          timeoutMs
+          timeoutMs,
+          retries
         });
       }
       return normalizeStory(raw, 'hackernews', normalizedType);
@@ -394,7 +397,11 @@ async function fetchHackerNewsSource(source) {
 async function fetchHackerNewsComments(ids, config, depth = config.commentDepth) {
   if (!Array.isArray(ids) || depth <= 0 || config.commentLimit <= 0) return [];
   const comments = await mapWithConcurrency(ids.slice(0, config.commentLimit), 4, async id => {
-    const raw = await requestJson(`${config.apiBaseUrl}/item/${encodeURIComponent(String(id))}.json`, config.timeoutMs);
+    const raw = await requestJson(
+      `${config.apiBaseUrl}/item/${encodeURIComponent(String(id))}.json`,
+      config.timeoutMs,
+      config.retries
+    );
     if (!raw || raw.type !== 'comment') return null;
     const comment = {
       id: raw.id,
@@ -874,7 +881,12 @@ function normalizeSeenEntries(raw) {
 
 async function fetchArticleText(url, config) {
   ensureFetch();
-  const response = await fetchWithTimeout(url, { method: 'GET', headers: { Accept: 'text/html,text/plain' } }, config.timeoutMs);
+  const response = await requestWithRetry(
+    url,
+    { method: 'GET', headers: { Accept: 'text/html,text/plain' } },
+    config.timeoutMs,
+    config.retries
+  );
   if (!response.ok) {
     throw new Error(`Article fetch failed with status ${response.status}`);
   }
@@ -882,26 +894,40 @@ async function fetchArticleText(url, config) {
   return truncate(cleanText(stripScriptsAndStyles(body)), config.maxArticleChars);
 }
 
-async function requestJson(url, timeoutMs) {
-  const response = await fetchWithTimeout(url, { method: 'GET', headers: { Accept: 'application/json' } }, timeoutMs);
+async function requestJson(url, timeoutMs, retries = 3) {
+  const response = await requestWithRetry(
+    url,
+    { method: 'GET', headers: { Accept: 'application/json' } },
+    timeoutMs,
+    retries
+  );
   if (!response.ok) {
-    throw new Error(`Request to ${url} failed with status ${response.status}`);
+    let detail = '';
+    try {
+      detail = truncate(await response.text(), 500);
+    } catch {
+      detail = response.statusText || '';
+    }
+    throw new Error(`Request to ${url} failed with status ${response.status}${detail ? `: ${detail}` : ''}`);
   }
   return await response.json();
 }
 
 async function requestWithRetry(url, init, timeoutMs, retries) {
   let attempt = 0;
+  const maxRetries = Math.max(0, Number.parseInt(retries, 10) || 0);
   while (true) {
+    let retryAfterMs = null;
     try {
       const response = await fetchWithTimeout(url, init, timeoutMs);
-      if (response.ok || !isRetryStatus(response.status) || attempt >= retries) {
+      if (response.ok || !isRetryStatus(response.status) || attempt >= maxRetries) {
         return response;
       }
+      retryAfterMs = readRetryAfter(response.headers);
     } catch (error) {
-      if (attempt >= retries) throw error;
+      if (attempt >= maxRetries) throw error;
     }
-    await sleep(500 * Math.pow(2, attempt));
+    await sleep(retryDelayMs(attempt, retryAfterMs));
     attempt += 1;
   }
 }
@@ -1235,6 +1261,23 @@ function truncate(value, max) {
 
 function isRetryStatus(status) {
   return status === 408 || status === 429 || (status >= 500 && status <= 599);
+}
+
+function readRetryAfter(headers) {
+  if (!headers || typeof headers.get !== 'function') return null;
+  const raw = headers.get('retry-after');
+  if (!raw) return null;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds * 1000);
+  const dateMs = new Date(raw).getTime();
+  return Number.isFinite(dateMs) ? Math.max(0, dateMs - Date.now()) : null;
+}
+
+function retryDelayMs(attempt, retryAfterMs) {
+  if (Number.isFinite(retryAfterMs) && retryAfterMs !== null) {
+    return Math.min(30000, Math.max(250, retryAfterMs));
+  }
+  return Math.min(30000, 500 * Math.pow(2, attempt));
 }
 
 function usesMaitaskRuntimeFetch() {

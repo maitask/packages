@@ -4,7 +4,7 @@ Generate multi-source intelligence briefings with filtering, deduplication state
 
 ## Features
 
-- Hacker News source adapter with story type, comment, and fixture-base support
+- Hacker News source adapter with story type, comment, retry, timeout, and fixture-base support
 - Upstream package input support for `@maitask/hackernews-crawler` results
 - Analysis profiles: `business`, `economic`, `forecast`, `technology`, `market`, `risk`, `policy`, `investment`, and `custom`
 - OpenAI-compatible provider support through configurable `baseUrl`
@@ -34,7 +34,9 @@ The package produces the briefing. Plane user adapters deliver it to Telegram, D
       "limit": 30,
       "includeComments": true,
       "commentLimit": 5,
-      "commentDepth": 1
+      "commentDepth": 1,
+      "timeoutMs": 20000,
+      "retries": 3
     }
   ],
   "analysis": {
@@ -191,7 +193,7 @@ In a workflow, connect the `@maitask/intelligence-briefing` node to an Adapter n
   "metadata": {
     "contract_version": "2026-06-27",
     "package": "@maitask/intelligence-briefing",
-    "version": "0.1.0"
+    "version": "0.1.2"
   },
   "citations": []
 }
@@ -201,4 +203,5 @@ In a workflow, connect the `@maitask/intelligence-briefing` node to an Adapter n
 
 - The `extractive` provider is available for deterministic smoke tests and no-key previews.
 - Use OpenAI-compatible analysis for production translation, impact assessment, and forecast profiles.
+- Set source `timeoutMs` and `retries` for live network sources that may return transient transport failures.
 - The package does not store Telegram, DingTalk, Feishu, Discord, or Slack credentials.
