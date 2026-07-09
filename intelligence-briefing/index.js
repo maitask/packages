@@ -252,19 +252,24 @@ async function collectStories(input, config) {
     if (normalized) stories.push(normalized);
   }
 
-  for (const source of config.sources) {
+  const sourceResults = await mapWithConcurrency(config.sources, 4, async source => {
     if (source.type === 'hackernews') {
-      const sourceStories = await fetchHackerNewsSource(source);
-      stories.push(...sourceStories);
+      return await fetchHackerNewsSource(source);
     } else if (source.type === 'items' || source.type === 'inline') {
       const sourceItems = extractInlineStories(source);
+      const out = [];
       for (const item of sourceItems) {
         const normalized = normalizeStory(item, source.name || 'inline');
-        if (normalized) stories.push(normalized);
+        if (normalized) out.push(normalized);
       }
+      return out;
     } else {
       throw new Error(`Unsupported intelligence source: ${source.type}`);
     }
+  });
+
+  for (const sourceStories of sourceResults) {
+    stories.push(...sourceStories);
   }
 
   const unique = [];
@@ -326,9 +331,9 @@ async function fetchHackerNewsSource(source) {
       throw new Error(`Unexpected Hacker News ${normalizedType} story list response`);
     }
 
-    for (const id of ids.slice(0, limit)) {
+    const storyItems = await mapWithConcurrency(ids.slice(0, limit), 6, async id => {
       const raw = await requestJson(`${apiBaseUrl}/item/${encodeURIComponent(String(id))}.json`, timeoutMs);
-      if (!raw || raw.type !== 'story') continue;
+      if (!raw || raw.type !== 'story') return null;
       if (includeComments && commentLimit > 0 && commentDepth > 0 && Array.isArray(raw.kids)) {
         raw.comments = await fetchHackerNewsComments(raw.kids, {
           apiBaseUrl,
@@ -337,7 +342,10 @@ async function fetchHackerNewsSource(source) {
           timeoutMs
         });
       }
-      const normalized = normalizeStory(raw, 'hackernews', normalizedType);
+      return normalizeStory(raw, 'hackernews', normalizedType);
+    });
+
+    for (const normalized of storyItems) {
       if (normalized) stories.push(normalized);
     }
   }
@@ -347,10 +355,9 @@ async function fetchHackerNewsSource(source) {
 
 async function fetchHackerNewsComments(ids, config, depth = config.commentDepth) {
   if (!Array.isArray(ids) || depth <= 0 || config.commentLimit <= 0) return [];
-  const comments = [];
-  for (const id of ids.slice(0, config.commentLimit)) {
+  const comments = await mapWithConcurrency(ids.slice(0, config.commentLimit), 4, async id => {
     const raw = await requestJson(`${config.apiBaseUrl}/item/${encodeURIComponent(String(id))}.json`, config.timeoutMs);
-    if (!raw || raw.type !== 'comment') continue;
+    if (!raw || raw.type !== 'comment') return null;
     const comment = {
       id: raw.id,
       author: raw.by || null,
@@ -362,9 +369,9 @@ async function fetchHackerNewsComments(ids, config, depth = config.commentDepth)
     if (depth > 1 && Array.isArray(raw.kids)) {
       comment.children = await fetchHackerNewsComments(raw.kids, config, depth - 1);
     }
-    comments.push(comment);
-  }
-  return comments;
+    return comment;
+  });
+  return comments.filter(Boolean);
 }
 
 function normalizeStory(raw, source, storyType = null) {
@@ -862,6 +869,10 @@ async function requestWithRetry(url, init, timeoutMs, retries) {
 }
 
 async function fetchWithTimeout(url, init, timeoutMs) {
+  if (usesMaitaskRuntimeFetch()) {
+    return await fetch(url, init);
+  }
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -1186,6 +1197,38 @@ function truncate(value, max) {
 
 function isRetryStatus(status) {
   return status === 408 || status === 429 || (status >= 500 && status <= 599);
+}
+
+function usesMaitaskRuntimeFetch() {
+  return Boolean(
+    typeof Deno !== 'undefined' &&
+      Deno &&
+      Deno.core &&
+      Deno.core.ops &&
+      typeof Deno.core.ops.op_http_request === 'function'
+  );
+}
+
+async function mapWithConcurrency(items, limit, mapper) {
+  const list = Array.isArray(items) ? items : [];
+  const concurrency = Math.max(1, Math.min(limit || 1, list.length || 1));
+  const results = new Array(list.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < list.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(list[index], index);
+    }
+  }
+
+  const workers = [];
+  for (let index = 0; index < concurrency; index += 1) {
+    workers.push(worker());
+  }
+  await Promise.all(workers);
+  return results;
 }
 
 function sleep(ms) {

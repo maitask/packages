@@ -387,6 +387,87 @@ test('intelligence-briefing generates a fixture-backed AI briefing', async t => 
   assert.equal(result.citations.length, 2);
 });
 
+test('intelligence-briefing uses Runtime fetch without abort timers', async t => {
+  const originalDeno = globalThis.Deno;
+  const originalFetch = globalThis.fetch;
+  const originalSetTimeout = globalThis.setTimeout;
+  const originalClearTimeout = globalThis.clearTimeout;
+  const requested = [];
+
+  globalThis.Deno = {
+    core: {
+      ops: {
+        op_http_request() {}
+      }
+    }
+  };
+  globalThis.setTimeout = () => {
+    throw new Error('Runtime fetch path must not create timeout timers');
+  };
+  globalThis.clearTimeout = () => {};
+  globalThis.fetch = async url => {
+    requested.push(String(url));
+    const path = new URL(String(url)).pathname;
+    const routes = {
+      '/v0/topstories.json': [1001, 1002],
+      '/v0/item/1001.json': {
+        id: 1001,
+        type: 'story',
+        title: 'Runtime fetch avoids timers',
+        score: 50,
+        time: 1783555200,
+        descendants: 0,
+        url: 'https://example.com/runtime-fetch'
+      },
+      '/v0/item/1002.json': {
+        id: 1002,
+        type: 'story',
+        title: 'Package execution stays within policy',
+        score: 45,
+        time: 1783558800,
+        descendants: 0,
+        url: 'https://example.com/runtime-policy'
+      }
+    };
+    const body = routes[path];
+    return {
+      ok: body !== undefined,
+      status: body === undefined ? 404 : 200,
+      json: async () => body,
+      text: async () => JSON.stringify(body)
+    };
+  };
+
+  t.after(() => {
+    globalThis.Deno = originalDeno;
+    globalThis.fetch = originalFetch;
+    globalThis.setTimeout = originalSetTimeout;
+    globalThis.clearTimeout = originalClearTimeout;
+  });
+
+  const result = await executeIntelligenceBriefing({
+    sources: [
+      {
+        type: 'hackernews',
+        storyTypes: ['top'],
+        limit: 2,
+        apiBaseUrl: 'https://fixture.local/v0'
+      }
+    ],
+    analysis: {
+      profile: 'forecast',
+      targetLanguage: 'en'
+    },
+    ai: {
+      provider: 'extractive'
+    }
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.summary.total, 2);
+  assert.equal(requested.length, 3);
+});
+
 test('intelligence-briefing consumes upstream Hacker News output and filters seen items', async () => {
   const result = await executeIntelligenceBriefing({
     data: {
