@@ -58,6 +58,10 @@ async function execute(input = {}, options = {}, context = {}) {
         target_language: config.analysis.targetLanguage,
         ai_provider: config.ai.enabled ? config.ai.provider : 'extractive',
         model: config.ai.enabled ? config.ai.model : null,
+        briefing_title: briefing.title,
+        briefing_summary: briefing.summary,
+        channel_message: message,
+        next_dedupe_state: nextDedupeState,
         execution_ms: Date.now() - startedAt,
         timestamp: new Date().toISOString()
       },
