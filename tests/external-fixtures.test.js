@@ -4,6 +4,7 @@ const test = require('node:test');
 
 const { execute: executeGraphql } = require('../graphql-client');
 const { execute: executeHackerNews } = require('../hackernews-crawler');
+const { execute: executeIntelligenceBriefing } = require('../intelligence-briefing');
 const { execute: executeWebScraper } = require('../web-scraper');
 const { execute: executeWebSearch } = require('../web-search');
 
@@ -252,4 +253,209 @@ test('web-scraper handles fixture pages and preserves partial success counts', a
   assert.deepEqual(result.data.items[0].data.customData.ctaHref, ['/signup']);
   assert.deepEqual(result.data.items[0].data.customData.firstParagraph, ['First paragraph']);
   assert.equal(result.data.items[1].metadata.success, false);
+});
+
+test('intelligence-briefing generates a fixture-backed AI briefing', async t => {
+  const server = await createFixtureServer(url => {
+    const routes = {
+      '/v0/topstories.json': [1001, 1002],
+      '/v0/item/1001.json': {
+        id: 1001,
+        type: 'story',
+        title: 'Database engine improves analytical query latency',
+        by: 'maintainer',
+        score: 180,
+        time: 1783555200,
+        descendants: 42,
+        url: 'https://example.com/database-latency',
+        kids: [2001],
+        text: 'Storage engine improvements reduce write amplification.'
+      },
+      '/v0/item/1002.json': {
+        id: 1002,
+        type: 'story',
+        title: 'AI infrastructure reporting proposal',
+        by: 'policywatch',
+        score: 95,
+        time: 1783558800,
+        descendants: 25,
+        url: 'https://example.com/ai-policy'
+      },
+      '/v0/item/2001.json': {
+        id: 2001,
+        type: 'comment',
+        by: 'reader',
+        parent: 1001,
+        time: 1783559000,
+        text: 'This could change operational cost models.'
+      },
+      '/v1/chat/completions': {
+        id: 'chatcmpl-fixture',
+        object: 'chat.completion',
+        model: 'fixture-intelligence',
+        choices: [
+          {
+            index: 0,
+            finish_reason: 'stop',
+            message: {
+              role: 'assistant',
+              content: JSON.stringify({
+                title: '受控情报简报',
+                summary: '两个信号分别指向数据库性能和 AI 基础设施监管。',
+                items: [
+                  {
+                    id: 'hackernews:1001',
+                    title: '数据库延迟改善',
+                    signal: 'high',
+                    analysis: '该更新可能降低分析型负载的基础设施成本。',
+                    impact: '对数据平台和云数据库产品有直接影响。',
+                    forecast: '短期关注基准测试和生产迁移案例。',
+                    risks: ['基准测试与真实负载可能存在差异'],
+                    watchlist: ['database']
+                  },
+                  {
+                    id: 'hackernews:1002',
+                    title: 'AI 基础设施报告',
+                    signal: 'medium',
+                    analysis: '报告义务可能提高大型运营商的合规成本。',
+                    impact: '影响模型服务、容量规划和事故披露。',
+                    forecast: '后续应关注监管文本和行业反馈。',
+                    risks: ['政策落地周期不确定'],
+                    watchlist: ['ai infrastructure']
+                  }
+                ],
+                message: '受控情报简报\n1. 数据库延迟改善\n2. AI 基础设施报告'
+              })
+            }
+          }
+        ],
+        usage: {
+          prompt_tokens: 100,
+          completion_tokens: 120,
+          total_tokens: 220
+        }
+      }
+    };
+
+    const body = routes[url.pathname];
+    return body === undefined ? null : { body };
+  });
+  t.after(() => server.close());
+
+  const result = await executeIntelligenceBriefing(
+    {
+      sources: [
+        {
+          type: 'hackernews',
+          storyTypes: ['top'],
+          limit: 2,
+          includeComments: true,
+          commentLimit: 1,
+          commentDepth: 1,
+          apiBaseUrl: `${server.url}/v0`
+        }
+      ],
+      analysis: {
+        profile: 'forecast',
+        targetLanguage: 'zh-CN',
+        focus: ['economic impact', 'risk signals']
+      },
+      selection: {
+        maxItems: 2,
+        minScore: 1
+      },
+      output: {
+        maxCharacters: 2000
+      }
+    },
+    {
+      apiKey: 'fixture-key',
+      baseUrl: `${server.url}/v1`,
+      model: 'fixture-intelligence'
+    },
+    { execution_id: 'fixture-intelligence' }
+  );
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.summary.total, 2);
+  assert.equal(result.data.summary.failure_count, 0);
+  assert.equal(result.data.briefing.language, 'zh-CN');
+  assert.equal(result.data.items[0].data.insight.signal, 'high');
+  assert.match(result.data.message, /受控情报简报/);
+  assert.equal(result.metadata.contract_version, '2026-06-27');
+  assert.equal(result.metadata.ai_provider, 'openai_compatible');
+  assert.equal(result.citations.length, 2);
+});
+
+test('intelligence-briefing consumes upstream Hacker News output and filters seen items', async () => {
+  const result = await executeIntelligenceBriefing({
+    data: {
+      stories: [
+        {
+          id: 1001,
+          source: 'hackernews',
+          title: 'Already delivered story',
+          score: 120,
+          commentCount: 10,
+          time: '2026-07-09T00:00:00Z',
+          url: 'https://example.com/seen'
+        },
+        {
+          id: 1002,
+          source: 'hackernews',
+          title: 'New story for the channel',
+          score: 140,
+          commentCount: 18,
+          time: '2026-07-09T01:00:00Z',
+          url: 'https://example.com/new'
+        }
+      ]
+    },
+    analysis: {
+      profile: 'economic',
+      targetLanguage: 'en'
+    },
+    selection: {
+      maxItems: 5
+    },
+    dedupe: {
+      windowHours: 72,
+      seen: [{ key: 'hackernews:1001', seenAt: '2026-07-09T00:30:00Z' }]
+    },
+    ai: {
+      provider: 'extractive'
+    }
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.summary.total, 1);
+  assert.equal(result.data.items[0].id, 'hackernews:1002');
+  assert.equal(result.data.nextDedupeState.seen.some(item => item.key === 'hackernews:1001'), true);
+  assert.equal(result.data.nextDedupeState.seen.some(item => item.key === 'hackernews:1002'), true);
+});
+
+test('intelligence-briefing returns structured failure when AI credentials are missing', async () => {
+  const result = await executeIntelligenceBriefing({
+    sourceData: [
+      {
+        id: 1001,
+        source: 'hackernews',
+        title: 'Needs model analysis',
+        score: 100,
+        commentCount: 20
+      }
+    ],
+    analysis: {
+      profile: 'forecast',
+      targetLanguage: 'en'
+    },
+    ai: {
+      provider: 'openai_compatible'
+    }
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.data.summary.failure_count, 1);
+  assert.equal(result.error.code, 'INTELLIGENCE_BRIEFING_ERROR');
+  assert.match(result.error.message, /AI API key is required/);
 });

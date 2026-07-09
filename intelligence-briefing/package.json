@@ -1,0 +1,62 @@
+{
+  "name": "@maitask/intelligence-briefing",
+  "version": "0.1.0",
+  "description": "Generate multi-source intelligence briefings with OpenAI-compatible analysis and channel-neutral output",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "commonjs",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "keywords": [
+    "maitask",
+    "intelligence",
+    "briefing",
+    "hackernews",
+    "analysis",
+    "forecast",
+    "translation"
+  ],
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "example.json"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "Intelligence Briefing",
+  "category": "AI & Cognitive Services",
+  "maitask": {
+    "locales": {
+      "en": {
+        "display_name": "Intelligence Briefing",
+        "description": "Generate multi-source intelligence briefings with OpenAI-compatible analysis, translation, filtering, and channel-neutral output.",
+        "category": "AI & Cognitive Services",
+        "keywords": [
+          "maitask",
+          "intelligence",
+          "briefing",
+          "hackernews",
+          "analysis",
+          "forecast",
+          "translation"
+        ]
+      },
+      "zh": {
+        "display_name": "情报简报",
+        "description": "基于多来源资讯生成情报简报，支持 OpenAI 兼容分析、翻译、筛选与通道中立输出。",
+        "category": "AI 与认知服务",
+        "keywords": [
+          "情报",
+          "简报",
+          "Hacker News",
+          "分析",
+          "预测",
+          "翻译",
+          "资讯"
+        ]
+      }
+    }
+  }
+}

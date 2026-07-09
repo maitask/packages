@@ -1,0 +1,51 @@
+{
+  "input": {
+    "sourceData": [
+      {
+        "id": 1001,
+        "source": "hackernews",
+        "title": "Open-source database reaches a major performance milestone",
+        "url": "https://example.com/database-performance",
+        "author": "maintainer",
+        "score": 186,
+        "time": "2026-07-09T00:00:00Z",
+        "commentCount": 72,
+        "text": "A storage-engine update improves write amplification and query latency for analytical workloads."
+      },
+      {
+        "id": 1002,
+        "source": "hackernews",
+        "title": "New policy proposal for AI infrastructure reporting",
+        "url": "https://example.com/ai-infrastructure-policy",
+        "author": "policywatch",
+        "score": 91,
+        "time": "2026-07-09T01:00:00Z",
+        "commentCount": 31,
+        "text": "The proposal would require large operators to disclose capacity, incidents, and model-serving risk controls."
+      }
+    ],
+    "analysis": {
+      "profile": "forecast",
+      "targetLanguage": "en",
+      "depth": "standard",
+      "focus": ["technology adoption", "economic impact", "risk signals"]
+    },
+    "selection": {
+      "maxItems": 2,
+      "minScore": 50
+    },
+    "dedupe": {
+      "windowHours": 72,
+      "seen": []
+    },
+    "output": {
+      "format": "channel_message",
+      "maxCharacters": 2500,
+      "includeSources": true
+    },
+    "ai": {
+      "provider": "extractive"
+    }
+  },
+  "options": {}
+}
