@@ -22,7 +22,7 @@ async function execute(input, options, context) {
             },
             metadata: {
                 package: '@maitask/web-search',
-                version: '0.1.0',
+                version: '0.1.1',
                 ...searchResult.metadata,
                 timestamp: new Date().toISOString()
             },
@@ -38,7 +38,7 @@ async function execute(input, options, context) {
             },
             metadata: {
                 package: '@maitask/web-search',
-                version: '0.1.0',
+                version: '0.1.1',
                 timestamp: new Date().toISOString()
             }
         };
@@ -136,11 +136,7 @@ async function searchDuckDuckGo(config) {
             pagination: pagination
         };
     } catch (err) {
-        return {
-            engine: 'duckduckgo',
-            results: [],
-            metadata: { sourceUrl: url, error: err.message }
-        };
+        throw buildSearchError('DuckDuckGo', url, err);
     }
 }
 
@@ -245,6 +241,14 @@ async function fetchPage(url, headers) {
     }
 
     return body || '';
+}
+
+function buildSearchError(engine, url, err) {
+    var message = err && err.message ? err.message : String(err || 'Search request failed');
+    var error = new Error(engine + ' search request failed: ' + message);
+    error.name = 'WebSearchRequestError';
+    error.sourceUrl = url;
+    return error;
 }
 
 // Parse DuckDuckGo search results with improved accuracy

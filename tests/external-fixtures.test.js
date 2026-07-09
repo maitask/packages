@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const http = require('node:http');
 const test = require('node:test');
 
+const { execute: executeGraphql } = require('../graphql-client');
 const { execute: executeHackerNews } = require('../hackernews-crawler');
 const { execute: executeWebScraper } = require('../web-scraper');
 const { execute: executeWebSearch } = require('../web-search');
@@ -136,6 +137,60 @@ test('web-search parses DuckDuckGo-compatible fixture results through baseUrl', 
   assert.equal(result.data.results[0].title, 'Maitask Docs');
   assert.equal(result.data.results[0].url, 'https://maitask.com/docs');
   assert.equal(result.metadata.sourceUrl, `${server.url}/html/?q=maitask&kl=en-us&kp=1`);
+});
+
+test('web-search reports upstream request failures as structured failures', async t => {
+  const server = await createFixtureServer(url => {
+    if (url.pathname !== '/html/') return null;
+
+    return {
+      status: 503,
+      headers: { 'content-type': 'text/plain; charset=utf-8' },
+      body: 'search unavailable'
+    };
+  });
+  t.after(() => server.close());
+
+  const result = await executeWebSearch({
+    query: 'maitask',
+    engine: 'duckduckgo',
+    baseUrl: server.url
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.code, 'WEB_SEARCH_ERROR');
+  assert.equal(result.error.type, 'WebSearchRequestError');
+  assert.match(result.error.message, /status 503/);
+  assert.equal(result.metadata.version, '0.1.1');
+});
+
+test('graphql-client executes queries against a fixture endpoint', async t => {
+  const server = await createFixtureServer((url, request) => {
+    if (url.pathname !== '/graphql') return null;
+
+    assert.equal(request.method, 'POST');
+    return {
+      body: {
+        data: {
+          countries: [{ code: 'MT', name: 'Maitask Fixture' }]
+        },
+        extensions: { fixture: true }
+      }
+    };
+  });
+  t.after(() => server.close());
+
+  const result = await executeGraphql({
+    url: `${server.url}/graphql`,
+    query: 'query MatrixCountries { countries { code name } }',
+    variables: {},
+    timeoutMs: 10000
+  });
+
+  assert.equal(result.success, true);
+  assert.deepEqual(result.data.data.countries, [{ code: 'MT', name: 'Maitask Fixture' }]);
+  assert.deepEqual(result.data.errors, []);
+  assert.equal(result.data.extensions.fixture, true);
 });
 
 test('web-scraper handles fixture pages and preserves partial success counts', async t => {

@@ -26,6 +26,8 @@ Search the web using multiple search engines.
 - `region`: Region code (e.g., 'us', 'cn') - defaults to 'us'
 - `includeSnippets`: Whether to include result snippets - defaults to true
 - `safeSearch`: Safe search level ('strict', 'moderate', 'off') - defaults to 'moderate'
+- `baseUrl`: Override the selected engine base URL for controlled upstreams or private search gateways
+- `engineBaseUrls`: Per-engine base URL overrides for `duckduckgo`, `bing`, and `google`
 
 ## Usage Examples
 
@@ -152,8 +154,16 @@ Error response:
 ```javascript
 {
   "success": false,
-  "message": "Search failed: error description",
-  "error": "error details"
+  "error": {
+    "message": "DuckDuckGo search request failed: Request to ... failed with status 503",
+    "code": "WEB_SEARCH_ERROR",
+    "type": "WebSearchRequestError"
+  },
+  "metadata": {
+    "package": "@maitask/web-search",
+    "version": "0.1.1",
+    "timestamp": "2026-07-09T00:00:00.000Z"
+  }
 }
 ```
 ## Response Contract (Current)
@@ -162,3 +172,6 @@ The package uses a standardized envelope:
 
 - Success: `{ success: true, data: {...}, metadata: {...}, pagination }`
 - Failure: `{ success: false, error: { message, code, type }, metadata: {...} }`
+
+Search request failures return a structured failure response. A valid search
+response that contains no organic results remains a successful empty result.

@@ -1,6 +1,6 @@
 # Maitask Package Catalogue
 
-> Total packages: **48** · Maintained by official account **`maitask`** · Version baseline: `v0.1.0`
+> Total packages: **48** · Maintained by official account **`maitask`** · Versions follow each package manifest
 >
 > Every package is published to the Maitask registry and validated against the latest engine.
 
@@ -49,7 +49,7 @@
 ## Web & API Integration (11)
 
 - [**@maitask/web-scraper**](./web-scraper) `v0.1.0` — Extract data from web pages with HTML parsing and CSS selectors
-- [**@maitask/web-search**](./web-search) `v0.1.0` — Search the web using multiple search engines
+- [**@maitask/web-search**](./web-search) `v0.1.1` — Search the web using multiple search engines
 - [**@maitask/http-request**](./http-request) `v1.1.0` — Production-grade HTTP client with retries, auth helpers, multipart bodies, and validation
 - [**@maitask/hackernews-crawler**](./hackernews-crawler) `v0.1.0` — Crawl and extract stories from Hacker News using official API
 - [**@maitask/github-integration**](./github-integration) `v0.2.0` — GitHub REST API integration for repositories, issues, pull requests, users, and custom REST calls
