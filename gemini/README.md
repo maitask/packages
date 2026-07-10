@@ -50,6 +50,16 @@ console.log(result.data.content);
 ### Options
 
 - `apiKey` - Google AI API key (required)
+- `baseUrl` - Gemini-compatible models API base URL (default: `https://generativelanguage.googleapis.com/v1beta/models`)
+- `timeoutMs` - Request timeout in milliseconds (default: `60000`)
+- `retries` - Retry count for transient failures (default: `2`)
+
+`options.baseUrl` has the highest endpoint precedence. Runtime may provide
+`context.env.GEMINI_API_BASE_URL` as the fallback for a compatible gateway or a
+controlled upstream. The official Google Generative Language URL remains the
+production default. Repository regression uses a loopback fixture and never
+requires live Gemini availability; credentialed live smoke checks are optional
+diagnostics.
 - `timeoutMs` - Request timeout in milliseconds (default: `60000`)
 - `retries` - Retry count for transient failures (default: `2`)
 

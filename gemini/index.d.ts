@@ -42,7 +42,9 @@ export interface ExecuteInput {
 export interface ExecuteOptions {
     apiKey?: string;
     api_key?: string;
-    GOOGLE_API_KEY?: string;
+    baseUrl?: string;
+    timeoutMs?: number;
+    retries?: number;
     model?: string;
     temperature?: number;
     maxOutputTokens?: number;
@@ -58,6 +60,12 @@ export interface ExecuteOptions {
 }
 
 export interface ExecuteContext {
+    secrets?: {
+        GOOGLE_API_KEY?: string;
+    };
+    env?: {
+        GEMINI_API_BASE_URL?: string;
+    };
     [key: string]: any;
 }
 

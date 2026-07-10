@@ -53,6 +53,15 @@ console.log(result.data.content);
 ### Options
 
 - `apiKey` - Anthropic API key (required)
+- `baseUrl` - Anthropic-compatible API base URL (default: `https://api.anthropic.com/v1`)
+- `timeoutMs` - Request timeout in milliseconds (default: `60000`)
+- `retries` - Retry count for transient failures (default: `2`)
+
+`options.baseUrl` has the highest endpoint precedence. Runtime may provide
+`context.env.ANTHROPIC_API_BASE_URL` as the fallback for a compatible gateway
+or controlled upstream. The official Anthropic URL remains the production
+default. Repository regression uses a loopback fixture and never requires live
+Anthropic availability; credentialed live smoke checks are optional diagnostics.
 - `timeoutMs` - Request timeout in milliseconds (default: `60000`)
 - `retries` - Retry count for transient failures (default: `2`)
 

@@ -28,7 +28,9 @@ export interface ExecuteInput {
 export interface ExecuteOptions {
     apiKey?: string;
     api_key?: string;
-    OPENAI_API_KEY?: string;
+    baseUrl?: string;
+    timeoutMs?: number;
+    retries?: number;
     model?: string;
     temperature?: number;
     maxTokens?: number;
@@ -42,6 +44,12 @@ export interface ExecuteOptions {
 }
 
 export interface ExecuteContext {
+    secrets?: {
+        OPENAI_API_KEY?: string;
+    };
+    env?: {
+        OPENAI_API_BASE_URL?: string;
+    };
     [key: string]: any;
 }
 

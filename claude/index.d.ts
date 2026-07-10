@@ -24,7 +24,9 @@ export interface ExecuteInput {
 export interface ExecuteOptions {
     apiKey?: string;
     api_key?: string;
-    ANTHROPIC_API_KEY?: string;
+    baseUrl?: string;
+    timeoutMs?: number;
+    retries?: number;
     model?: string;
     system?: string | any[];
     maxTokens?: number;
@@ -38,6 +40,12 @@ export interface ExecuteOptions {
 }
 
 export interface ExecuteContext {
+    secrets?: {
+        ANTHROPIC_API_KEY?: string;
+    };
+    env?: {
+        ANTHROPIC_API_BASE_URL?: string;
+    };
     [key: string]: any;
 }
 

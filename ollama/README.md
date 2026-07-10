@@ -56,6 +56,11 @@ console.log(result.data.content);
 - `timeoutMs` - Request timeout in milliseconds (default: `60000`)
 - `retries` - Retry count for transient failures (default: `2`)
 
+The mandatory AI provider regression exercises `options.baseUrl` against a
+loopback Ollama-compatible fixture for both request routing and native NDJSON
+response handling. Live model availability remains an optional diagnostic and
+is not required by the repository quality gate.
+
 ## Return Envelope
 
 ```json

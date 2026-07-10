@@ -55,6 +55,15 @@ console.log(result.data.content);
 ### Options
 
 - `apiKey` - OpenAI API key (required)
+- `baseUrl` - OpenAI-compatible API base URL (default: `https://api.openai.com/v1`)
+- `timeoutMs` - Request timeout in milliseconds (default: `60000`)
+- `retries` - Retry count for transient failures (default: `2`)
+
+`options.baseUrl` has the highest endpoint precedence. Runtime may provide
+`context.env.OPENAI_API_BASE_URL` as the fallback for a compatible gateway or a
+controlled upstream. The official OpenAI URL remains the production default.
+Repository regression uses a loopback fixture and never requires live OpenAI
+availability; credentialed live smoke checks are optional diagnostics.
 - `timeoutMs` - Request timeout in milliseconds (default: `60000`)
 - `retries` - Retry count for transient failures (default: `2`)
 

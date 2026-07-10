@@ -28,7 +28,9 @@ export interface ExecuteInput {
 export interface ExecuteOptions {
     apiKey?: string;
     api_key?: string;
-    DEEPSEEK_API_KEY?: string;
+    baseUrl?: string;
+    timeoutMs?: number;
+    retries?: number;
     model?: string;
     temperature?: number;
     top_p?: number;
@@ -42,6 +44,12 @@ export interface ExecuteOptions {
 }
 
 export interface ExecuteContext {
+    secrets?: {
+        DEEPSEEK_API_KEY?: string;
+    };
+    env?: {
+        DEEPSEEK_API_BASE_URL?: string;
+    };
     [key: string]: any;
 }
 
