@@ -4,11 +4,11 @@ Send text, Block Kit layouts, and attachment-compatible JSON through a Slack Inc
 
 ## Contract
 
-`execute(input, options?, context?)` returns `Promise<SlackResult>`. `input` is either a non-blank string or a plain object containing only `text`, `blocks`, and `attachments`. `blocks` and `attachments` must be non-empty arrays of plain objects. A message must contain non-blank text, at least one block, or at least one attachment.
+`execute(input, options?, context?)` returns `Promise<SlackResult>`. `input` is either a non-blank string or a plain object containing only `text`, `blocks`, and `attachments`. `blocks` and `attachments` must be non-empty arrays. Every block must be a plain object with an own, non-blank string `type` data property. Attachments remain provider-specific plain objects. A message must contain non-blank text, at least one valid block, or at least one attachment.
 
 The exact option allowlist is `webhookUrl`, `threadTs`, `channel`, `username`, `iconEmoji`, `iconUrl`, `linkNames`, `mrkdwn`, and `timeoutMs`. Message content belongs in `input`, and legacy or unknown fields are rejected.
 
-- `webhookUrl` may be provided explicitly or through `context.secrets.SLACK_WEBHOOK_URL`.
+- `webhookUrl` may be provided explicitly or through `context.secrets.SLACK_WEBHOOK_URL`; that secret is the only formal context configuration.
 - `username` defaults to `Maitask Bot`.
 - `iconEmoji` defaults to `:robot_face:` when neither icon option is set. Explicit `iconEmoji` and `iconUrl` are mutually exclusive.
 - `linkNames` and `mrkdwn` both default to `true`.

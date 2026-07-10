@@ -32,22 +32,15 @@ export interface TelegramOptions {
 
 export interface TelegramSecrets {
   TELEGRAM_BOT_TOKEN?: string;
-  [key: string]: unknown;
 }
 
 export interface TelegramEnvironment {
   TELEGRAM_API_BASE_URL?: string;
-  [key: string]: string | undefined;
 }
 
 export interface TelegramContext {
   secrets?: TelegramSecrets;
   env?: TelegramEnvironment;
-  defaults?: Record<string, unknown>;
-  workspacePath?: string;
-  executionId?: string;
-  userId?: string;
-  [key: string]: unknown;
 }
 
 export interface TelegramDeliveryData {

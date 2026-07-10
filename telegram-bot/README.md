@@ -4,7 +4,7 @@ Send a text message, photo, or document through the Telegram Bot API.
 
 ## Contract
 
-`execute(input, options, context?)` returns `Promise<TelegramResult>`. `input` is either a string or a plain object with only `text`, `fileUrl`, and `caption`.
+`execute(input, options, context?)` returns `Promise<TelegramResult>`. `input` is either a string or a plain object whose closed field set is `text`, `fileUrl`, and `caption`.
 
 - `messageType` is `text` by default and accepts `text`, `photo`, or `document`.
 - Text delivery requires non-blank `text`.
@@ -15,11 +15,11 @@ Send a text message, photo, or document through the Telegram Bot API.
 - `replyToMessageId` must be a positive integer. `replyMarkup` must be a plain JSON object.
 - `timeoutMs` defaults to 30000, must be positive and finite, and is clamped to 120000.
 
-The exact option allowlist is `baseUrl`, `botToken`, `chatId`, `messageType`, `parseMode`, `replyToMessageId`, `disableNotification`, `disableWebPagePreview`, `replyMarkup`, and `timeoutMs`. Message content does not belong in `options`.
+The exact option allowlist is `baseUrl`, `botToken`, `chatId`, `messageType`, `parseMode`, `replyToMessageId`, `disableNotification`, `disableWebPagePreview`, `replyMarkup`, and `timeoutMs`. Message content does not belong in `options`. Before making a request, the Runtime rejects every unknown or legacy field in either `input` or `options`, including Telegram wire names.
 
 ## Authentication and endpoint selection
 
-Prefer the Runtime secret `context.secrets.TELEGRAM_BOT_TOKEN`. An explicit `options.botToken` takes precedence. `options.baseUrl` takes precedence over `context.env.TELEGRAM_API_BASE_URL`; otherwise the package uses `https://api.telegram.org`.
+The formal context contains only `secrets.TELEGRAM_BOT_TOKEN` and `env.TELEGRAM_API_BASE_URL`. Prefer the Runtime secret for the bot token; an explicit `options.botToken` takes precedence. `options.baseUrl` takes precedence over the context environment value; otherwise the package uses `https://api.telegram.org`.
 
 `baseUrl` must be an absolute HTTP or HTTPS URL without credentials, query parameters, or a fragment. A delivery performs one JSON `POST`; the package does not retry automatically and refuses redirects.
 

@@ -42,16 +42,10 @@ export interface SlackOptions {
 
 export interface SlackSecrets {
   SLACK_WEBHOOK_URL?: string;
-  [key: string]: unknown;
 }
 
 export interface SlackContext {
   secrets?: SlackSecrets;
-  defaults?: Record<string, unknown>;
-  workspacePath?: string;
-  executionId?: string;
-  userId?: string;
-  [key: string]: unknown;
 }
 
 export interface SlackDeliveryData {

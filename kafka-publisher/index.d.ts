@@ -27,17 +27,21 @@ export interface KafkaOptions {
   timeoutMs?: number;
 }
 
-export interface KafkaContext {
-  [key: string]: unknown;
-}
+export type KafkaContext = Record<string, never>;
 
-export interface KafkaOffset {
-  partition?: number;
-  offset?: number;
-  error_code?: number;
-  error?: string;
-  [key: string]: KafkaJsonValue | undefined;
-}
+export type KafkaOffset =
+  | {
+      partition: number;
+      offset: number;
+      errorCode?: never;
+      error?: never;
+    }
+  | {
+      partition: number;
+      offset?: number;
+      errorCode: number;
+      error: string;
+    };
 
 export interface KafkaDeliveryData {
   topic: string;

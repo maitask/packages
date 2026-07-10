@@ -12,12 +12,14 @@ Publish one or more records through a Confluent-compatible Kafka REST Proxy JSON
 | `messages` | JSON value or JSON value array | Yes | Null entries in a batch are discarded; at least one entry must remain. |
 | `key` | JSON value | No | Non-null values are converted to a string and applied to every record. |
 | `headers` | object | No | Non-null values are converted to strings and added as HTTP request headers. |
-| `proxyUrl` | string | Conditional | REST Proxy base URL. Takes precedence over `options.proxyUrl`. |
-| `timeoutMs` | number | No | Takes precedence over `options.timeoutMs`. |
+| `proxyUrl` | string | Conditional | REST Proxy base URL. An own input field takes precedence over `options.proxyUrl`. |
+| `timeoutMs` | number | No | An own input field takes precedence over `options.timeoutMs`. |
 
-The public options are the fallback fields `proxyUrl` and `timeoutMs`; other option fields are not used. `context` is currently unused. `proxyUrl` is required after input/options fallback resolution.
+The public options are the fallback fields `proxyUrl` and `timeoutMs`; other option fields are not used. An own input field is authoritative even when its value is `undefined`, `null`, or otherwise invalid, so explicit invalid input does not fall back to `options`. `proxyUrl` is required after input/options selection.
 
-The timeout defaults to 30000 milliseconds when the selected value is missing, non-finite, or not positive. Positive values are clamped to 120000 milliseconds.
+`context` has no supported fields and is not read. Omit it or pass an empty object.
+
+When neither input nor options supplies `timeoutMs`, the timeout defaults to 30000 milliseconds. A selected timeout must be a finite positive number; invalid explicit values return a structured failure instead of using a fallback or default. Positive values are clamped to 120000 milliseconds.
 
 ```json
 {
@@ -71,7 +73,9 @@ The package currently performs no automatic retry. It also does not add redirect
 }
 ```
 
-`offsets` is the REST Proxy response array passed through without field translation. Confluent-compatible entries commonly contain `partition` and `offset`; provider error entries may contain the wire field `error_code` and `error`. These are response wire fields, not Maitask input or option names. A missing or non-array response `offsets` value becomes an empty array.
+Successful HTTP responses must contain a valid plain-object envelope with an `offsets` array. Every offset requires a non-negative safe-integer `partition` and at least one result: a non-negative safe-integer `offset`, or an integer provider error code paired with a string error message. Malformed envelopes and invalid offset entries return the normal structured failure result.
+
+Result offsets expose only the known camelCase fields `partition`, `offset`, `errorCode`, and `error`; unknown provider fields do not enter the result. On the REST Proxy wire, the provider field `error_code` is accepted and translated to `errorCode`.
 
 Failures use the current fixed code `KAFKA_PUBLISHER_ERROR` and type `KafkaPublisherError`:
 
