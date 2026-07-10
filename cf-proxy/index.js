@@ -47,7 +47,9 @@ async function execute(input = {}, options = {}, context = {}) {
         status: response.status,
         statusText: response.ok ? 'OK' : 'Error',
         headers: response.headers,
-        body: response.body,
+        bodyBase64: response.bodyBase64,
+        bodyEncoding: 'base64',
+        bodyBytes: response.bodyBytes,
         targetDomain: target.domain,
         targetPath: target.path,
         isDockerRequest: DOCKER_HOSTS.has(target.domain),
@@ -91,7 +93,8 @@ function buildConfig(input) {
     allowedHosts: Array.isArray(config.allowedHosts) && config.allowedHosts.length ? config.allowedHosts : DEFAULT_ALLOWED_HOSTS,
     restrictPaths: Boolean(config.restrictPaths),
     allowedPaths: Array.isArray(config.allowedPaths) && config.allowedPaths.length ? config.allowedPaths : ['library'],
-    maxRedirects: toBoundedInt(config.maxRedirects, 0, 20, 5)
+    maxRedirects: toBoundedInt(config.maxRedirects, 0, 20, 5),
+    allowPrivateHosts: config.allowPrivateHosts === true
   };
 }
 
@@ -106,13 +109,21 @@ function parseTargetUrl(url) {
   return {
     href: parsed.href,
     domain: parsed.hostname,
-    path: parsed.pathname.replace(/^\//, '')
+    path: parsed.pathname.replace(/^\//, ''),
+    origin: parsed.origin,
+    protocol: parsed.protocol
   };
 }
 
 function validateTarget(target, cfg) {
+  if (target.protocol !== 'http:' && target.protocol !== 'https:') {
+    throw new Error('Target must use HTTP or HTTPS');
+  }
   if (!cfg.allowedHosts.includes(target.domain)) {
-    throw new Error(`Domain ${target.domain} is not allowed`);
+    throw new Error('Target domain is not allowed');
+  }
+  if (!cfg.allowPrivateHosts && isPrivateOrLocalHost(target.domain)) {
+    throw new Error('Private or local targets require allowPrivateHosts');
   }
 
   if (!cfg.restrictPaths) return;
@@ -137,7 +148,7 @@ async function sendWithDockerAuthIfNeeded(target, cfg) {
   });
 
   if (!isDockerRequest) {
-    return processRedirects(first, cfg.maxRedirects, withS3Headers(baseHeaders, target.domain), 0);
+    return processRedirects(first, target, cfg, withS3Headers(baseHeaders, target.domain), 0);
   }
 
   if (first.status === 401) {
@@ -151,31 +162,37 @@ async function sendWithDockerAuthIfNeeded(target, cfg) {
           Authorization: `Bearer ${token}`
         }, target.domain)
       });
-      return processRedirects(authed, cfg.maxRedirects, withS3Headers(baseHeaders, target.domain), 0);
+      return processRedirects(authed, target, cfg, withS3Headers(baseHeaders, target.domain), 0);
     }
   }
 
-  return processRedirects(first, cfg.maxRedirects, withS3Headers(baseHeaders, target.domain), 0);
+  return processRedirects(first, target, cfg, withS3Headers(baseHeaders, target.domain), 0);
 }
 
-async function processRedirects(response, maxRedirects, headers, redirectCount) {
+async function processRedirects(response, initialTarget, cfg, headers, redirectCount) {
   let current = response;
+  let currentTarget = initialTarget;
   let redirects = redirectCount;
 
-  while ((current.status === 302 || current.status === 307) && redirects < maxRedirects) {
+  while (isRedirectStatus(current.status) && redirects < cfg.maxRedirects) {
     const nextUrl = current.headers.location || current.headers.Location;
     if (!nextUrl) break;
 
-    const nextDomain = new URL(nextUrl).hostname;
-    current = await request(nextUrl, {
+    const nextTarget = parseTargetUrl(new URL(nextUrl, currentTarget.href).href);
+    validateTarget(nextTarget, cfg);
+    const nextHeaders = nextTarget.origin === currentTarget.origin
+      ? { ...headers }
+      : stripCrossOriginCredentials(headers);
+    current = await request(nextTarget.href, {
       method: 'GET',
-      headers: withS3Headers({ ...headers, Host: nextDomain }, nextDomain)
+      headers: withS3Headers({ ...nextHeaders, Host: nextTarget.domain }, nextTarget.domain)
     });
+    currentTarget = nextTarget;
     redirects += 1;
   }
 
-  if ((current.status === 302 || current.status === 307) && redirects >= maxRedirects) {
-    throw new Error(`Max redirects (${maxRedirects}) exceeded`);
+  if (isRedirectStatus(current.status) && redirects >= cfg.maxRedirects) {
+    throw new Error(`Max redirects (${cfg.maxRedirects}) exceeded`);
   }
 
   return {
@@ -201,7 +218,7 @@ async function requestDockerToken(wwwAuthHeader) {
 
   let json;
   try {
-    json = JSON.parse(tokenRes.body || '{}');
+    json = JSON.parse(decodeBodyText(tokenRes) || '{}');
   } catch {
     return null;
   }
@@ -229,18 +246,73 @@ async function request(url, init) {
       ok: Boolean(denoRes.ok),
       status: Number(denoRes.status),
       headers: denoRes.headers || {},
-      body: denoRes.body || ''
+      bodyBase64: denoRes.bodyBase64 || encodeUtf8Base64(denoRes.body || ''),
+      bodyBytes: Number(denoRes.bodyBytes) || decodeBase64Length(denoRes.bodyBase64 || encodeUtf8Base64(denoRes.body || ''))
     };
   }
 
-  const res = await fetch(url, init);
-  const body = await res.text();
+  const res = await fetch(url, { ...init, redirect: 'manual' });
+  const bytes = new Uint8Array(await res.arrayBuffer());
   return {
     ok: res.ok,
     status: res.status,
     headers: Object.fromEntries(res.headers.entries()),
-    body
+    bodyBase64: bytesToBase64(bytes),
+    bodyBytes: bytes.byteLength
   };
+}
+
+function isRedirectStatus(status) {
+  return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+}
+
+function stripCrossOriginCredentials(headers) {
+  const result = {};
+  for (const [key, value] of Object.entries(headers)) {
+    const lower = key.toLowerCase();
+    if (lower === 'authorization' || lower === 'cookie' || lower === 'proxy-authorization') continue;
+    result[key] = value;
+  }
+  return result;
+}
+
+function isPrivateOrLocalHost(hostname) {
+  const host = hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (host === 'localhost' || host.endsWith('.localhost')) return true;
+  if (host === '::1' || host.startsWith('fc') || host.startsWith('fd') || host.startsWith('fe8') || host.startsWith('fe9') || host.startsWith('fea') || host.startsWith('feb')) return true;
+  const parts = host.split('.').map(Number);
+  if (parts.length !== 4 || parts.some(part => !Number.isInteger(part) || part < 0 || part > 255)) return false;
+  return parts[0] === 10 || parts[0] === 127 || parts[0] === 0 || (parts[0] === 169 && parts[1] === 254) || (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) || (parts[0] === 192 && parts[1] === 168);
+}
+
+function decodeBodyText(response) {
+  return new TextDecoder().decode(base64ToBytes(response.bodyBase64 || ''));
+}
+
+function encodeUtf8Base64(value) {
+  return bytesToBase64(new TextEncoder().encode(String(value)));
+}
+
+function decodeBase64Length(value) {
+  return base64ToBytes(value || '').byteLength;
+}
+
+function bytesToBase64(bytes) {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let offset = 0; offset < bytes.length; offset += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(value) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
 }
 
 function sanitizeHeaders(headers) {
