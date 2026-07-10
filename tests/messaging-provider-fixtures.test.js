@@ -1512,7 +1512,7 @@ test('kafka publishes records through a controlled REST proxy', async t => {
     return {
       body: {
         offsets: [
-          { partition: 0, offset: 101 },
+          { partition: 0, offset: 101, provider_metadata: 'drop' },
           { partition: 0, offset: 102 }
         ]
       }
@@ -1535,6 +1535,293 @@ test('kafka publishes records through a controlled REST proxy', async t => {
     { partition: 0, offset: 102 }
   ]);
   assert.doesNotMatch(JSON.stringify(result), /fixture-kafka/);
+});
+
+test('kafka does not fall back from explicit invalid input proxy URLs', async t => {
+  const fetchState = forbidFetch(t);
+
+  for (const proxyUrl of ['', null, undefined, '   ', true]) {
+    const result = await executeKafka(
+      { proxyUrl, topic: 'production-events', messages: ['event'] },
+      { proxyUrl: 'https://valid-proxy.example' }
+    );
+
+    assert.equal(result.success, false);
+    assert.equal(result.error.code, 'KAFKA_PUBLISHER_ERROR');
+    assert.equal(result.error.type, 'KafkaPublisherError');
+    assert.match(result.error.message, /proxyUrl.*required/i);
+  }
+
+  assert.equal(fetchState.calls, 0);
+});
+
+test('kafka rejects explicit invalid input timeouts without falling back to options', async t => {
+  const fetchState = forbidFetch(t);
+
+  const invalidTimeouts = [null, undefined, '1000', true, 0, -1, Number.POSITIVE_INFINITY, Number.NaN];
+
+  for (const timeoutMs of invalidTimeouts) {
+    const result = await executeKafka(
+      {
+        proxyUrl: 'https://valid-proxy.example',
+        topic: 'production-events',
+        messages: ['event'],
+        timeoutMs
+      },
+      { timeoutMs: 5000 }
+    );
+
+    assert.equal(result.success, false);
+    assert.equal(result.error.code, 'KAFKA_PUBLISHER_ERROR');
+    assert.equal(result.error.type, 'KafkaPublisherError');
+    assert.match(result.error.message, /timeoutMs.*positive number/i);
+  }
+
+  for (const timeoutMs of invalidTimeouts) {
+    const result = await executeKafka(
+      {
+        proxyUrl: 'https://valid-proxy.example',
+        topic: 'production-events',
+        messages: ['event']
+      },
+      { timeoutMs }
+    );
+
+    assert.equal(result.success, false);
+    assert.equal(result.error.code, 'KAFKA_PUBLISHER_ERROR');
+    assert.equal(result.error.type, 'KafkaPublisherError');
+    assert.match(result.error.message, /timeoutMs.*positive number/i);
+  }
+
+  assert.equal(fetchState.calls, 0);
+});
+
+test('kafka defaults, falls back, and clamps timeout scheduling', async t => {
+  const guardedSetTimeout = global.setTimeout;
+  const guardedClearTimeout = global.clearTimeout;
+  const scheduledTimeouts = [];
+  const clearedTimeouts = [];
+  let nextTimerId = 900;
+
+  global.setTimeout = (_callback, timeoutMs) => {
+    scheduledTimeouts.push(timeoutMs);
+    return nextTimerId++;
+  };
+  global.clearTimeout = timeoutId => {
+    clearedTimeouts.push(timeoutId);
+  };
+  replaceFetch(t, async () => ({
+    ok: true,
+    status: 200,
+    text: async () => JSON.stringify({ offsets: [{ partition: 0, offset: 1 }] })
+  }));
+  t.after(() => {
+    global.setTimeout = guardedSetTimeout;
+    global.clearTimeout = guardedClearTimeout;
+  });
+
+  const defaultResult = await executeKafka({
+    proxyUrl: 'https://valid-proxy.example',
+    topic: 'default-timeout',
+    messages: ['event']
+  });
+  const fallbackResult = await executeKafka(
+    {
+      proxyUrl: 'https://valid-proxy.example',
+      topic: 'fallback-timeout',
+      messages: ['event']
+    },
+    { timeoutMs: 45000 }
+  );
+  const clampedResult = await executeKafka(
+    {
+      proxyUrl: 'https://valid-proxy.example',
+      topic: 'clamped-timeout',
+      messages: ['event'],
+      timeoutMs: 300000
+    },
+    { timeoutMs: 1000 }
+  );
+
+  assert.equal(defaultResult.success, true);
+  assert.equal(fallbackResult.success, true);
+  assert.equal(clampedResult.success, true);
+  assert.deepEqual(scheduledTimeouts, [30000, 45000, 120000]);
+  assert.deepEqual(clearedTimeouts, [900, 901, 902]);
+});
+
+test('kafka rejects malformed REST proxy success envelopes', async t => {
+  let responseBody;
+  replaceFetch(t, async () => ({
+    ok: true,
+    status: 200,
+    text: async () => JSON.stringify(responseBody)
+  }));
+
+  const cases = [
+    { label: 'null response', body: null },
+    { label: 'string response', body: 'accepted' },
+    { label: 'array response', body: [] },
+    { label: 'missing offsets', body: {} },
+    { label: 'non-array offsets', body: { offsets: {} } },
+    { label: 'primitive entry', body: { offsets: [1] } },
+    { label: 'array entry', body: { offsets: [[0, 1]] } }
+  ];
+
+  for (const testCase of cases) {
+    responseBody = testCase.body;
+    const result = await executeKafka({
+      proxyUrl: 'https://valid-proxy.example',
+      topic: 'production-events',
+      messages: ['event']
+    });
+
+    assert.equal(result.success, false, `accepted ${testCase.label}`);
+    assert.equal(result.error.code, 'KAFKA_PUBLISHER_ERROR');
+    assert.equal(result.error.type, 'KafkaPublisherError');
+    assert.match(result.error.message, /malformed response/i);
+  }
+});
+
+test('kafka rejects unsafe REST proxy response objects without invoking accessors', async t => {
+  const guardedJsonParse = JSON.parse;
+  let parsedResponse;
+  let accessorReads = 0;
+  const customPrototypeResponse = Object.create({ provider: true });
+  customPrototypeResponse.offsets = [{ partition: 0, offset: 1 }];
+  const accessorResponse = {};
+  Object.defineProperty(accessorResponse, 'offsets', {
+    enumerable: true,
+    get: () => {
+      accessorReads += 1;
+      return [{ partition: 0, offset: 1 }];
+    }
+  });
+  const customPrototypeEntry = Object.create({ provider: true });
+  customPrototypeEntry.partition = 0;
+  customPrototypeEntry.offset = 1;
+  const accessorEntry = { offset: 1 };
+  Object.defineProperty(accessorEntry, 'partition', {
+    enumerable: true,
+    get: () => {
+      accessorReads += 1;
+      return 0;
+    }
+  });
+
+  JSON.parse = text =>
+    text === '__kafka_fixture_response__' ? parsedResponse : guardedJsonParse(text);
+  replaceFetch(t, async () => ({
+    ok: true,
+    status: 200,
+    text: async () => '__kafka_fixture_response__'
+  }));
+  t.after(() => {
+    JSON.parse = guardedJsonParse;
+  });
+
+  const cases = [
+    { label: 'custom prototype response', body: customPrototypeResponse },
+    { label: 'accessor response', body: accessorResponse },
+    { label: 'custom prototype entry', body: { offsets: [customPrototypeEntry] } },
+    { label: 'accessor entry', body: { offsets: [accessorEntry] } },
+    {
+      label: 'unknown nested object',
+      body: { offsets: [{ partition: 0, offset: 1, provider: { internal: true } }] }
+    }
+  ];
+
+  for (const testCase of cases) {
+    parsedResponse = testCase.body;
+    const result = await executeKafka({
+      proxyUrl: 'https://valid-proxy.example',
+      topic: 'production-events',
+      messages: ['event']
+    });
+
+    assert.equal(result.success, false, `accepted ${testCase.label}`);
+    assert.equal(result.error.code, 'KAFKA_PUBLISHER_ERROR');
+    assert.equal(result.error.type, 'KafkaPublisherError');
+    assert.match(result.error.message, /malformed response/i);
+  }
+
+  assert.equal(accessorReads, 0);
+});
+
+test('kafka rejects invalid REST proxy offset fields', async t => {
+  let responseBody;
+  replaceFetch(t, async () => ({
+    ok: true,
+    status: 200,
+    text: async () => JSON.stringify(responseBody)
+  }));
+
+  const cases = [
+    { label: 'missing partition', entry: { offset: 1 } },
+    { label: 'negative partition', entry: { partition: -1, offset: 1 } },
+    { label: 'fractional partition', entry: { partition: 0.5, offset: 1 } },
+    { label: 'unsafe partition', entry: { partition: Number.MAX_SAFE_INTEGER + 1, offset: 1 } },
+    { label: 'string partition', entry: { partition: '0', offset: 1 } },
+    { label: 'missing result', entry: { partition: 0 } },
+    { label: 'negative offset', entry: { partition: 0, offset: -1 } },
+    { label: 'fractional offset', entry: { partition: 0, offset: 1.5 } },
+    { label: 'unsafe offset', entry: { partition: 0, offset: Number.MAX_SAFE_INTEGER + 1 } },
+    { label: 'string offset', entry: { partition: 0, offset: '1' } },
+    { label: 'null offset', entry: { partition: 0, offset: null } },
+    { label: 'string error code', entry: { partition: 0, error_code: '50003', error: 'failed' } },
+    { label: 'fractional error code', entry: { partition: 0, error_code: 50003.5, error: 'failed' } },
+    { label: 'missing error', entry: { partition: 0, error_code: 50003 } },
+    { label: 'orphan error', entry: { partition: 0, error: 'failed' } },
+    { label: 'non-string error', entry: { partition: 0, error_code: 50003, error: 503 } },
+    {
+      label: 'invalid optional error code',
+      entry: { partition: 0, offset: 1, error_code: null, error: 'failed' }
+    }
+  ];
+
+  for (const testCase of cases) {
+    responseBody = { offsets: [testCase.entry] };
+    const result = await executeKafka({
+      proxyUrl: 'https://valid-proxy.example',
+      topic: 'production-events',
+      messages: ['event']
+    });
+
+    assert.equal(result.success, false, `accepted ${testCase.label}`);
+    assert.equal(result.error.code, 'KAFKA_PUBLISHER_ERROR');
+    assert.equal(result.error.type, 'KafkaPublisherError');
+    assert.match(result.error.message, /malformed response/i);
+  }
+});
+
+test('kafka normalizes provider error offsets to controlled camelCase fields', async t => {
+  replaceFetch(t, async () => ({
+    ok: true,
+    status: 200,
+    text: async () =>
+      JSON.stringify({
+        offsets: [
+          {
+            partition: 0,
+            error_code: 50003,
+            error: 'broker unavailable',
+            unknown: 'drop'
+          }
+        ]
+      })
+  }));
+
+  const result = await executeKafka({
+    proxyUrl: 'https://valid-proxy.example',
+    topic: 'production-events',
+    messages: ['event']
+  });
+
+  assert.equal(result.success, true);
+  assert.deepEqual(result.data.offsets, [
+    { partition: 0, errorCode: 50003, error: 'broker unavailable' }
+  ]);
+  assert.doesNotMatch(JSON.stringify(result.data.offsets), /error_code|unknown/);
 });
 
 test('kafka returns a structured REST proxy failure', async t => {
