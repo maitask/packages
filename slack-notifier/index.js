@@ -10,6 +10,7 @@ const PACKAGE_NAME = '@maitask/slack-notifier';
 const PACKAGE_VERSION = '0.1.0';
 const DEFAULT_TIMEOUT_MS = 30000;
 const MAX_TIMEOUT_MS = 120000;
+const MAX_PROVIDER_NORMALIZATION_PASSES = 4;
 const INPUT_FIELDS = new Set(['text', 'blocks', 'attachments']);
 const OPTION_FIELDS = new Set([
   'webhookUrl',
@@ -362,7 +363,7 @@ function providerError(response, body, webhookUrl) {
 
 function sanitizeProviderText(value, webhookUrl) {
   if (typeof value !== 'string') return '';
-  let sanitized = value;
+  let sanitized = normalizeProviderEncoding(value);
   const secrets = webhookSecrets(webhookUrl).sort((a, b) => b.length - a.length);
 
   for (const secret of secrets) {
@@ -377,24 +378,43 @@ function sanitizeProviderText(value, webhookUrl) {
   return sanitized.replace(/\s+/g, ' ').trim().slice(0, 1000);
 }
 
+function normalizeProviderEncoding(value) {
+  let normalized = value;
+
+  for (let pass = 0; pass < MAX_PROVIDER_NORMALIZATION_PASSES; pass += 1) {
+    const next = decodePercentRuns(normalized.replace(/\\\//g, '/'));
+    if (next === normalized) break;
+    normalized = next;
+  }
+
+  return normalized;
+}
+
+function decodePercentRuns(value) {
+  return value.replace(/(?:%[0-9a-f]{2})+/gi, run => {
+    try {
+      return decodeURIComponent(run);
+    } catch {
+      return run.replace(/%([0-9a-f]{2})/gi, (encodedByte, hex) => {
+        const byte = Number.parseInt(hex, 16);
+        return byte <= 0x7f ? String.fromCharCode(byte) : encodedByte;
+      });
+    }
+  });
+}
+
 function webhookSecrets(webhookUrl) {
   try {
     const parsed = new URL(webhookUrl);
     const parts = parsed.pathname.split('/').filter(Boolean);
     const sensitiveParts = parts[0] === 'services' ? parts.slice(1) : parts;
-    const secrets = new Set([webhookUrl, parsed.pathname]);
+    const secrets = new Set([
+      normalizeProviderEncoding(webhookUrl),
+      normalizeProviderEncoding(parsed.pathname)
+    ]);
 
     for (const part of sensitiveParts) {
-      secrets.add(part);
-      try {
-        secrets.add(decodeURIComponent(part));
-      } catch {
-        // The parsed URL remains safe to mask even if a path segment is malformed.
-      }
-    }
-
-    for (const secret of [...secrets]) {
-      secrets.add(encodeURIComponent(secret));
+      secrets.add(normalizeProviderEncoding(part));
     }
     return [...secrets];
   } catch {

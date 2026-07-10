@@ -961,6 +961,45 @@ test('slack sanitizes provider text that echoes webhook secrets and arbitrary UR
   assert.doesNotMatch(JSON.stringify(result), /TSECRET300|BSECRET300|token:value_300|token%3Avalue_300/i);
 });
 
+test('slack normalizes escaped and percent-encoded provider secrets before sanitizing', async t => {
+  const secret = 'nonstandard-secret';
+  const server = await createFixtureServer((url, request) => {
+    assert.equal(url.pathname, `/hooks/${secret}`);
+    assert.equal(request.method, 'POST');
+    const escapedWebhook = `${server.url}/hooks/${secret}`.replaceAll('/', '\\/');
+    return {
+      status: 400,
+      headers: { 'content-type': 'text/plain' },
+      body: [
+        'delivery rejected',
+        escapedWebhook,
+        String.raw`https:\/\/media.example\/private.png`,
+        'https%3A%2F%2Fencoded.example%2Fprivate.png',
+        'h%74tps%3a%2f%2fmixed.example%2Fprivate.png',
+        'nonstandard%2Dsecret',
+        '%6eonstandard%2dsecret',
+        'non%73tandard%252Dsecret',
+        '%4EONSTANDARD%2DSECRET',
+        'malformed %E0%A4%A'
+      ].join(' ')
+    };
+  });
+  t.after(() => server.close());
+
+  const result = await executeSlack('normalize provider error', {
+    webhookUrl: `${server.url}/hooks/${secret}`
+  });
+
+  assert.equal(result.success, false);
+  assert.match(result.error.message, /delivery rejected/);
+  assert.equal(result.metadata.webhook, `${server.url}/services/***`);
+  assert.doesNotMatch(
+    JSON.stringify(result.error),
+    /[a-z][a-z0-9+.-]*:\/\/|\\\/|https?%|nonstandard|media\.example|encoded\.example|mixed\.example/i
+  );
+  assert.doesNotMatch(JSON.stringify(result), /nonstandard(?:-|%25?2d)secret/i);
+});
+
 test('slack returns a secret-safe retriable network failure', async t => {
   replaceFetch(t, async url => {
     throw new Error(`socket failed at ${url} via https://diagnostics.example/private`);
