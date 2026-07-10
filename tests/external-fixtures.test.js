@@ -1,5 +1,4 @@
 const assert = require('node:assert/strict');
-const http = require('node:http');
 const test = require('node:test');
 
 const { execute: executeGraphql } = require('../graphql-client');
@@ -7,36 +6,7 @@ const { execute: executeHackerNews } = require('../hackernews-crawler');
 const { execute: executeIntelligenceBriefing } = require('../intelligence-briefing');
 const { execute: executeWebScraper } = require('../web-scraper');
 const { execute: executeWebSearch } = require('../web-search');
-
-function createFixtureServer(handler) {
-  const server = http.createServer((request, response) => {
-    const url = new URL(request.url, `http://${request.headers.host}`);
-    const result = handler(url, request);
-
-    if (!result) {
-      response.writeHead(404, { 'content-type': 'text/plain; charset=utf-8' });
-      response.end('not found');
-      return;
-    }
-
-    const status = result.status || 200;
-    const headers = result.headers || { 'content-type': 'application/json; charset=utf-8' };
-    const body = typeof result.body === 'string' ? result.body : JSON.stringify(result.body);
-    response.writeHead(status, headers);
-    response.end(body);
-  });
-
-  return new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(0, '127.0.0.1', () => {
-      const address = server.address();
-      resolve({
-        url: `http://127.0.0.1:${address.port}`,
-        close: () => new Promise(closeResolve => server.close(closeResolve))
-      });
-    });
-  });
-}
+const { createFixtureServer } = require('./helpers/http-fixture');
 
 test('hackernews-crawler crawls stories and comments from a fixture API', async t => {
   const server = await createFixtureServer(url => {
