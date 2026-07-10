@@ -6,7 +6,8 @@
   "scripts": {
     "test": "node --test tests/*.test.js",
     "test:external-fixtures": "node --test tests/external-fixtures.test.js",
-    "test:metadata": "node --test tests/package-metadata.test.js"
+    "test:metadata": "node --test tests/catalog-integrity.test.js",
+    "test:archives": "node --test tests/package-archives.test.js"
   },
   "engines": {
     "node": ">=18.0.0"

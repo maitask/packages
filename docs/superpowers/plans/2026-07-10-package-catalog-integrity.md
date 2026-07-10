@@ -170,8 +170,19 @@ test('every official package has complete production metadata', () => {
     for (const locale of ['en', 'zh']) {
       const localized = manifest.maitask?.locales?.[locale];
       assert.ok(localized, `${manifest.name} must define maitask.locales.${locale}`);
-      assertNonEmptyString(localized.name, `${manifest.name} ${locale} name is required`);
+      assertNonEmptyString(
+        localized.display_name,
+        `${manifest.name} ${locale} display_name is required`
+      );
       assertNonEmptyString(localized.description, `${manifest.name} ${locale} description is required`);
+      assertNonEmptyString(localized.category, `${manifest.name} ${locale} category is required`);
+      assert.ok(
+        Array.isArray(localized.keywords) && localized.keywords.length > 0,
+        `${manifest.name} ${locale} keywords are required`
+      );
+      for (const keyword of localized.keywords) {
+        assertNonEmptyString(keyword, `${manifest.name} ${locale} keyword must be a string`);
+      }
     }
   }
 });
