@@ -8,6 +8,7 @@
     "test:ai-providers": "node --test tests/ai-provider-fixtures.test.js",
     "test:external-fixtures": "node --test tests/external-fixtures.test.js",
     "test:messaging-providers": "node --test tests/messaging-provider-fixtures.test.js",
+    "test:cf-proxy": "node --test tests/cf-proxy-fixtures.test.js",
     "test:metadata": "node --test tests/catalog-integrity.test.js",
     "test:archives": "node --test tests/package-archives.test.js"
   },
