@@ -38,11 +38,7 @@ async function execute(input, options = {}, context = {}) {
 
         return {
             success: true,
-            data: {
-                messageId: message?.message_id,
-                chatId: message?.chat?.id,
-                message
-            },
+            data: buildSuccessData(message),
             metadata: buildMetadata({ method })
         };
     } catch (error) {
@@ -82,9 +78,9 @@ function buildConfig(input, options, context) {
         text: content.text,
         fileUrl: content.fileUrl,
         caption: content.caption ?? content.text,
-        parseMode: options.parseMode,
+        parseMode: options.parseMode ?? 'Markdown',
         replyToMessageId: options.replyToMessageId,
-        disableNotification: options.disableNotification,
+        disableNotification: options.disableNotification === true,
         disableWebPagePreview: options.disableWebPagePreview,
         replyMarkup: options.replyMarkup,
         timeoutMs: normalizeTimeout(options.timeoutMs)
@@ -176,6 +172,15 @@ function buildPayload(config) {
 
 function omitUndefined(value) {
     return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined));
+}
+
+function buildSuccessData(message) {
+    return omitUndefined({
+        messageId: message?.message_id,
+        chatId: message?.chat?.id,
+        text: message?.text,
+        caption: message?.caption
+    });
 }
 
 async function telegramRequest(url, payload, timeoutMs) {

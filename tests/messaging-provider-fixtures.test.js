@@ -36,7 +36,12 @@ test('telegram sends text through a controlled Bot API endpoint', async t => {
     return {
       body: {
         ok: true,
-        result: { message_id: 42, chat: { id: -1001 }, text: 'deployment complete' }
+        result: {
+          message_id: 42,
+          chat: { id: -1001, title: 'Operations' },
+          text: 'deployment complete',
+          unknown_field: 'must not escape'
+        }
       }
     };
   });
@@ -54,13 +59,49 @@ test('telegram sends text through a controlled Bot API endpoint', async t => {
   );
 
   assert.equal(result.success, true);
-  assert.equal(result.data.messageId, 42);
-  assert.equal(result.data.chatId, -1001);
-  assert.equal(result.data.message.text, 'deployment complete');
+  assert.deepEqual(result.data, {
+    messageId: 42,
+    chatId: -1001,
+    text: 'deployment complete'
+  });
   assert.equal(Object.hasOwn(result, 'message_id'), false);
   assert.equal(Object.hasOwn(result, 'chat_id'), false);
+  assert.doesNotMatch(JSON.stringify(result.data), /message_id|chat_id|unknown_field|Operations/);
   assert.equal(result.metadata.method, 'sendMessage');
   assert.doesNotMatch(JSON.stringify(result), /fixture-token/);
+});
+
+test('telegram applies formal defaults to text delivery', async t => {
+  const server = await createFixtureServer((url, request, body) => {
+    assert.equal(url.pathname, '/telegram/botfixture-token/sendMessage');
+    assert.equal(request.method, 'POST');
+    assert.deepEqual(JSON.parse(body), {
+      chat_id: '-100-default',
+      text: 'default delivery',
+      parse_mode: 'Markdown',
+      disable_notification: false
+    });
+    return {
+      body: {
+        ok: true,
+        result: { message_id: 46, chat: { id: -1007 }, text: 'default delivery' }
+      }
+    };
+  });
+  t.after(() => server.close());
+
+  const result = await executeTelegram('default delivery', {
+    baseUrl: `${server.url}/telegram`,
+    botToken: 'fixture-token',
+    chatId: '-100-default'
+  });
+
+  assert.equal(result.success, true);
+  assert.deepEqual(result.data, {
+    messageId: 46,
+    chatId: -1007,
+    text: 'default delivery'
+  });
 });
 
 test('telegram sends a photo from task content without mutating the input', async t => {
@@ -71,7 +112,8 @@ test('telegram sends a photo from task content without mutating the input', asyn
       chat_id: '-1002',
       photo: 'https://fixtures.example/release.png',
       caption: 'release dashboard',
-      parse_mode: 'MarkdownV2'
+      parse_mode: 'MarkdownV2',
+      disable_notification: false
     });
     return {
       body: {
@@ -96,8 +138,11 @@ test('telegram sends a photo from task content without mutating the input', asyn
   });
 
   assert.equal(result.success, true);
-  assert.equal(result.data.messageId, 43);
-  assert.equal(result.data.chatId, -1002);
+  assert.deepEqual(result.data, {
+    messageId: 43,
+    chatId: -1002,
+    caption: 'release dashboard'
+  });
   assert.equal(result.metadata.method, 'sendPhoto');
   assert.deepEqual(input, originalInput);
 });
@@ -109,7 +154,9 @@ test('telegram sends a document and falls back to task text for its caption', as
     assert.deepEqual(JSON.parse(body), {
       chat_id: '-1003',
       document: 'https://fixtures.example/report.pdf',
-      caption: 'quarterly report'
+      caption: 'quarterly report',
+      parse_mode: 'Markdown',
+      disable_notification: false
     });
     return {
       body: {
@@ -131,7 +178,11 @@ test('telegram sends a document and falls back to task text for its caption', as
   );
 
   assert.equal(result.success, true);
-  assert.equal(result.data.messageId, 44);
+  assert.deepEqual(result.data, {
+    messageId: 44,
+    chatId: -1003,
+    caption: 'quarterly report'
+  });
   assert.equal(result.metadata.method, 'sendDocument');
 });
 
