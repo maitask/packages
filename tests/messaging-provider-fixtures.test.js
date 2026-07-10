@@ -26,6 +26,7 @@ test('telegram sends text through a controlled Bot API endpoint', async t => {
   const server = await createFixtureServer((url, request, body) => {
     assert.equal(url.pathname, '/telegram/botfixture-token/sendMessage');
     assert.equal(request.method, 'POST');
+    assert.equal(request.headers['content-type'], 'application/json');
     assert.deepEqual(JSON.parse(body), {
       chat_id: '-1001',
       text: 'deployment complete',
@@ -56,11 +57,13 @@ test('telegram sends text through a controlled Bot API endpoint', async t => {
   assert.equal(result.message_id, 42);
   assert.equal(result.chat_id, -1001);
   assert.equal(result.metadata.method, 'sendMessage');
+  assert.doesNotMatch(JSON.stringify(result), /fixture-token/);
 });
 
 test('telegram returns a structured API failure through the Runtime endpoint fallback', async t => {
-  const server = await createFixtureServer(url => {
+  const server = await createFixtureServer((url, request) => {
     assert.equal(url.pathname, '/telegram/botfixture-token/sendMessage');
+    assert.equal(request.headers['content-type'], 'application/json');
     return { status: 400, body: { ok: false, description: 'chat not found' } };
   });
   t.after(() => server.close());
@@ -81,6 +84,7 @@ test('slack sends the formal webhook payload and masks the result URL', async t 
   const server = await createFixtureServer((url, request, body) => {
     assert.equal(url.pathname, '/services/T000/B000/fixture-secret');
     assert.equal(request.method, 'POST');
+    assert.equal(request.headers['content-type'], 'application/json');
     assert.deepEqual(JSON.parse(body), {
       text: 'release complete',
       blocks: [{ type: 'section', text: { type: 'mrkdwn', text: '*Success*' } }],
@@ -115,11 +119,16 @@ test('slack sends the formal webhook payload and masks the result URL', async t 
 });
 
 test('slack returns a retriable secret-safe structured webhook failure', async t => {
-  const server = await createFixtureServer(() => ({
-    status: 429,
-    headers: { 'content-type': 'text/plain', 'retry-after': '3' },
-    body: 'rate_limited'
-  }));
+  const server = await createFixtureServer((url, request) => {
+    assert.equal(url.pathname, '/services/T111/B111/fixture-secret');
+    assert.equal(request.method, 'POST');
+    assert.equal(request.headers['content-type'], 'application/json');
+    return {
+      status: 429,
+      headers: { 'content-type': 'text/plain', 'retry-after': '3' },
+      body: 'rate_limited'
+    };
+  });
   t.after(() => server.close());
 
   const result = await executeSlack(
@@ -129,10 +138,12 @@ test('slack returns a retriable secret-safe structured webhook failure', async t
 
   assert.equal(result.success, false);
   assert.equal(result.error.code, 'SLACK_ERROR');
+  assert.equal(result.error.status, 429);
   assert.match(result.error.message, /429.*rate_limited/);
   assert.equal(result.error.retriable, true);
   assert.equal(result.error.details?.retryAfterSeconds, 3);
-  assert.doesNotMatch(JSON.stringify(result), /fixture-secret/);
+  assert.equal(result.metadata.webhook, `${server.url}/services/T***/B***/***`);
+  assert.doesNotMatch(JSON.stringify(result), /T111|B111|fixture-secret/);
 });
 
 test('kafka publishes records through a controlled REST proxy', async t => {
@@ -171,23 +182,30 @@ test('kafka publishes records through a controlled REST proxy', async t => {
     { partition: 0, offset: 101 },
     { partition: 0, offset: 102 }
   ]);
+  assert.doesNotMatch(JSON.stringify(result), /fixture-kafka/);
 });
 
 test('kafka returns a structured REST proxy failure', async t => {
-  const server = await createFixtureServer(() => ({
-    status: 503,
-    body: { error: { message: 'broker unavailable' } }
-  }));
+  const server = await createFixtureServer((url, request) => {
+    assert.equal(url.pathname, '/topics/production-events');
+    assert.equal(request.headers.authorization, 'Bearer fixture-kafka');
+    return {
+      status: 503,
+      body: { error_code: 50003, message: 'broker unavailable' }
+    };
+  });
   t.after(() => server.close());
 
   const result = await executeKafka({
     proxyUrl: server.url,
     topic: 'production-events',
-    messages: ['event']
+    messages: ['event'],
+    headers: { Authorization: 'Bearer fixture-kafka' }
   });
 
   assert.equal(result.success, false);
   assert.equal(result.error.code, 'KAFKA_PUBLISHER_ERROR');
   assert.equal(result.error.type, 'KafkaPublisherError');
   assert.equal(result.error.message, 'broker unavailable');
+  assert.doesNotMatch(JSON.stringify(result), /fixture-kafka/);
 });
