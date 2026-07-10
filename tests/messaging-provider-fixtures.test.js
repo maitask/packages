@@ -316,6 +316,50 @@ test('telegram rejects malformed successful response envelopes', async t => {
   }
 });
 
+test('telegram rejects malformed known fields in successful results', async t => {
+  const validResult = {
+    message_id: 49,
+    chat: { id: -1010 },
+    text: 'validated result'
+  };
+  const invalidResults = [
+    { ...validResult, message_id: {} },
+    { ...validResult, message_id: [] },
+    { ...validResult, message_id: '49' },
+    { ...validResult, message_id: 0 },
+    { ...validResult, message_id: Number.MAX_SAFE_INTEGER + 1 },
+    { ...validResult, chat: [] },
+    { ...validResult, chat: null },
+    { ...validResult, chat: {} },
+    { ...validResult, chat: { id: '-1010' } },
+    { ...validResult, chat: { id: Number.MAX_SAFE_INTEGER + 1 } },
+    { ...validResult, text: {} },
+    { message_id: 49, chat: { id: -1010 }, caption: [] }
+  ];
+  let requestIndex = 0;
+  const server = await createFixtureServer(() => ({
+    body: { ok: true, result: invalidResults[requestIndex++] }
+  }));
+  t.after(() => server.close());
+
+  for (const invalidResult of invalidResults) {
+    const result = await executeTelegram('validate provider result', {
+      baseUrl: `${server.url}/telegram`,
+      botToken: 'fixture-token',
+      chatId: '-1010'
+    });
+
+    assert.equal(
+      result.success,
+      false,
+      `accepted malformed result ${JSON.stringify(invalidResult)}`
+    );
+    assert.equal(result.error.code, 'TELEGRAM_ERROR');
+    assert.match(result.error.message, /malformed response/i);
+    assert.doesNotMatch(JSON.stringify(result), /fixture-token|https?:\/\//);
+  }
+});
+
 test('telegram uses an HTTP-200 API error code for retry classification', async t => {
   const server = await createFixtureServer(() => ({
     body: {

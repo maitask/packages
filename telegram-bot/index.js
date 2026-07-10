@@ -321,7 +321,7 @@ async function telegramRequest(url, payload, timeoutMs) {
             );
         }
 
-        if (responseData.ok !== true || !isPlainObject(responseData.result)) {
+        if (responseData.ok !== true || !isValidMessageResult(responseData.result)) {
             throw malformedResponseError(response.status);
         }
 
@@ -356,6 +356,18 @@ function isPlainObject(value) {
 
 function validErrorStatus(value) {
     return Number.isInteger(value) && value >= 100 && value <= 599 ? value : undefined;
+}
+
+function isValidMessageResult(result) {
+    return (
+        isPlainObject(result) &&
+        Number.isSafeInteger(result.message_id) &&
+        result.message_id > 0 &&
+        isPlainObject(result.chat) &&
+        Number.isSafeInteger(result.chat.id) &&
+        (result.text === undefined || typeof result.text === 'string') &&
+        (result.caption === undefined || typeof result.caption === 'string')
+    );
 }
 
 function malformedResponseError(status) {
