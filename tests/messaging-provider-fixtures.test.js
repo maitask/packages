@@ -758,6 +758,262 @@ test('telegram rejects parse modes outside the formal enum before fetch', async 
   assert.equal(fetchState.calls, 0);
 });
 
+test('telegram rejects public accessors without invoking getters', async t => {
+  const fetchState = forbidFetch(t);
+  const validOptions = {
+    baseUrl: 'https://telegram-accessor.example/api',
+    botToken: 'fixture-token',
+    chatId: '-100-accessor'
+  };
+  const cases = [
+    {
+      field: 'input.text',
+      create(counter) {
+        const input = {};
+        Object.defineProperty(input, 'text', {
+          enumerable: true,
+          get() {
+            counter.calls += 1;
+            return 'accessor content';
+          }
+        });
+        return { input, options: validOptions, context: {} };
+      }
+    },
+    ...['botToken', 'chatId', 'parseMode'].map(field => ({
+      field: `options.${field}`,
+      create(counter) {
+        const options = { ...validOptions };
+        delete options[field];
+        Object.defineProperty(options, field, {
+          enumerable: true,
+          get() {
+            counter.calls += 1;
+            if (field === 'botToken') {
+              throw new Error('throwing-getter-secret');
+            }
+            return field === 'chatId' ? '-100-accessor' : 'HTML';
+          }
+        });
+        return { input: 'accessor content', options, context: {} };
+      }
+    })),
+    {
+      field: 'context.secrets',
+      create(counter) {
+        const context = {};
+        Object.defineProperty(context, 'secrets', {
+          enumerable: true,
+          get() {
+            counter.calls += 1;
+            return { TELEGRAM_BOT_TOKEN: 'fixture-token' };
+          }
+        });
+        return {
+          input: 'accessor content',
+          options: { baseUrl: validOptions.baseUrl, chatId: validOptions.chatId },
+          context
+        };
+      }
+    },
+    {
+      field: 'context.env',
+      create(counter) {
+        const context = {};
+        Object.defineProperty(context, 'env', {
+          enumerable: true,
+          get() {
+            counter.calls += 1;
+            return { TELEGRAM_API_BASE_URL: validOptions.baseUrl };
+          }
+        });
+        return {
+          input: 'accessor content',
+          options: { botToken: validOptions.botToken, chatId: validOptions.chatId },
+          context
+        };
+      }
+    }
+  ];
+
+  for (const testCase of cases) {
+    const counter = { calls: 0 };
+    const invocation = testCase.create(counter);
+    const result = await executeTelegram(
+      invocation.input,
+      invocation.options,
+      invocation.context
+    );
+
+    assert.equal(result.success, false, `accepted accessor ${testCase.field}`);
+    assert.equal(result.error.code, 'TELEGRAM_ERROR');
+    assert.equal(counter.calls, 0, `invoked accessor ${testCase.field}`);
+    assert.doesNotMatch(JSON.stringify(result), /throwing-getter-secret|fixture-token|https?:\/\//);
+  }
+
+  assert.equal(fetchState.calls, 0);
+});
+
+test('telegram rejects symbol keys before fetch', async t => {
+  const fetchState = forbidFetch(t);
+  const input = { text: 'symbol input', [Symbol()]: 'input-symbol' };
+  const options = {
+    baseUrl: 'https://telegram-symbol.example/api',
+    botToken: 'fixture-token',
+    chatId: '-100-symbol',
+    [Symbol()]: 'option-symbol'
+  };
+
+  const inputResult = await executeTelegram(input, {
+    baseUrl: options.baseUrl,
+    botToken: options.botToken,
+    chatId: options.chatId
+  });
+  const optionResult = await executeTelegram('symbol options', options);
+
+  assert.equal(inputResult.success, false);
+  assert.equal(inputResult.error.code, 'TELEGRAM_ERROR');
+  assert.equal(optionResult.success, false);
+  assert.equal(optionResult.error.code, 'TELEGRAM_ERROR');
+  assert.equal(fetchState.calls, 0);
+});
+
+test('telegram hides arbitrary non-provider exception messages', async () => {
+  const input = new Proxy(
+    {},
+    {
+      getPrototypeOf() {
+        throw new Error('proxy-trap-secret https://proxy-secret.example/path');
+      }
+    }
+  );
+
+  const result = await executeTelegram(input, {
+    baseUrl: 'https://telegram-proxy.example/api',
+    botToken: 'fixture-token',
+    chatId: '-100-proxy'
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.code, 'TELEGRAM_ERROR');
+  assert.equal(result.error.message, 'Telegram request failed');
+  assert.doesNotMatch(JSON.stringify(result), /proxy-trap-secret|proxy-secret|fixture-token/);
+});
+
+test('telegram rejects unsafe nested reply markup without executing behavior', async t => {
+  const fetchState = forbidFetch(t);
+  const getterCounter = { calls: 0 };
+  const getterButton = {};
+  Object.defineProperty(getterButton, 'text', {
+    enumerable: true,
+    get() {
+      getterCounter.calls += 1;
+      return 'nested-getter-secret';
+    }
+  });
+
+  const toJsonCounter = { calls: 0 };
+  const toJsonMarkup = {
+    inline_keyboard: [],
+    toJSON() {
+      toJsonCounter.calls += 1;
+      return { leaked: 'to-json-secret' };
+    }
+  };
+  const cyclicMarkup = { inline_keyboard: [] };
+  cyclicMarkup.self = cyclicMarkup;
+  const customButton = Object.create({ inherited: 'custom-prototype-secret' });
+  customButton.text = 'custom prototype';
+  const sparseRow = [];
+  sparseRow.length = 1;
+
+  const cases = [
+    { label: 'nested getter', value: { inline_keyboard: [[getterButton]] } },
+    { label: 'toJSON function', value: toJsonMarkup },
+    { label: 'cycle', value: cyclicMarkup },
+    { label: 'custom prototype', value: { inline_keyboard: [[customButton]] } },
+    { label: 'array hole', value: { inline_keyboard: [sparseRow] } },
+    { label: 'symbol field', value: { inline_keyboard: [], [Symbol()]: true } },
+    { label: 'function value', value: { inline_keyboard: [], handler() {} } },
+    { label: 'bigint value', value: { inline_keyboard: [], count: 1n } },
+    { label: 'undefined value', value: { inline_keyboard: [], extra: undefined } }
+  ];
+
+  for (const testCase of cases) {
+    const result = await executeTelegram('unsafe reply markup', {
+      baseUrl: 'https://telegram-reply-markup.example/api',
+      botToken: 'fixture-token',
+      chatId: '-100-reply-markup',
+      replyMarkup: testCase.value
+    });
+
+    assert.equal(result.success, false, `accepted ${testCase.label}`);
+    assert.equal(result.error.code, 'TELEGRAM_ERROR');
+    assert.match(result.error.message, /replyMarkup.*JSON data/i);
+    assert.doesNotMatch(
+      JSON.stringify(result),
+      /nested-getter-secret|to-json-secret|custom-prototype-secret|fixture-token|https?:\/\//
+    );
+  }
+
+  assert.equal(getterCounter.calls, 0);
+  assert.equal(toJsonCounter.calls, 0);
+  assert.equal(fetchState.calls, 0);
+});
+
+test('telegram copies valid deep reply markup without mutating caller data', async t => {
+  const replyMarkup = {
+    inline_keyboard: [
+      [
+        { text: 'Approve', callback_data: 'approve' },
+        { text: 'Documentation', url: 'https://docs.example/release' }
+      ]
+    ],
+    selective: false
+  };
+  const originalReplyMarkup = structuredClone(replyMarkup);
+  const originalStringify = JSON.stringify;
+  let observedDetachedCopy = false;
+  JSON.stringify = (value, ...args) => {
+    if (value?.reply_markup !== undefined) {
+      observedDetachedCopy =
+        value.reply_markup !== replyMarkup &&
+        value.reply_markup.inline_keyboard !== replyMarkup.inline_keyboard &&
+        value.reply_markup.inline_keyboard[0] !== replyMarkup.inline_keyboard[0] &&
+        value.reply_markup.inline_keyboard[0][0] !== replyMarkup.inline_keyboard[0][0];
+    }
+    return originalStringify(value, ...args);
+  };
+  t.after(() => {
+    JSON.stringify = originalStringify;
+  });
+
+  const server = await createFixtureServer((_url, _request, body) => {
+    assert.deepEqual(JSON.parse(body).reply_markup, originalReplyMarkup);
+    return {
+      body: {
+        ok: true,
+        result: { message_id: 50, chat: { id: -1011 }, text: 'deep reply markup' }
+      }
+    };
+  });
+  t.after(() => server.close());
+
+  const options = {
+    baseUrl: `${server.url}/telegram`,
+    botToken: 'fixture-token',
+    chatId: '-1011',
+    replyMarkup
+  };
+  const originalOptions = { ...options };
+  const result = await executeTelegram('deep reply markup', options);
+
+  assert.equal(result.success, true);
+  assert.equal(observedDetachedCopy, true);
+  assert.deepEqual(replyMarkup, originalReplyMarkup);
+  assert.deepEqual(options, originalOptions);
+});
+
 test('telegram uses the Runtime bot-token secret fallback', async t => {
   const botToken = '123456:runtime_secret';
   const server = await createFixtureServer((url, request, body) => {
@@ -773,14 +1029,14 @@ test('telegram uses the Runtime bot-token secret fallback', async t => {
   });
   t.after(() => server.close());
 
-  const result = await executeTelegram(
-    'secret fallback',
-    { chatId: '-1008' },
-    {
-      secrets: { TELEGRAM_BOT_TOKEN: botToken },
-      env: { TELEGRAM_API_BASE_URL: `${server.url}/telegram` }
-    }
-  );
+  const options = { chatId: '-1008' };
+  const context = {
+    secrets: { TELEGRAM_BOT_TOKEN: botToken },
+    env: { TELEGRAM_API_BASE_URL: `${server.url}/telegram` }
+  };
+  const originalOptions = structuredClone(options);
+  const originalContext = structuredClone(context);
+  const result = await executeTelegram('secret fallback', options, context);
 
   assert.equal(result.success, true);
   assert.deepEqual(result.data, {
@@ -789,6 +1045,8 @@ test('telegram uses the Runtime bot-token secret fallback', async t => {
     text: 'secret fallback'
   });
   assert.doesNotMatch(JSON.stringify(result), /runtime_secret|123456/);
+  assert.deepEqual(options, originalOptions);
+  assert.deepEqual(context, originalContext);
 });
 
 test('telegram refuses POST redirects without contacting the redirected origin', async t => {

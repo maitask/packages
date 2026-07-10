@@ -61,15 +61,8 @@ async function execute(input, options = {}, context = {}) {
 }
 
 function buildConfig(input, options, context) {
-    requirePlainObject(options, 'options');
-    rejectUnknownFields(options, OPTION_FIELDS, 'options');
-    requirePlainObject(context, 'context');
-    if (context.secrets !== undefined) {
-        requirePlainObject(context.secrets, 'context.secrets');
-    }
-    if (context.env !== undefined) {
-        requirePlainObject(context.env, 'context.env');
-    }
+    options = snapshotStrictRecord(options, OPTION_FIELDS, 'options');
+    context = snapshotRuntimeContext(context);
 
     const content = normalizeInput(input);
     const messageType = options.messageType === undefined ? 'text' : options.messageType;
@@ -99,6 +92,10 @@ function buildConfig(input, options, context) {
     }
 
     validateOperationalOptions(options);
+    const replyMarkup =
+        options.replyMarkup === undefined
+            ? undefined
+            : cloneReplyMarkup(options.replyMarkup);
 
     return {
         baseUrl: normalizeBaseUrl(selectBaseUrl(options, context)),
@@ -112,7 +109,7 @@ function buildConfig(input, options, context) {
         replyToMessageId: options.replyToMessageId,
         disableNotification: options.disableNotification === true,
         disableWebPagePreview: options.disableWebPagePreview,
-        replyMarkup: options.replyMarkup,
+        replyMarkup,
         timeoutMs: normalizeTimeout(options.timeoutMs)
     };
 }
@@ -131,10 +128,7 @@ function normalizeInput(input) {
     if (typeof input === 'string') {
         return { text: input };
     }
-    if (!isPlainObject(input)) {
-        throw new TelegramBotError('Input must be a string or a plain object');
-    }
-    rejectUnknownFields(input, INPUT_FIELDS, 'input');
+    input = snapshotStrictRecord(input, INPUT_FIELDS, 'input');
 
     for (const field of ['text', 'fileUrl', 'caption']) {
         if (input[field] !== undefined && typeof input[field] !== 'string') {
@@ -219,9 +213,6 @@ function validateOperationalOptions(options) {
     ) {
         throw new TelegramBotError('replyToMessageId must be a positive integer');
     }
-    if (options.replyMarkup !== undefined && !isPlainObject(options.replyMarkup)) {
-        throw new TelegramBotError('replyMarkup must be a plain object');
-    }
 }
 
 function validateOptionalBoolean(value, field) {
@@ -230,21 +221,192 @@ function validateOptionalBoolean(value, field) {
     }
 }
 
-function requirePlainObject(value, field) {
-    if (!isPlainObject(value)) {
+function snapshotStrictRecord(value, allowedFields, field) {
+    assertRecordShape(value, field);
+    const snapshot = Object.create(null);
+
+    for (const key of Reflect.ownKeys(value)) {
+        if (typeof key !== 'string') {
+            throw new TelegramBotError(`${field} must not contain symbol fields`);
+        }
+        if (!allowedFields.has(key)) {
+            throw new TelegramBotError(`${field} contains unsupported field ${key}`);
+        }
+        snapshot[key] = readOwnDataProperty(value, key, field);
+    }
+
+    return snapshot;
+}
+
+function snapshotRuntimeContext(context) {
+    assertRecordShape(context, 'context');
+    rejectSymbolFields(context, 'context');
+
+    const secrets = readOwnDataProperty(context, 'secrets', 'context');
+    const env = readOwnDataProperty(context, 'env', 'context');
+
+    return {
+        secrets:
+            secrets === undefined
+                ? undefined
+                : snapshotSelectedRecord(
+                    secrets,
+                    ['TELEGRAM_BOT_TOKEN'],
+                    'context.secrets'
+                ),
+        env:
+            env === undefined
+                ? undefined
+                : snapshotSelectedRecord(
+                    env,
+                    ['TELEGRAM_API_BASE_URL'],
+                    'context.env'
+                )
+    };
+}
+
+function snapshotSelectedRecord(value, selectedFields, field) {
+    assertRecordShape(value, field);
+    const snapshot = Object.create(null);
+
+    for (const key of Reflect.ownKeys(value)) {
+        if (typeof key !== 'string') {
+            throw new TelegramBotError(`${field} must not contain symbol fields`);
+        }
+        const propertyValue = readOwnDataProperty(value, key, field);
+        if (selectedFields.includes(key)) {
+            snapshot[key] = propertyValue;
+        }
+    }
+
+    return snapshot;
+}
+
+function assertRecordShape(value, field) {
+    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+        throw new TelegramBotError(`${field} must be a plain object`);
+    }
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) {
         throw new TelegramBotError(`${field} must be a plain object`);
     }
 }
 
-function rejectUnknownFields(value, allowedFields, field) {
-    const unknownField = Reflect.ownKeys(value).find(
-        key => typeof key !== 'string' || !allowedFields.has(key)
-    );
-    if (unknownField !== undefined) {
-        throw new TelegramBotError(
-            `${field} contains unsupported field ${String(unknownField)}`
-        );
+function rejectSymbolFields(value, field) {
+    if (Reflect.ownKeys(value).some(key => typeof key !== 'string')) {
+        throw new TelegramBotError(`${field} must not contain symbol fields`);
     }
+}
+
+function readOwnDataProperty(value, key, field) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (descriptor === undefined) {
+        return undefined;
+    }
+    if (!Object.hasOwn(descriptor, 'value')) {
+        throw new TelegramBotError(`${field}.${key} must be an own data property`);
+    }
+    return descriptor.value;
+}
+
+function cloneReplyMarkup(value) {
+    try {
+        if (!isPlainObject(value)) {
+            throw invalidReplyMarkupError();
+        }
+        return copyJsonData(value, new Set());
+    } catch (error) {
+        if (error instanceof TelegramBotError) {
+            throw error;
+        }
+        throw invalidReplyMarkupError();
+    }
+}
+
+function copyJsonData(value, ancestors) {
+    if (value === null || typeof value === 'string' || typeof value === 'boolean') {
+        return value;
+    }
+    if (typeof value === 'number') {
+        if (!Number.isFinite(value)) {
+            throw invalidReplyMarkupError();
+        }
+        return value;
+    }
+    if (typeof value !== 'object') {
+        throw invalidReplyMarkupError();
+    }
+    if (ancestors.has(value)) {
+        throw invalidReplyMarkupError();
+    }
+
+    ancestors.add(value);
+    try {
+        if (Array.isArray(value)) {
+            return copyJsonArray(value, ancestors);
+        }
+        if (!isPlainObject(value)) {
+            throw invalidReplyMarkupError();
+        }
+        return copyJsonObject(value, ancestors);
+    } finally {
+        ancestors.delete(value);
+    }
+}
+
+function copyJsonArray(value, ancestors) {
+    if (Object.getPrototypeOf(value) !== Array.prototype) {
+        throw invalidReplyMarkupError();
+    }
+
+    const lengthDescriptor = Object.getOwnPropertyDescriptor(value, 'length');
+    const length = lengthDescriptor?.value;
+    if (!Number.isSafeInteger(length) || length < 0) {
+        throw invalidReplyMarkupError();
+    }
+
+    for (const key of Reflect.ownKeys(value)) {
+        if (typeof key !== 'string') {
+            throw invalidReplyMarkupError();
+        }
+        if (key !== 'length' && !isArrayIndexKey(key, length)) {
+            throw invalidReplyMarkupError();
+        }
+    }
+
+    const copy = [];
+    for (let index = 0; index < length; index += 1) {
+        const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+        if (descriptor === undefined || !Object.hasOwn(descriptor, 'value')) {
+            throw invalidReplyMarkupError();
+        }
+        copy.push(copyJsonData(descriptor.value, ancestors));
+    }
+    return copy;
+}
+
+function copyJsonObject(value, ancestors) {
+    const copy = Object.create(null);
+    for (const key of Reflect.ownKeys(value)) {
+        if (typeof key !== 'string') {
+            throw invalidReplyMarkupError();
+        }
+        const descriptor = Object.getOwnPropertyDescriptor(value, key);
+        if (descriptor === undefined || !Object.hasOwn(descriptor, 'value')) {
+            throw invalidReplyMarkupError();
+        }
+        copy[key] = copyJsonData(descriptor.value, ancestors);
+    }
+    return copy;
+}
+
+function isArrayIndexKey(key, length) {
+    const index = Number(key);
+    return Number.isInteger(index) && index >= 0 && index < length && String(index) === key;
+}
+
+function invalidReplyMarkupError() {
+    return new TelegramBotError('replyMarkup must contain only controlled JSON data');
 }
 
 function methodForMessageType(messageType) {
@@ -406,7 +568,7 @@ function buildErrorResult(error, botToken) {
     const telegramError =
         error instanceof TelegramBotError
             ? error
-            : new TelegramBotError(error?.message || 'Telegram request failed');
+            : new TelegramBotError('Telegram request failed');
     const safeMessage = sanitizeProviderMessage(telegramError.message, botToken);
     const errorData = {
         message: safeMessage,
