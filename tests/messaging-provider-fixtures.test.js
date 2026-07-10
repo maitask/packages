@@ -54,10 +54,85 @@ test('telegram sends text through a controlled Bot API endpoint', async t => {
   );
 
   assert.equal(result.success, true);
-  assert.equal(result.message_id, 42);
-  assert.equal(result.chat_id, -1001);
+  assert.equal(result.data.messageId, 42);
+  assert.equal(result.data.chatId, -1001);
+  assert.equal(result.data.message.text, 'deployment complete');
+  assert.equal(Object.hasOwn(result, 'message_id'), false);
+  assert.equal(Object.hasOwn(result, 'chat_id'), false);
   assert.equal(result.metadata.method, 'sendMessage');
   assert.doesNotMatch(JSON.stringify(result), /fixture-token/);
+});
+
+test('telegram sends a photo from task content without mutating the input', async t => {
+  const server = await createFixtureServer((url, request, body) => {
+    assert.equal(url.pathname, '/telegram/botfixture-token/sendPhoto');
+    assert.equal(request.method, 'POST');
+    assert.deepEqual(JSON.parse(body), {
+      chat_id: '-1002',
+      photo: 'https://fixtures.example/release.png',
+      caption: 'release dashboard',
+      parse_mode: 'MarkdownV2'
+    });
+    return {
+      body: {
+        ok: true,
+        result: { message_id: 43, chat: { id: -1002 }, caption: 'release dashboard' }
+      }
+    };
+  });
+  t.after(() => server.close());
+
+  const input = {
+    fileUrl: 'https://fixtures.example/release.png',
+    caption: 'release dashboard'
+  };
+  const originalInput = structuredClone(input);
+  const result = await executeTelegram(input, {
+    baseUrl: `${server.url}/telegram`,
+    botToken: 'fixture-token',
+    chatId: '-1002',
+    messageType: 'photo',
+    parseMode: 'MarkdownV2'
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.messageId, 43);
+  assert.equal(result.data.chatId, -1002);
+  assert.equal(result.metadata.method, 'sendPhoto');
+  assert.deepEqual(input, originalInput);
+});
+
+test('telegram sends a document and falls back to task text for its caption', async t => {
+  const server = await createFixtureServer((url, request, body) => {
+    assert.equal(url.pathname, '/telegram/botfixture-token/sendDocument');
+    assert.equal(request.method, 'POST');
+    assert.deepEqual(JSON.parse(body), {
+      chat_id: '-1003',
+      document: 'https://fixtures.example/report.pdf',
+      caption: 'quarterly report'
+    });
+    return {
+      body: {
+        ok: true,
+        result: { message_id: 44, chat: { id: -1003 }, caption: 'quarterly report' }
+      }
+    };
+  });
+  t.after(() => server.close());
+
+  const result = await executeTelegram(
+    { fileUrl: 'https://fixtures.example/report.pdf', text: 'quarterly report' },
+    {
+      baseUrl: `${server.url}/telegram`,
+      botToken: 'fixture-token',
+      chatId: '-1003',
+      messageType: 'document'
+    }
+  );
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.messageId, 44);
+  assert.equal(result.metadata.method, 'sendDocument');
 });
 
 test('telegram returns a structured API failure through the Runtime endpoint fallback', async t => {
@@ -77,6 +152,114 @@ test('telegram returns a structured API failure through the Runtime endpoint fal
   assert.equal(result.success, false);
   assert.equal(result.error.code, 'TELEGRAM_ERROR');
   assert.match(result.error.message, /400.*chat not found/);
+  assert.doesNotMatch(JSON.stringify(result), /fixture-token/);
+});
+
+test('telegram exposes secret-safe retry details for rate limits', async t => {
+  const server = await createFixtureServer((url, request) => {
+    assert.equal(url.pathname, '/telegram/botfixture-token/sendMessage');
+    assert.equal(request.method, 'POST');
+    return {
+      status: 429,
+      body: {
+        ok: false,
+        description: 'Too Many Requests',
+        parameters: { retry_after: 7 }
+      }
+    };
+  });
+  t.after(() => server.close());
+
+  const result = await executeTelegram(
+    'retry later',
+    {
+      baseUrl: `${server.url}/telegram`,
+      botToken: 'fixture-token',
+      chatId: '-1004'
+    }
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.code, 'TELEGRAM_ERROR');
+  assert.equal(result.error.status, 429);
+  assert.equal(result.error.retriable, true);
+  assert.equal(result.error.details?.retryAfterSeconds, 7);
+  assert.doesNotMatch(JSON.stringify(result), /fixture-token/);
+});
+
+test('telegram rejects a non-http base URL without calling fetch', async t => {
+  const guardedFetch = global.fetch;
+  let fetchCalls = 0;
+  global.fetch = async () => {
+    fetchCalls += 1;
+    throw new Error('fetch must not be called');
+  };
+  t.after(() => {
+    global.fetch = guardedFetch;
+  });
+
+  const result = await executeTelegram('invalid endpoint', {
+    baseUrl: 'file:///tmp/telegram',
+    botToken: 'fixture-token',
+    chatId: '-1005'
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.code, 'TELEGRAM_ERROR');
+  assert.equal(result.error.type, 'TelegramBotError');
+  assert.match(result.error.message, /base URL.*HTTP/i);
+  assert.equal(fetchCalls, 0);
+  assert.doesNotMatch(JSON.stringify(result), /fixture-token/);
+});
+
+test('telegram hides the request URL and bot token when delivery fails', async t => {
+  const guardedFetch = global.fetch;
+  global.fetch = async url => {
+    throw new Error(`network failed at ${url}`);
+  };
+  t.after(() => {
+    global.fetch = guardedFetch;
+  });
+
+  const result = await executeTelegram('network failure', {
+    baseUrl: 'https://telegram-fixture.invalid/api',
+    botToken: 'fixture-token',
+    chatId: '-1006'
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.code, 'TELEGRAM_ERROR');
+  assert.equal(result.error.message, 'Telegram request failed');
+  assert.doesNotMatch(JSON.stringify(result), /telegram-fixture\.invalid|fixture-token/);
+});
+
+test('telegram returns a retriable structured timeout error', async t => {
+  const server = await createFixtureServer(async (url, request) => {
+    assert.equal(url.pathname, '/telegram/botfixture-token/sendMessage');
+    assert.equal(request.method, 'POST');
+    await new Promise(resolve => setTimeout(resolve, 100));
+    return {
+      body: {
+        ok: true,
+        result: { message_id: 45, chat: { id: -1006 }, text: 'too slow' }
+      }
+    };
+  });
+  t.after(() => server.close());
+
+  const result = await executeTelegram('too slow', {
+    baseUrl: `${server.url}/telegram`,
+    botToken: 'fixture-token',
+    chatId: '-1006',
+    timeoutMs: 20
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.code, 'TELEGRAM_ERROR');
+  assert.equal(result.error.type, 'TelegramBotError');
+  assert.match(result.error.message, /timed out/i);
+  assert.equal(result.error.retriable, true);
+  assert.equal(result.error.details?.timeoutMs, 20);
   assert.doesNotMatch(JSON.stringify(result), /fixture-token/);
 });
 

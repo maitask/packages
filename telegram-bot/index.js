@@ -4,236 +4,288 @@
  * Documentation: https://core.telegram.org/bots/api
  */
 
+const PACKAGE_NAME = '@maitask/telegram-bot';
+const PACKAGE_VERSION = '0.1.0';
+const DEFAULT_BASE_URL = 'https://api.telegram.org';
+const DEFAULT_TIMEOUT_MS = 30000;
+const MAX_TIMEOUT_MS = 120000;
+const RETRIABLE_STATUSES = new Set([408, 425, 429]);
+
+class TelegramBotError extends Error {
+    constructor(message, { status, retriable, details } = {}) {
+        super(message);
+        this.name = 'TelegramBotError';
+        this.status = status;
+        this.retriable = retriable;
+        this.details = details;
+    }
+}
+
 async function execute(input, options = {}, context = {}) {
+    let config;
+
     try {
-        const config = buildConfig(input, options, context);
-        ensureFetch('telegram-bot');
+        config = buildConfig(input, options, context);
+        ensureFetch();
 
-        // Validate required fields
-        if (!config.bot_token) {
-            throw new Error('bot_token is required');
-        }
-        if (!config.chat_id) {
-            throw new Error('chat_id is required (user ID, group ID, or channel username)');
-        }
+        const method = methodForMessageType(config.messageType);
+        const payload = buildPayload(config);
+        const message = await telegramRequest(
+            `${config.baseUrl}/bot${config.botToken}/${method}`,
+            payload,
+            config.timeoutMs
+        );
 
-        // Prepare message content
-        let messageText = config.text;
-        if (!messageText && typeof input === 'string') {
-            messageText = input;
-        } else if (!messageText && typeof input === 'object') {
-            messageText = JSON.stringify(input, null, 2);
-        } else if (!messageText) {
-            throw new Error('Message text is required');
-        }
-
-        // Send based on message type
-        if (config.message_type === 'photo') {
-            return await sendPhoto(config, messageText);
-        } else if (config.message_type === 'document') {
-            return await sendDocument(config, messageText);
-        } else {
-            return await sendMessage(config, messageText);
-        }
-    } catch (error) {
         return {
-            success: false,
-            error: {
-                message: error.message,
-                code: 'TELEGRAM_ERROR',
-                type: 'TelegramBotError'
-            }
+            success: true,
+            data: {
+                messageId: message?.message_id,
+                chatId: message?.chat?.id,
+                message
+            },
+            metadata: buildMetadata({ method })
         };
+    } catch (error) {
+        return buildErrorResult(error, config?.botToken);
     }
 }
 
 function buildConfig(input, options, context) {
+    const content = normalizeInput(input);
+    const messageType = options.messageType ?? 'text';
+    const botToken = options.botToken ?? context?.secrets?.TELEGRAM_BOT_TOKEN;
+    const chatId = options.chatId;
+
+    if (!['text', 'photo', 'document'].includes(messageType)) {
+        throw new TelegramBotError('messageType must be text, photo, or document');
+    }
+    if (typeof botToken !== 'string' || botToken.length === 0) {
+        throw new TelegramBotError('botToken is required');
+    }
+    if (chatId === undefined || chatId === null || chatId === '') {
+        throw new TelegramBotError('chatId is required (user ID, group ID, or channel username)');
+    }
+    if (messageType === 'text' && !hasStringContent(content.text)) {
+        throw new TelegramBotError('Text content is required for text messages');
+    }
+    if (messageType !== 'text' && !hasStringContent(content.fileUrl)) {
+        throw new TelegramBotError(`fileUrl is required for ${messageType} messages`);
+    }
+
     return {
-        // Required
-        bot_token: options.bot_token || context.bot_token || context?.secrets?.TELEGRAM_BOT_TOKEN,
-        chat_id: options.chat_id || context.chat_id,
-
-        // Message content
-        text: options.text,
-        message_type: options.message_type || 'text', // text, photo, document
-
-        // Optional message parameters
-        parse_mode: options.parse_mode || 'Markdown', // Markdown, MarkdownV2, HTML
-        reply_to_message_id: options.reply_to_message_id,
-        disable_notification: options.disable_notification || false,
-        disable_web_page_preview: options.disable_web_page_preview,
-        reply_markup: options.reply_markup, // InlineKeyboardMarkup or ReplyKeyboardMarkup
-
-        // Photo/document specific
-        file_url: options.file_url, // For photo/document uploads
-        caption: options.caption,
-
-        // System
-        timeout: options.timeout || 30000
+        baseUrl: normalizeBaseUrl(
+            options.baseUrl ?? context?.env?.TELEGRAM_API_BASE_URL ?? DEFAULT_BASE_URL
+        ),
+        botToken,
+        chatId,
+        messageType,
+        text: content.text,
+        fileUrl: content.fileUrl,
+        caption: content.caption ?? content.text,
+        parseMode: options.parseMode,
+        replyToMessageId: options.replyToMessageId,
+        disableNotification: options.disableNotification,
+        disableWebPagePreview: options.disableWebPagePreview,
+        replyMarkup: options.replyMarkup,
+        timeoutMs: normalizeTimeout(options.timeoutMs)
     };
 }
 
-async function sendMessage(config, text) {
-    const url = `https://api.telegram.org/bot${config.bot_token}/sendMessage`;
+function normalizeInput(input) {
+    if (typeof input === 'string') {
+        return { text: input };
+    }
+    if (!input || typeof input !== 'object' || Array.isArray(input)) {
+        throw new TelegramBotError('Input must be a string or an object');
+    }
+
+    for (const field of ['text', 'fileUrl', 'caption']) {
+        if (input[field] !== undefined && typeof input[field] !== 'string') {
+            throw new TelegramBotError(`Input ${field} must be a string`);
+        }
+    }
+
+    return {
+        text: input.text,
+        fileUrl: input.fileUrl,
+        caption: input.caption
+    };
+}
+
+function normalizeBaseUrl(value) {
+    let parsed;
+    try {
+        parsed = new URL(value);
+    } catch {
+        throw new TelegramBotError('base URL must be an absolute HTTP or HTTPS URL');
+    }
+
+    if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.host) {
+        throw new TelegramBotError('base URL must be an absolute HTTP or HTTPS URL');
+    }
+
+    return parsed.toString().replace(/\/+$/, '');
+}
+
+function normalizeTimeout(value) {
+    if (value === undefined) {
+        return DEFAULT_TIMEOUT_MS;
+    }
+
+    const timeoutMs = Number(value);
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+        throw new TelegramBotError('timeoutMs must be a positive number');
+    }
+
+    return Math.min(timeoutMs, MAX_TIMEOUT_MS);
+}
+
+function hasStringContent(value) {
+    return typeof value === 'string' && value.length > 0;
+}
+
+function methodForMessageType(messageType) {
+    if (messageType === 'photo') {
+        return 'sendPhoto';
+    }
+    if (messageType === 'document') {
+        return 'sendDocument';
+    }
+    return 'sendMessage';
+}
+
+function buildPayload(config) {
     const payload = {
-        chat_id: config.chat_id,
-        text: text,
-        parse_mode: config.parse_mode,
-        reply_to_message_id: config.reply_to_message_id,
-        disable_notification: config.disable_notification,
-        disable_web_page_preview: config.disable_web_page_preview,
-        reply_markup: config.reply_markup || undefined
+        chat_id: config.chatId,
+        parse_mode: config.parseMode,
+        reply_to_message_id: config.replyToMessageId,
+        disable_notification: config.disableNotification,
+        reply_markup: config.replyMarkup
     };
 
-    // Remove undefined values
-    Object.keys(payload).forEach(key => {
-        if (payload[key] === undefined) {
-            delete payload[key];
-        }
-    });
-
-    const result = await telegramRequest(url, payload, config.timeout);
-
-    return {
-        success: true,
-        message_id: result.message_id,
-        chat_id: result.chat?.id,
-        data: result,
-        metadata: {
-            version: '0.1.0',
-            timestamp: new Date().toISOString(),
-            method: 'sendMessage'
-        }
-    };
-}
-
-async function sendPhoto(config, caption) {
-    if (!config.file_url) {
-        throw new Error('file_url is required for photo messages');
+    if (config.messageType === 'text') {
+        payload.text = config.text;
+        payload.disable_web_page_preview = config.disableWebPagePreview;
+    } else {
+        payload[config.messageType] = config.fileUrl;
+        payload.caption = config.caption;
     }
 
-    const url = `https://api.telegram.org/bot${config.bot_token}/sendPhoto`;
-    const formData = {
-        chat_id: config.chat_id,
-        photo: config.file_url,
-        caption: caption,
-        parse_mode: config.parse_mode,
-        reply_to_message_id: config.reply_to_message_id,
-        disable_notification: config.disable_notification,
-        reply_markup: config.reply_markup || undefined
-    };
-
-    // Remove undefined values
-    Object.keys(formData).forEach(key => {
-        if (formData[key] === undefined) {
-            delete formData[key];
-        }
-    });
-
-    const result = await telegramRequest(url, formData, config.timeout);
-
-    return {
-        success: true,
-        message_id: result.message_id,
-        chat_id: result.chat?.id,
-        data: result,
-        metadata: {
-            version: '0.1.0',
-            timestamp: new Date().toISOString(),
-            method: 'sendPhoto'
-        }
-    };
+    return omitUndefined(payload);
 }
 
-async function sendDocument(config, caption) {
-    if (!config.file_url) {
-        throw new Error('file_url is required for document messages');
-    }
-
-    const url = `https://api.telegram.org/bot${config.bot_token}/sendDocument`;
-    const formData = {
-        chat_id: config.chat_id,
-        document: config.file_url,
-        caption: caption,
-        parse_mode: config.parse_mode,
-        reply_to_message_id: config.reply_to_message_id,
-        disable_notification: config.disable_notification,
-        reply_markup: config.reply_markup || undefined
-    };
-
-    // Remove undefined values
-    Object.keys(formData).forEach(key => {
-        if (formData[key] === undefined) {
-            delete formData[key];
-        }
-    });
-
-    const result = await telegramRequest(url, formData, config.timeout);
-
-    return {
-        success: true,
-        message_id: result.message_id,
-        chat_id: result.chat?.id,
-        data: result,
-        metadata: {
-            version: '0.1.0',
-            timestamp: new Date().toISOString(),
-            method: 'sendDocument'
-        }
-    };
+function omitUndefined(value) {
+    return Object.fromEntries(Object.entries(value).filter(([, item]) => item !== undefined));
 }
 
-async function telegramRequest(url, payload, timeout) {
-    const controller = typeof AbortController === 'function' ? new AbortController() : null;
-    let timeoutId = null;
-
-    if (controller && timeout) {
-        timeoutId = setTimeout(() => controller.abort(), timeout);
-    }
+async function telegramRequest(url, payload, timeoutMs) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
         const response = await fetch(url, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
-            signal: controller ? controller.signal : undefined
+            signal: controller.signal
         });
+        const responseText = await response.text();
+        let responseData;
 
-        const text = await response.text();
-        let data;
         try {
-            data = text ? JSON.parse(text) : {};
-        } catch (err) {
-            throw new Error(`Telegram API returned non-JSON response: ${text}`);
+            responseData = responseText ? JSON.parse(responseText) : {};
+        } catch {
+            throw new TelegramBotError('Telegram API returned a non-JSON response', {
+                status: response.status,
+                retriable: isRetriableStatus(response.status)
+            });
         }
 
-        if (!response.ok || data.ok === false) {
-            const description = data && data.description ? data.description : text;
-            throw new Error(`Telegram API error: ${response.status} - ${description}`);
+        if (!response.ok || responseData.ok === false) {
+            const description = responseData.description || 'Telegram API request failed';
+            const retryAfterSeconds = Number(responseData.parameters?.retry_after);
+            const details = Number.isFinite(retryAfterSeconds)
+                ? { retryAfterSeconds }
+                : undefined;
+            throw new TelegramBotError(
+                `Telegram API error: ${response.status} - ${description}`,
+                {
+                    status: response.status,
+                    retriable: isRetriableStatus(response.status),
+                    details
+                }
+            );
         }
 
-        return data.result;
+        return responseData.result;
     } catch (error) {
-        if (error.name === 'AbortError') {
-            throw new Error('Telegram request timed out');
+        if (error?.name === 'AbortError') {
+            throw new TelegramBotError(`Telegram request timed out after ${timeoutMs} ms`, {
+                retriable: true,
+                details: { timeoutMs }
+            });
         }
-        throw error;
+        if (error instanceof TelegramBotError) {
+            throw error;
+        }
+        throw new TelegramBotError('Telegram request failed');
     } finally {
-        if (timeoutId) {
-            clearTimeout(timeoutId);
-        }
+        clearTimeout(timeoutId);
     }
 }
 
-function ensureFetch(packageName) {
+function isRetriableStatus(status) {
+    return RETRIABLE_STATUSES.has(status) || status >= 500;
+}
+
+function buildErrorResult(error, botToken) {
+    const telegramError =
+        error instanceof TelegramBotError
+            ? error
+            : new TelegramBotError(error?.message || 'Telegram request failed');
+    const safeMessage = redactToken(telegramError.message, botToken);
+    const errorData = {
+        message: safeMessage,
+        code: 'TELEGRAM_ERROR',
+        type: 'TelegramBotError',
+        status: telegramError.status,
+        retriable: telegramError.retriable,
+        details: telegramError.details
+    };
+
+    return {
+        success: false,
+        error: omitUndefined(errorData),
+        metadata: buildMetadata()
+    };
+}
+
+function redactToken(message, botToken) {
+    if (!botToken || typeof message !== 'string') {
+        return message;
+    }
+    return message.split(botToken).join('[REDACTED]');
+}
+
+function buildMetadata(extra = {}) {
+    return {
+        package: PACKAGE_NAME,
+        version: PACKAGE_VERSION,
+        provider: 'telegram',
+        ...extra,
+        timestamp: new Date().toISOString()
+    };
+}
+
+function ensureFetch() {
     if (typeof fetch !== 'function') {
-        throw new Error(`Global fetch API is unavailable. Please run @maitask/${packageName} on Node.js 18 or newer.`);
+        throw new TelegramBotError(
+            'Global fetch API is unavailable. Please run @maitask/telegram-bot on Node.js 18 or newer.'
+        );
     }
 }
 
-if (typeof module !== "undefined") {
-  module.exports = { execute };
+if (typeof module !== 'undefined') {
+    module.exports = { execute };
 }
 execute;
