@@ -900,6 +900,43 @@ test('telegram hides arbitrary non-provider exception messages', async () => {
   assert.doesNotMatch(JSON.stringify(result), /proxy-trap-secret|proxy-secret|fixture-token/);
 });
 
+test('telegram does not inspect a Proxy exception thrown by input validation', async () => {
+  const exceptionTraps = { get: 0, getPrototypeOf: 0 };
+  const hostileException = new Proxy(
+    {},
+    {
+      get() {
+        exceptionTraps.get += 1;
+        return 'exception-proxy-secret';
+      },
+      getPrototypeOf() {
+        exceptionTraps.getPrototypeOf += 1;
+        return Object.prototype;
+      }
+    }
+  );
+  const input = new Proxy(
+    {},
+    {
+      getPrototypeOf() {
+        throw hostileException;
+      }
+    }
+  );
+
+  const result = await executeTelegram(input, {
+    baseUrl: 'https://telegram-proxy.example/api',
+    botToken: 'fixture-token',
+    chatId: '-100-proxy'
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.code, 'TELEGRAM_ERROR');
+  assert.equal(result.error.message, 'Telegram request failed');
+  assert.deepEqual(exceptionTraps, { get: 0, getPrototypeOf: 0 });
+  assert.doesNotMatch(JSON.stringify(result), /exception-proxy-secret|fixture-token/);
+});
+
 test('telegram rejects unsafe nested reply markup without executing behavior', async t => {
   const fetchState = forbidFetch(t);
   const getterCounter = { calls: 0 };
@@ -1103,6 +1140,64 @@ test('telegram hides the request URL and bot token when delivery fails', async t
   assert.equal(result.error.message, 'Telegram request failed');
   assert.equal(result.error.retriable, true);
   assert.doesNotMatch(JSON.stringify(result), /telegram-fixture\.invalid|fixture-token/);
+});
+
+test('telegram does not inspect a name accessor on fetch rejection', async t => {
+  let nameGetterCalls = 0;
+  const rejection = {};
+  Object.defineProperty(rejection, 'name', {
+    get() {
+      nameGetterCalls += 1;
+      return 'AbortError';
+    }
+  });
+  replaceFetch(t, async () => {
+    throw rejection;
+  });
+
+  const result = await executeTelegram('hostile named rejection', {
+    baseUrl: 'https://telegram-rejection.example/api',
+    botToken: 'fixture-token',
+    chatId: '-100-rejection'
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.message, 'Telegram request failed');
+  assert.equal(result.error.retriable, true);
+  assert.equal(result.error.details, undefined);
+  assert.equal(nameGetterCalls, 0);
+});
+
+test('telegram does not inspect Proxy traps on fetch rejection', async t => {
+  const rejectionTraps = { get: 0, getPrototypeOf: 0 };
+  const rejection = new Proxy(
+    {},
+    {
+      get() {
+        rejectionTraps.get += 1;
+        return undefined;
+      },
+      getPrototypeOf() {
+        rejectionTraps.getPrototypeOf += 1;
+        return Object.prototype;
+      }
+    }
+  );
+  replaceFetch(t, async () => {
+    throw rejection;
+  });
+
+  const result = await executeTelegram('hostile Proxy rejection', {
+    baseUrl: 'https://telegram-rejection.example/api',
+    botToken: 'fixture-token',
+    chatId: '-100-rejection'
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.message, 'Telegram request failed');
+  assert.equal(result.error.retriable, true);
+  assert.equal(result.error.details, undefined);
+  assert.deepEqual(rejectionTraps, { get: 0, getPrototypeOf: 0 });
 });
 
 test('telegram returns a retriable structured timeout error', async t => {

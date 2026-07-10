@@ -24,6 +24,7 @@ const OPTION_FIELDS = new Set([
     'timeoutMs'
 ]);
 const PARSE_MODES = new Set(['Markdown', 'MarkdownV2', 'HTML']);
+const CONTROLLED_TELEGRAM_ERRORS = new WeakSet();
 
 class TelegramBotError extends Error {
     constructor(message, { status, retriable, details } = {}) {
@@ -32,6 +33,7 @@ class TelegramBotError extends Error {
         this.status = status;
         this.retriable = retriable;
         this.details = details;
+        CONTROLLED_TELEGRAM_ERRORS.add(this);
     }
 }
 
@@ -316,7 +318,7 @@ function cloneReplyMarkup(value) {
         }
         return copyJsonData(value, new Set());
     } catch (error) {
-        if (error instanceof TelegramBotError) {
+        if (isControlledTelegramError(error)) {
             throw error;
         }
         throw invalidReplyMarkupError();
@@ -461,7 +463,11 @@ function buildSuccessData(message) {
 
 async function telegramRequest(url, payload, timeoutMs) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+    }, timeoutMs);
 
     try {
         const response = await fetch(url, {
@@ -514,13 +520,13 @@ async function telegramRequest(url, payload, timeoutMs) {
 
         return responseData.result;
     } catch (error) {
-        if (error?.name === 'AbortError') {
+        if (timedOut) {
             throw new TelegramBotError(`Telegram request timed out after ${timeoutMs} ms`, {
                 retriable: true,
                 details: { timeoutMs }
             });
         }
-        if (error instanceof TelegramBotError) {
+        if (isControlledTelegramError(error)) {
             throw error;
         }
         throw new TelegramBotError('Telegram request failed', { retriable: true });
@@ -566,7 +572,7 @@ function malformedResponseError(status) {
 
 function buildErrorResult(error, botToken) {
     const telegramError =
-        error instanceof TelegramBotError
+        isControlledTelegramError(error)
             ? error
             : new TelegramBotError('Telegram request failed');
     const safeMessage = sanitizeProviderMessage(telegramError.message, botToken);
@@ -584,6 +590,14 @@ function buildErrorResult(error, botToken) {
         error: omitUndefined(errorData),
         metadata: buildMetadata()
     };
+}
+
+function isControlledTelegramError(value) {
+    const valueType = typeof value;
+    if ((valueType !== 'object' && valueType !== 'function') || value === null) {
+        return false;
+    }
+    return CONTROLLED_TELEGRAM_ERRORS.has(value);
 }
 
 function sanitizeProviderMessage(message, botToken) {
