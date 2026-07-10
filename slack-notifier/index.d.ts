@@ -1,53 +1,124 @@
-export interface MaitaskPackageContext {
-  secrets?: Record<string, unknown>;
-  env?: Record<string, string | undefined>;
-  defaults?: Record<string, unknown>;
-  workspace_path?: string;
-  execution_id?: string;
-  user_id?: string;
-  [key: string]: unknown;
+export type SlackJsonPrimitive = string | number | boolean | null;
+
+export type SlackJsonValue =
+  | SlackJsonPrimitive
+  | SlackJsonValue[]
+  | SlackJsonObject;
+
+export interface SlackJsonObject {
+  [key: string]: SlackJsonValue;
 }
 
-export interface MaitaskPackageError {
-  message: string;
-  code: string;
+export interface SlackTextObject extends SlackJsonObject {
   type: string;
-  details?: unknown;
+  text: string;
 }
 
-export interface MaitaskPackageItem<T = unknown> {
-  index: number;
-  id?: string | number;
-  data: T;
-  metadata?: Record<string, unknown>;
-  citation_ids?: string[];
+export interface SlackBlock extends SlackJsonObject {
+  type: string;
 }
 
-export interface MaitaskPackageSummary {
-  total: number;
-  success_count: number;
-  failure_count: number;
-  metrics?: Record<string, unknown>;
+export interface SlackAttachment extends SlackJsonObject {}
+
+export interface SlackMessageInput {
+  text?: string;
+  blocks?: SlackBlock[];
+  attachments?: SlackAttachment[];
+}
+
+export type SlackInput = string | SlackMessageInput;
+
+export interface SlackOptions {
+  webhookUrl?: string;
+  threadTs?: string;
+  channel?: string;
+  username?: string;
+  iconEmoji?: string;
+  iconUrl?: string;
+  linkNames?: boolean;
+  mrkdwn?: boolean;
+  timeoutMs?: number;
+}
+
+export interface SlackSecrets {
+  SLACK_WEBHOOK_URL?: string;
   [key: string]: unknown;
 }
 
-export interface MaitaskPackageData<T = unknown> {
-  items?: Array<MaitaskPackageItem<T>>;
-  summary?: MaitaskPackageSummary;
+export interface SlackContext {
+  secrets?: SlackSecrets;
+  defaults?: Record<string, unknown>;
+  workspacePath?: string;
+  executionId?: string;
+  userId?: string;
   [key: string]: unknown;
 }
 
-export interface MaitaskPackageResult<T = unknown> {
-  success: boolean;
-  data?: MaitaskPackageData<T> | T;
-  error?: MaitaskPackageError | null;
-  metadata?: Record<string, unknown>;
-  citations?: unknown[];
-  [key: string]: unknown;
+export interface SlackDeliveryData {
+  webhook: string;
+  username: string;
+  icon?: string;
+  channel?: string;
+  threadTs?: string;
+  hasBlocks: boolean;
+  hasAttachments: boolean;
 }
+
+export interface SlackSuccessMetadata {
+  package: '@maitask/slack-notifier';
+  version: '0.1.0';
+  provider: 'slack';
+  webhook: string;
+  responseStatus: number;
+  responseTimeMs: number;
+  timestamp: string;
+}
+
+export interface SlackFailureMetadata {
+  package: '@maitask/slack-notifier';
+  version: '0.1.0';
+  provider: 'slack';
+  webhook: string | null;
+  timestamp: string;
+}
+
+export interface SlackRetryAfterDetails {
+  retryAfterSeconds: number;
+}
+
+export interface SlackTimeoutDetails {
+  timeoutMs: number;
+}
+
+export type SlackErrorDetails = SlackRetryAfterDetails | SlackTimeoutDetails;
+
+export interface SlackError {
+  message: string;
+  code: 'SLACK_ERROR';
+  type: 'SlackNotificationError';
+  status?: number;
+  retriable?: boolean;
+  details?: SlackErrorDetails;
+}
+
+export interface SlackSuccess {
+  success: true;
+  data: SlackDeliveryData;
+  metadata: SlackSuccessMetadata;
+  error?: never;
+}
+
+export interface SlackFailure {
+  success: false;
+  error: SlackError;
+  metadata: SlackFailureMetadata;
+  data?: never;
+}
+
+export type SlackResult = SlackSuccess | SlackFailure;
 
 export function execute(
-  input?: unknown,
-  options?: Record<string, unknown>,
-  context?: MaitaskPackageContext
-): MaitaskPackageResult | Promise<MaitaskPackageResult>;
+  input: SlackInput,
+  options?: SlackOptions,
+  context?: SlackContext
+): Promise<SlackResult>;

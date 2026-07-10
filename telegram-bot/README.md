@@ -1,109 +1,77 @@
 # @maitask/telegram-bot
 
-Send messages via Telegram Bot API to users and groups.
+Send a text message, photo, or document through the Telegram Bot API.
 
-## Features
+## Contract
 
-- Send text messages to Telegram users and groups
-- Support for photos, documents, and other media types
-- Markdown and HTML formatting options
-- Thread replies and silent notifications
-- Custom keyboard markup support
+`execute(input, options, context?)` returns `Promise<TelegramResult>`. `input` is either a string or a plain object with only `text`, `fileUrl`, and `caption`.
 
-## Configuration
+- `messageType` is `text` by default and accepts `text`, `photo`, or `document`.
+- Text delivery requires non-blank `text`.
+- Photo and document delivery require non-blank `fileUrl`. `caption` is used when present; otherwise `text` becomes the caption.
+- `chatId` is required and accepts a non-empty string or safe integer.
+- `parseMode` defaults to `Markdown`; the formal values are `Markdown`, `MarkdownV2`, and `HTML`.
+- `disableNotification` defaults to `false`. `disableWebPagePreview` applies only to text messages.
+- `replyToMessageId` must be a positive integer. `replyMarkup` must be a plain JSON object.
+- `timeoutMs` defaults to 30000, must be positive and finite, and is clamped to 120000.
 
-### Required Options
+The exact option allowlist is `baseUrl`, `botToken`, `chatId`, `messageType`, `parseMode`, `replyToMessageId`, `disableNotification`, `disableWebPagePreview`, `replyMarkup`, and `timeoutMs`. Message content does not belong in `options`.
 
-- `bot_token`: Your Telegram bot token from @BotFather
-- `chat_id`: Target chat ID (user, group, or channel)
+## Authentication and endpoint selection
 
-### Optional Options
+Prefer the Runtime secret `context.secrets.TELEGRAM_BOT_TOKEN`. An explicit `options.botToken` takes precedence. `options.baseUrl` takes precedence over `context.env.TELEGRAM_API_BASE_URL`; otherwise the package uses `https://api.telegram.org`.
 
-- `text`: Message text content
-- `message_type`: 'text', 'photo', or 'document' (default: 'text')
-- `parse_mode`: 'Markdown', 'MarkdownV2', or 'HTML' (default: 'Markdown')
-- `reply_to_message_id`: Reply to a specific message
-- `disable_notification`: Send silent notification (default: false)
-- `disable_web_page_preview`: Disable link previews
-- `reply_markup`: Inline keyboard or reply keyboard markup
-- `file_url`: URL of photo/document for media messages
-- `caption`: Caption for media messages
-- `timeout`: Request timeout in milliseconds (default: 30000)
+`baseUrl` must be an absolute HTTP or HTTPS URL without credentials, query parameters, or a fragment. A delivery performs one JSON `POST`; the package does not retry automatically and refuses redirects.
 
-## Usage Examples
-
-### Send Text Message
-
-```javascript
+```json
 {
-  "bot_token": "YOUR_BOT_TOKEN",
-  "chat_id": "@your_chat",
-  "text": "Hello from Maitask!",
-  "parse_mode": "Markdown"
+  "input": {
+    "fileUrl": "https://assets.example/release.png",
+    "text": "Release complete"
+  },
+  "options": {
+    "chatId": "@release_updates",
+    "messageType": "photo",
+    "parseMode": "MarkdownV2",
+    "disableNotification": false,
+    "timeoutMs": 30000
+  },
+  "context": {
+    "secrets": {
+      "TELEGRAM_BOT_TOKEN": "<runtime-secret>"
+    }
+  }
 }
 ```
 
-### Send Photo
+## Provider wire mapping
 
-```javascript
-{
-  "bot_token": "YOUR_BOT_TOKEN",
-  "chat_id": "@your_chat",
-  "file_url": "https://example.com/image.jpg",
-  "caption": "This is an image",
-  "message_type": "photo"
-}
-```
+Maitask configuration remains camelCase. The package translates it to Telegram wire fields such as `chat_id`, `parse_mode`, `reply_to_message_id`, `disable_notification`, `disable_web_page_preview`, and `reply_markup`. These wire names are not accepted in `input` or `options`.
 
-### Send Document
+## Results and errors
 
-```javascript
-{
-  "bot_token": "YOUR_BOT_TOKEN",
-  "chat_id": "@your_chat",
-  "file_url": "https://example.com/document.pdf",
-  "caption": "This is a document",
-  "message_type": "document"
-}
-```
+Successful output contains only validated delivery fields rather than the complete Telegram response:
 
-### Reply with Silent Notification
-
-```javascript
-{
-  "bot_token": "YOUR_BOT_TOKEN",
-  "chat_id": "@your_chat",
-  "text": "Replying to message",
-  "reply_to_message_id": 123456,
-  "disable_notification": true
-}
-```
-
-## Return Value
-
-Success response:
-```javascript
+```json
 {
   "success": true,
-  "message_id": 12345,
-  "chat_id": -1001234567890,
-  "data": { /* Telegram API response */ },
+  "data": {
+    "messageId": 42,
+    "chatId": -1001,
+    "caption": "Release complete"
+  },
   "metadata": {
+    "package": "@maitask/telegram-bot",
     "version": "0.1.0",
-    "timestamp": "2025-01-27T10:30:00.000Z",
-    "method": "sendMessage"
+    "provider": "telegram",
+    "method": "sendPhoto",
+    "timestamp": "2026-07-10T00:00:00.000Z"
   }
 }
 ```
 
-Error response:
-```javascript
-{
-  "success": false,
-  "error": {
-    "message": "Error details",
-    "code": "TELEGRAM_ERROR",
-    "type": "TelegramBotError"
-  }
-}
-```
+Failures use code `TELEGRAM_ERROR` and type `TelegramBotError`. They may include `status`, `retriable`, and either `details.retryAfterSeconds` for a valid provider rate-limit hint or `details.timeoutMs` for a timeout. `retriable` classifies the failure for the caller; it does not mean the package retried the POST. Provider messages are sanitized so bot tokens and URLs do not appear in returned errors, and success output never contains the bot token.
+
+## Regression verification
+
+Mandatory package regression uses controlled loopback fixtures and does not depend on Telegram availability. A live Telegram smoke check is optional diagnostics only and is not the package success-path release gate.

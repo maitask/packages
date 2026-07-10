@@ -1,19 +1,40 @@
 {
   "input": {
     "text": "Deployment succeeded :rocket:",
-    "channel": "#deployments",
-    "username": "Maitask Bot",
+    "blocks": [
+      {
+        "type": "section",
+        "text": {
+          "type": "mrkdwn",
+          "text": "*Service:* api-gateway\n*Version:* 1.4.2"
+        }
+      }
+    ],
     "attachments": [
       {
         "color": "#36C5F0",
         "fields": [
-          {"title": "Service", "value": "api-gateway", "short": true},
-          {"title": "Version", "value": "v1.4.2", "short": true}
+          {
+            "title": "Environment",
+            "value": "production",
+            "short": true
+          }
         ]
       }
     ]
   },
   "options": {
-    "webhook_url": "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXXXXXX"
+    "channel": "#deployments",
+    "username": "Maitask Bot",
+    "threadTs": "1700000000.000001",
+    "iconEmoji": ":rocket:",
+    "linkNames": true,
+    "mrkdwn": true,
+    "timeoutMs": 30000
+  },
+  "context": {
+    "secrets": {
+      "SLACK_WEBHOOK_URL": "<runtime-secret>"
+    }
   }
 }

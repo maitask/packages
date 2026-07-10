@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "description": "Publish messages to Kafka topics via REST proxy",
   "main": "index.js",
+  "types": "index.d.ts",
   "type": "commonjs",
   "author": "Maitask Team <team@maitask.com>",
   "license": "MIT",
@@ -12,6 +13,12 @@
     "messaging",
     "events",
     "streaming"
+  ],
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "example.json"
   ],
   "engines": {
     "node": ">=18.0.0"

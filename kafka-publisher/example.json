@@ -1,15 +1,23 @@
 {
-  "proxyUrl": "https://kafka-proxy.internal",
-  "topic": "user.events",
-  "messages": [
-    {
-      "event": "signup",
-      "user_id": "u-1"
-    },
-    {
-      "event": "login",
-      "user_id": "u-1"
+  "input": {
+    "topic": "user.events",
+    "messages": [
+      {
+        "event": "signup",
+        "userId": "u-1"
+      },
+      {
+        "event": "login",
+        "userId": "u-1"
+      }
+    ],
+    "key": "u-1",
+    "headers": {
+      "X-Trace-Source": "maitask"
     }
-  ],
-  "key": "u-1"
+  },
+  "options": {
+    "proxyUrl": "https://kafka-proxy.internal",
+    "timeoutMs": 30000
+  }
 }
