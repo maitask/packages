@@ -9,6 +9,8 @@ const PACKAGE_VERSION = '0.1.0';
 const DEFAULT_BASE_URL = 'https://api.telegram.org';
 const DEFAULT_TIMEOUT_MS = 30000;
 const MAX_TIMEOUT_MS = 120000;
+const MAX_PROVIDER_NORMALIZATION_PASSES = 4;
+const MAX_PROVIDER_MESSAGE_LENGTH = 1000;
 const RETRIABLE_STATUSES = new Set([408, 425, 429]);
 const INPUT_FIELDS = new Set(['text', 'fileUrl', 'caption']);
 const OPTION_FIELDS = new Set([
@@ -605,20 +607,53 @@ function sanitizeProviderMessage(message, botToken) {
         return message;
     }
 
-    let sanitized = message;
+    let sanitized = normalizeProviderEncoding(message);
     if (botToken) {
-        const encodedToken = encodeURIComponent(botToken);
-        sanitized = sanitized.split(botToken).join('[REDACTED]');
-        sanitized = sanitized.split(encodedToken).join('[REDACTED]');
-        sanitized = sanitized
-            .split(encodedToken.replace(/%[0-9A-F]{2}/gu, value => value.toLowerCase()))
-            .join('[REDACTED]');
+        sanitized = sanitized.replace(
+            new RegExp(escapeRegExp(botToken), 'giu'),
+            '[REDACTED]'
+        );
     }
 
-    return sanitized.replace(
+    sanitized = sanitized.replace(
         /\b[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s"'<>]+/gu,
         '[REDACTED_URL]'
     );
+    return sanitized
+        .replace(/\s+/gu, ' ')
+        .trim()
+        .slice(0, MAX_PROVIDER_MESSAGE_LENGTH);
+}
+
+function normalizeProviderEncoding(value) {
+    let normalized = value;
+
+    for (let pass = 0; pass < MAX_PROVIDER_NORMALIZATION_PASSES; pass += 1) {
+        const next = decodePercentRuns(normalized.replace(/\\\//gu, '/'));
+        if (next === normalized) {
+            break;
+        }
+        normalized = next;
+    }
+
+    return normalized;
+}
+
+function decodePercentRuns(value) {
+    return value.replace(/(?:%[0-9A-F]{2})+/giu, run => {
+        try {
+            return decodeURIComponent(run);
+        } catch {
+            return run.replace(/%([0-9A-F]{2})/giu, (encodedByte, hex) => {
+                const byte = Number.parseInt(hex, 16);
+                return byte <= 0x7f ? String.fromCharCode(byte) : encodedByte;
+            });
+        }
+    });
+}
+
+function escapeRegExp(value) {
+    return value.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 }
 
 function buildMetadata(extra = {}) {

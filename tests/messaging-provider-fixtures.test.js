@@ -265,6 +265,56 @@ test('telegram sanitizes provider descriptions that echo request secrets and URL
   );
 });
 
+test('telegram normalizes repeated provider encodings before sanitizing descriptions', async t => {
+  const botToken = '123456:ABC_def-ghi';
+  const server = await createFixtureServer((url, request) => {
+    assert.equal(url.pathname, `/telegram/bot${encodeURIComponent(botToken)}/sendMessage`);
+    assert.equal(request.method, 'POST');
+    const requestUrl = `${server.url}/telegram/bot${botToken}/sendMessage`;
+    const encodedRequestUrl = encodeURIComponent(requestUrl);
+    const doubleEncodedRequestUrl = encodeURIComponent(encodedRequestUrl);
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        description: [
+          'delivery   rejected\n',
+          botToken,
+          botToken.replace(':', '%3A'),
+          botToken.replace(':', '%253A'),
+          '123456%3aABC_def%2dghi',
+          requestUrl.replace(/\//g, '\\/'),
+          encodedRequestUrl,
+          doubleEncodedRequestUrl,
+          'https:\\/\\/escaped.example/private',
+          'https%3A%2F%2Fencoded.example/private',
+          'https%253A%252F%252Fdouble.example/private',
+          '%E0%A4%A',
+          `${'x'.repeat(985)}${botToken.replace(':', '%253A')}`
+        ].join(' ')
+      }
+    };
+  });
+  t.after(() => server.close());
+
+  const result = await executeTelegram('encoded provider failure', {
+    baseUrl: `${server.url}/telegram`,
+    botToken,
+    chatId: '-100-encoded'
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.code, 'TELEGRAM_ERROR');
+  assert.equal(result.error.status, 400);
+  assert.match(result.error.message, /delivery rejected/);
+  assert.doesNotMatch(result.error.message, /\s{2,}/);
+  assert.ok(result.error.message.length <= 1100);
+  assert.doesNotMatch(
+    JSON.stringify(result),
+    /123456(?::|%|\\)|ABC_def-ghi|ABC_def%2dghi|127\.0\.0\.1|escaped\.example|encoded\.example|double\.example|https?(?:%25|%3a|:\\?\/)/i
+  );
+});
+
 test('telegram exposes secret-safe retry details for rate limits', async t => {
   const server = await createFixtureServer((url, request) => {
     assert.equal(url.pathname, '/telegram/botfixture-token/sendMessage');
