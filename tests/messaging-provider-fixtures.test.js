@@ -2177,6 +2177,237 @@ test('kafka publishes records through a controlled REST proxy', async t => {
   assert.doesNotMatch(JSON.stringify(result), /fixture-kafka/);
 });
 
+test('kafka rejects non-plain explicit input and options containers before fetch', async t => {
+  const fetchState = forbidFetch(t);
+  const validInput = {
+    proxyUrl: 'https://valid-proxy.example',
+    topic: 'production-events',
+    messages: ['event']
+  };
+  const customInput = Object.create({ inherited: true });
+  Object.assign(customInput, validInput);
+  const customOptions = Object.create({ inherited: true });
+  customOptions.timeoutMs = 1000;
+  const cases = [
+    { label: 'missing input', input: undefined, options: undefined },
+    { label: 'null input', input: null, options: undefined },
+    { label: 'primitive input', input: 'event', options: undefined },
+    { label: 'array input', input: [], options: undefined },
+    { label: 'custom prototype input', input: customInput, options: undefined },
+    { label: 'null options', input: validInput, options: null },
+    { label: 'primitive options', input: validInput, options: 'invalid' },
+    { label: 'array options', input: validInput, options: [] },
+    { label: 'custom prototype options', input: validInput, options: customOptions }
+  ];
+
+  for (const testCase of cases) {
+    const result = await executeKafka(testCase.input, testCase.options);
+    assert.equal(result.success, false, `accepted ${testCase.label}`);
+    assert.equal(result.error.code, 'KAFKA_PUBLISHER_ERROR');
+    assert.equal(result.error.type, 'KafkaPublisherError');
+    assert.match(result.error.message, /(?:input|options).*plain object/i);
+  }
+
+  assert.equal(fetchState.calls, 0);
+});
+
+test('kafka snapshots input and options data properties without invoking accessors', async t => {
+  const fetchState = forbidFetch(t);
+  let accessorReads = 0;
+  const accessorInput = {
+    proxyUrl: 'https://valid-proxy.example',
+    messages: ['event']
+  };
+  Object.defineProperty(accessorInput, 'topic', {
+    enumerable: true,
+    get: () => {
+      accessorReads += 1;
+      return 'production-events';
+    }
+  });
+  const unknownAccessorInput = {
+    proxyUrl: 'https://valid-proxy.example',
+    topic: 'production-events',
+    messages: ['event']
+  };
+  Object.defineProperty(unknownAccessorInput, 'unknown', {
+    enumerable: true,
+    get: () => {
+      accessorReads += 1;
+      return 'ignored';
+    }
+  });
+  const accessorOptions = {};
+  Object.defineProperty(accessorOptions, 'proxyUrl', {
+    enumerable: true,
+    get: () => {
+      accessorReads += 1;
+      return 'https://valid-proxy.example';
+    }
+  });
+  const symbolInput = {
+    proxyUrl: 'https://valid-proxy.example',
+    topic: 'production-events',
+    messages: ['event'],
+    [Symbol('input')]: 'invalid'
+  };
+  const symbolOptions = { [Symbol('options')]: 'invalid' };
+  const cases = [
+    { label: 'input field accessor', input: accessorInput, options: {} },
+    { label: 'unknown input accessor', input: unknownAccessorInput, options: {} },
+    {
+      label: 'options field accessor',
+      input: { topic: 'production-events', messages: ['event'] },
+      options: accessorOptions
+    },
+    { label: 'input symbol', input: symbolInput, options: {} },
+    {
+      label: 'options symbol',
+      input: {
+        proxyUrl: 'https://valid-proxy.example',
+        topic: 'production-events',
+        messages: ['event']
+      },
+      options: symbolOptions
+    }
+  ];
+
+  for (const testCase of cases) {
+    const result = await executeKafka(testCase.input, testCase.options);
+    assert.equal(result.success, false, `accepted ${testCase.label}`);
+    assert.equal(result.error.code, 'KAFKA_PUBLISHER_ERROR');
+    assert.equal(result.error.type, 'KafkaPublisherError');
+  }
+
+  assert.equal(fetchState.calls, 0);
+  assert.equal(accessorReads, 0);
+});
+
+test('kafka rejects unsafe recursive message key and header data without callbacks', async t => {
+  const fetchState = forbidFetch(t);
+  let callbackCalls = 0;
+  const accessorMessage = {};
+  Object.defineProperty(accessorMessage, 'value', {
+    enumerable: true,
+    get: () => {
+      callbackCalls += 1;
+      return 'secret';
+    }
+  });
+  const toJsonMessage = {
+    toJSON: () => {
+      callbackCalls += 1;
+      return { exposed: true };
+    }
+  };
+  const cyclicMessage = {};
+  cyclicMessage.self = cyclicMessage;
+  const callbackKey = {
+    toString: () => {
+      callbackCalls += 1;
+      return 'unsafe-key';
+    }
+  };
+  const callbackHeader = {
+    toString: () => {
+      callbackCalls += 1;
+      return 'unsafe-header';
+    }
+  };
+  const accessorHeaders = {};
+  Object.defineProperty(accessorHeaders, 'X-Unsafe', {
+    enumerable: true,
+    get: () => {
+      callbackCalls += 1;
+      return 'unsafe-header';
+    }
+  });
+  const sparseMessages = [];
+  sparseMessages[1] = 'event';
+  const customArrayMessages = ['event'];
+  Object.setPrototypeOf(customArrayMessages, Object.create(Array.prototype));
+  const customMessage = Object.create({ inherited: true });
+  customMessage.event = 'release';
+  const symbolMessage = { event: 'release', [Symbol('nested')]: 'invalid' };
+  const base = {
+    proxyUrl: 'https://valid-proxy.example',
+    topic: 'production-events'
+  };
+  const cases = [
+    { label: 'nested message accessor', input: { ...base, messages: [accessorMessage] } },
+    { label: 'message toJSON', input: { ...base, messages: [toJsonMessage] } },
+    { label: 'cyclic message', input: { ...base, messages: [cyclicMessage] } },
+    { label: 'callback key', input: { ...base, messages: ['event'], key: callbackKey } },
+    {
+      label: 'callback header',
+      input: { ...base, messages: ['event'], headers: { 'X-Unsafe': callbackHeader } }
+    },
+    { label: 'header accessor', input: { ...base, messages: ['event'], headers: accessorHeaders } },
+    { label: 'sparse messages', input: { ...base, messages: sparseMessages } },
+    { label: 'custom array prototype', input: { ...base, messages: customArrayMessages } },
+    { label: 'undefined message', input: { ...base, messages: ['event', undefined] } },
+    { label: 'function message', input: { ...base, messages: ['event', () => 'unsafe'] } },
+    { label: 'bigint message', input: { ...base, messages: [1n] } },
+    { label: 'non-finite message', input: { ...base, messages: [Number.NaN] } },
+    { label: 'custom prototype message', input: { ...base, messages: [customMessage] } },
+    { label: 'nested symbol', input: { ...base, messages: [symbolMessage] } }
+  ];
+
+  for (const testCase of cases) {
+    const result = await executeKafka(testCase.input);
+    assert.equal(result.success, false, `accepted ${testCase.label}`);
+    assert.equal(result.error.code, 'KAFKA_PUBLISHER_ERROR');
+    assert.equal(result.error.type, 'KafkaPublisherError');
+  }
+
+  assert.equal(fetchState.calls, 0);
+  assert.equal(callbackCalls, 0);
+});
+
+test('kafka snapshots legal deeply nested JSON data without changing wire behavior', async t => {
+  const nestedMessage = Object.create(null);
+  nestedMessage.event = 'release';
+  nestedMessage.details = { versions: [1, 2, { stable: true }], note: null };
+  const input = Object.create(null);
+  input.topic = 'production-events';
+  input.messages = ['deployed', nestedMessage];
+  input.key = ['release', { id: 1 }];
+  input.headers = {
+    'X-Trace': ['fixture', { attempt: 1 }],
+    'X-Metadata': { environment: 'production' },
+    'X-Null': null
+  };
+  const options = Object.create(null);
+  options.proxyUrl = 'https://valid-proxy.example';
+  options.timeoutMs = 1000;
+  const originalMessage = JSON.stringify(nestedMessage);
+
+  replaceFetch(t, async (_url, init) => {
+    assert.equal(init.headers['X-Trace'], 'fixture,[object Object]');
+    assert.equal(init.headers['X-Metadata'], '[object Object]');
+    assert.equal(Object.hasOwn(init.headers, 'X-Null'), false);
+    assert.deepEqual(JSON.parse(init.body), {
+      records: [
+        { key: 'release,[object Object]', value: 'deployed' },
+        { key: 'release,[object Object]', value: originalMessage }
+      ]
+    });
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ offsets: [{ partition: 0, offset: 12 }] })
+    };
+  });
+
+  const result = await executeKafka(input, options);
+
+  assert.equal(result.success, true);
+  assert.deepEqual(result.data.offsets, [{ partition: 0, offset: 12 }]);
+  assert.equal(JSON.stringify(nestedMessage), originalMessage);
+  assert.equal(input.key[1].id, 1);
+  assert.equal(input.headers['X-Metadata'].environment, 'production');
+});
+
 test('kafka does not fall back from explicit invalid input proxy URLs', async t => {
   const fetchState = forbidFetch(t);
 
@@ -2348,6 +2579,27 @@ test('kafka rejects unsafe REST proxy response objects without invoking accessor
       return 0;
     }
   });
+  const customOffsets = [{ partition: 0, offset: 1 }];
+  Object.setPrototypeOf(customOffsets, {
+    map: callback => {
+      accessorReads += 1;
+      return [{ partition: 0, offset: 1 }].map(callback);
+    }
+  });
+  const accessorOffsets = [];
+  Object.defineProperty(accessorOffsets, '0', {
+    enumerable: true,
+    configurable: true,
+    get: () => {
+      accessorReads += 1;
+      return { partition: 0, offset: 1 };
+    }
+  });
+  accessorOffsets.length = 1;
+  const symbolOffsets = [{ partition: 0, offset: 1 }];
+  symbolOffsets[Symbol('provider')] = 'invalid';
+  const sparseOffsets = [];
+  sparseOffsets.length = 1;
 
   JSON.parse = text =>
     text === '__kafka_fixture_response__' ? parsedResponse : guardedJsonParse(text);
@@ -2363,12 +2615,12 @@ test('kafka rejects unsafe REST proxy response objects without invoking accessor
   const cases = [
     { label: 'custom prototype response', body: customPrototypeResponse },
     { label: 'accessor response', body: accessorResponse },
+    { label: 'custom offsets prototype', body: { offsets: customOffsets } },
+    { label: 'accessor offsets entry', body: { offsets: accessorOffsets } },
+    { label: 'symbol offsets field', body: { offsets: symbolOffsets } },
+    { label: 'sparse offsets', body: { offsets: sparseOffsets } },
     { label: 'custom prototype entry', body: { offsets: [customPrototypeEntry] } },
-    { label: 'accessor entry', body: { offsets: [accessorEntry] } },
-    {
-      label: 'unknown nested object',
-      body: { offsets: [{ partition: 0, offset: 1, provider: { internal: true } }] }
-    }
+    { label: 'accessor entry', body: { offsets: [accessorEntry] } }
   ];
 
   for (const testCase of cases) {
@@ -2386,6 +2638,51 @@ test('kafka rejects unsafe REST proxy response objects without invoking accessor
   }
 
   assert.equal(accessorReads, 0);
+});
+
+test('kafka ignores unknown nested provider response data without reading it', async t => {
+  const guardedJsonParse = JSON.parse;
+  let nestedAccessorReads = 0;
+  const providerMetadata = {};
+  Object.defineProperty(providerMetadata, 'secret', {
+    enumerable: true,
+    get: () => {
+      nestedAccessorReads += 1;
+      return 'must not be read';
+    }
+  });
+  const parsedResponse = {
+    provider: providerMetadata,
+    offsets: [
+      {
+        partition: 0,
+        offset: 21,
+        provider: providerMetadata
+      }
+    ]
+  };
+
+  JSON.parse = text =>
+    text === '__kafka_nested_provider_response__' ? parsedResponse : guardedJsonParse(text);
+  replaceFetch(t, async () => ({
+    ok: true,
+    status: 200,
+    text: async () => '__kafka_nested_provider_response__'
+  }));
+  t.after(() => {
+    JSON.parse = guardedJsonParse;
+  });
+
+  const result = await executeKafka({
+    proxyUrl: 'https://valid-proxy.example',
+    topic: 'production-events',
+    messages: ['event']
+  });
+
+  assert.equal(result.success, true);
+  assert.deepEqual(result.data.offsets, [{ partition: 0, offset: 21 }]);
+  assert.equal(nestedAccessorReads, 0);
+  assert.doesNotMatch(JSON.stringify(result), /provider|secret|must not be read/);
 });
 
 test('kafka rejects invalid REST proxy offset fields', async t => {
@@ -2487,4 +2784,101 @@ test('kafka returns a structured REST proxy failure', async t => {
   assert.equal(result.error.type, 'KafkaPublisherError');
   assert.equal(result.error.message, 'broker unavailable');
   assert.doesNotMatch(JSON.stringify(result), /fixture-kafka/);
+});
+
+test('kafka does not invoke accessors in HTTP error envelopes', async t => {
+  const guardedJsonParse = JSON.parse;
+  let parsedResponse;
+  let accessorReads = 0;
+  const rootMessageAccessor = {};
+  Object.defineProperty(rootMessageAccessor, 'message', {
+    enumerable: true,
+    get: () => {
+      accessorReads += 1;
+      return 'unsafe root message';
+    }
+  });
+  const nestedMessageAccessor = { error: {} };
+  Object.defineProperty(nestedMessageAccessor.error, 'message', {
+    enumerable: true,
+    get: () => {
+      accessorReads += 1;
+      return 'unsafe nested message';
+    }
+  });
+  const errorAccessor = {};
+  Object.defineProperty(errorAccessor, 'error', {
+    enumerable: true,
+    get: () => {
+      accessorReads += 1;
+      return { message: 'unsafe error object' };
+    }
+  });
+  const cases = [rootMessageAccessor, nestedMessageAccessor, errorAccessor, { message: { text: 'complex' } }];
+  let status = 501;
+
+  JSON.parse = text =>
+    text === '__kafka_error_response__' ? parsedResponse : guardedJsonParse(text);
+  replaceFetch(t, async () => ({
+    ok: false,
+    get status() {
+      return status;
+    },
+    text: async () => '__kafka_error_response__'
+  }));
+  t.after(() => {
+    JSON.parse = guardedJsonParse;
+  });
+
+  for (const errorBody of cases) {
+    parsedResponse = errorBody;
+    const expectedStatus = status;
+    const result = await executeKafka({
+      proxyUrl: 'https://valid-proxy.example',
+      topic: 'production-events',
+      messages: ['event']
+    });
+    status += 1;
+
+    assert.equal(result.success, false);
+    assert.equal(result.error.message, `Request failed with status ${expectedStatus}`);
+    assert.equal(result.error.code, 'KAFKA_PUBLISHER_ERROR');
+    assert.equal(result.error.type, 'KafkaPublisherError');
+  }
+
+  assert.equal(accessorReads, 0);
+});
+
+test('kafka does not invoke arbitrary rejected error accessors', async t => {
+  let accessorReads = 0;
+  const unsafeError = {};
+  Object.defineProperties(unsafeError, {
+    name: {
+      enumerable: true,
+      get: () => {
+        accessorReads += 1;
+        return 'AbortError';
+      }
+    },
+    message: {
+      enumerable: true,
+      get: () => {
+        accessorReads += 1;
+        return 'unsafe exception message';
+      }
+    }
+  });
+  replaceFetch(t, async () => {
+    throw unsafeError;
+  });
+
+  const result = await executeKafka({
+    proxyUrl: 'https://valid-proxy.example',
+    topic: 'production-events',
+    messages: ['event']
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.message, 'Unknown error');
+  assert.equal(accessorReads, 0);
 });

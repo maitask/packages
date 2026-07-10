@@ -8,20 +8,30 @@
 
 async function execute(input, options = {}, context = {}) {
   try {
-    const payload = asObject(input);
-    const proxyUrl = readProxyUrl(readPreferredValue(payload, options, 'proxyUrl'));
+    const payload = snapshotContainer(input, 'input');
+    const settings = snapshotContainer(options, 'options');
+    const proxyUrl = readProxyUrl(readPreferredValue(payload, settings, 'proxyUrl'));
     const topic = readRequiredString(payload.topic, 'topic');
-    const timeout = readPreferredValue(payload, options, 'timeoutMs');
+    const timeout = readPreferredValue(payload, settings, 'timeoutMs');
     const timeoutMs = readTimeout(timeout.value, timeout.present);
+    const messageData = Object.hasOwn(payload, 'messages')
+      ? snapshotJson(payload.messages, 'messages')
+      : undefined;
+    const keyData = Object.hasOwn(payload, 'key')
+      ? snapshotJson(payload.key, 'key')
+      : undefined;
+    const headerData = Object.hasOwn(payload, 'headers')
+      ? snapshotJson(payload.headers, 'headers')
+      : undefined;
 
-    const messages = Array.isArray(payload.messages) ? payload.messages : [payload.messages];
+    const messages = Array.isArray(messageData) ? messageData : [messageData];
     const filtered = messages.filter(item => item != null);
     if (filtered.length === 0) {
       throw new Error('messages must contain at least one entry');
     }
 
     const records = filtered.map(item => ({
-      key: payload.key == null ? null : String(payload.key),
+      key: keyData == null ? null : String(keyData),
       value: typeof item === 'string' ? item : JSON.stringify(item)
     }));
 
@@ -29,7 +39,7 @@ async function execute(input, options = {}, context = {}) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/vnd.kafka.json.v2+json',
-        ...asHeaders(payload.headers)
+        ...asHeaders(headerData)
       },
       body: { records },
       timeoutMs
@@ -75,12 +85,12 @@ async function fetchJson(url, { method, headers, body, timeoutMs }) {
     const data = tryParseJson(text);
 
     if (!response.ok) {
-      throw new Error(data?.message || data?.error?.message || text || `Request failed with status ${response.status}`);
+      throw new Error(readHttpErrorMessage(data, response.status));
     }
 
     return data == null ? {} : data;
   } catch (error) {
-    if (error.name === 'AbortError') {
+    if (controller.signal.aborted) {
       throw new Error(`Request timed out after ${timeoutMs}ms`);
     }
     throw error;
@@ -97,7 +107,7 @@ function asHeaders(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
     return {};
   }
-  const headers = {};
+  const headers = Object.create(null);
   for (const [key, item] of Object.entries(value)) {
     if (item == null) continue;
     headers[key] = String(item);
@@ -114,11 +124,103 @@ function tryParseJson(text) {
   }
 }
 
-function asObject(value) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error('input must be an object');
+function snapshotContainer(value, field) {
+  if (!isPlainObject(value)) {
+    throw new Error(`${field} must be a plain object`);
   }
-  return value;
+
+  const snapshot = Object.create(null);
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string') {
+      throw new Error(`${field} must not contain symbol properties`);
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!isDataDescriptor(descriptor)) {
+      throw new Error(`${field}.${key} must be an own data property`);
+    }
+    Object.defineProperty(snapshot, key, {
+      value: descriptor.value,
+      enumerable: descriptor.enumerable,
+      configurable: true,
+      writable: true
+    });
+  }
+  return snapshot;
+}
+
+function snapshotJson(value, field, active = new WeakSet()) {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) throw new Error(`${field} must contain finite JSON numbers`);
+    return value;
+  }
+  if (typeof value !== 'object') {
+    throw new Error(`${field} must contain only JSON values`);
+  }
+  if (active.has(value)) throw new Error(`${field} must not contain cycles`);
+
+  active.add(value);
+  try {
+    if (Array.isArray(value)) {
+      if (Object.getPrototypeOf(value) !== Array.prototype) {
+        throw new Error(`${field} arrays must use the standard Array prototype`);
+      }
+      return snapshotJsonArray(value, field, active);
+    }
+    if (!isPlainObject(value)) {
+      throw new Error(`${field} must contain only plain JSON objects`);
+    }
+    return snapshotJsonObject(value, field, active);
+  } finally {
+    active.delete(value);
+  }
+}
+
+function snapshotJsonArray(value, field, active) {
+  const allowedKeys = new Set(['length']);
+  for (let index = 0; index < value.length; index += 1) {
+    allowedKeys.add(String(index));
+  }
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string' || !allowedKeys.has(key)) {
+      throw new Error(`${field} must not contain array symbols or extra properties`);
+    }
+  }
+
+  const snapshot = new Array(value.length);
+  for (let index = 0; index < value.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, String(index));
+    if (!isDataDescriptor(descriptor)) {
+      throw new Error(`${field}[${index}] must be an own data property`);
+    }
+    snapshot[index] = snapshotJson(descriptor.value, `${field}[${index}]`, active);
+  }
+  return snapshot;
+}
+
+function snapshotJsonObject(value, field, active) {
+  const snapshot = {};
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string') {
+      throw new Error(`${field} must not contain symbol properties`);
+    }
+    if (key === 'toJSON') {
+      throw new Error(`${field}.toJSON is not supported`);
+    }
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!isDataDescriptor(descriptor)) {
+      throw new Error(`${field}.${key} must be an own data property`);
+    }
+    Object.defineProperty(snapshot, key, {
+      value: snapshotJson(descriptor.value, `${field}.${key}`, active),
+      enumerable: descriptor.enumerable,
+      configurable: true,
+      writable: true
+    });
+  }
+  return snapshot;
 }
 
 function readPreferredValue(input, options, key) {
@@ -139,9 +241,10 @@ function readProxyUrl(selection) {
 }
 
 function readRequiredString(value, key) {
-  const text = value == null ? '' : String(value).trim();
-  if (!text) throw new Error(`${key} is required`);
-  return text;
+  if (typeof value !== 'string' || !value.trim()) {
+    throw new Error(`${key} is required and must be a non-empty string`);
+  }
+  return value.trim();
 }
 
 function readTimeout(value, present) {
@@ -154,19 +257,53 @@ function readTimeout(value, present) {
 
 function normalizeOffsets(response) {
   if (!isPlainObject(response)) throw malformedResponseError();
-  assertSafeObjectProperties(response, new Set(['offsets']));
+  assertOwnDataProperties(response);
 
   const offsetsDescriptor = Object.getOwnPropertyDescriptor(response, 'offsets');
   if (!isDataDescriptor(offsetsDescriptor) || !Array.isArray(offsetsDescriptor.value)) {
     throw malformedResponseError();
   }
 
-  return offsetsDescriptor.value.map(normalizeOffset);
+  return readOffsetEntries(offsetsDescriptor.value).map(normalizeOffset);
+}
+
+function readOffsetEntries(offsets) {
+  if (Object.getPrototypeOf(offsets) !== Array.prototype) throw malformedResponseError();
+
+  const descriptors = new Map();
+  let length;
+  for (const key of Reflect.ownKeys(offsets)) {
+    if (typeof key !== 'string') throw malformedResponseError();
+    const descriptor = Object.getOwnPropertyDescriptor(offsets, key);
+    if (!isDataDescriptor(descriptor)) throw malformedResponseError();
+    if (key === 'length') {
+      length = descriptor.value;
+    } else {
+      descriptors.set(key, descriptor);
+    }
+  }
+  if (!Number.isSafeInteger(length) || length < 0) throw malformedResponseError();
+  for (const key of descriptors.keys()) {
+    if (!isArrayIndex(key, length)) throw malformedResponseError();
+  }
+
+  const entries = new Array(length);
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors.get(String(index));
+    if (!descriptor) throw malformedResponseError();
+    entries[index] = descriptor.value;
+  }
+  return entries;
+}
+
+function isArrayIndex(key, length) {
+  const index = Number(key);
+  return Number.isInteger(index) && index >= 0 && index < length && String(index) === key;
 }
 
 function normalizeOffset(entry) {
   if (!isPlainObject(entry)) throw malformedResponseError();
-  assertSafeObjectProperties(entry, new Set(['partition', 'offset', 'error_code', 'error']));
+  assertOwnDataProperties(entry);
 
   const partition = readDataProperty(entry, 'partition');
   if (!partition.present || !isNonNegativeSafeInteger(partition.value)) {
@@ -195,14 +332,11 @@ function normalizeOffset(entry) {
   return normalized;
 }
 
-function assertSafeObjectProperties(object, knownFields) {
+function assertOwnDataProperties(object) {
   for (const key of Reflect.ownKeys(object)) {
     if (typeof key !== 'string') throw malformedResponseError();
     const descriptor = Object.getOwnPropertyDescriptor(object, key);
     if (!isDataDescriptor(descriptor)) throw malformedResponseError();
-    if (!knownFields.has(key) && descriptor.value !== null && typeof descriptor.value === 'object') {
-      throw malformedResponseError();
-    }
   }
 }
 
@@ -231,11 +365,49 @@ function malformedResponseError() {
   return new Error('Kafka REST proxy returned a malformed response');
 }
 
+function readHttpErrorMessage(data, status) {
+  const fallback = `Request failed with status ${status}`;
+  if (!isPlainObject(data) || !hasOnlyOwnDataProperties(data)) return fallback;
+
+  const message = Object.getOwnPropertyDescriptor(data, 'message');
+  if (message !== undefined) {
+    return isDataDescriptor(message) && typeof message.value === 'string'
+      ? message.value
+      : fallback;
+  }
+
+  const error = Object.getOwnPropertyDescriptor(data, 'error');
+  if (!isDataDescriptor(error) || !isPlainObject(error.value)) return fallback;
+  if (!hasOnlyOwnDataProperties(error.value)) return fallback;
+  const nestedMessage = Object.getOwnPropertyDescriptor(error.value, 'message');
+  return isDataDescriptor(nestedMessage) && typeof nestedMessage.value === 'string'
+    ? nestedMessage.value
+    : fallback;
+}
+
+function hasOnlyOwnDataProperties(value) {
+  for (const key of Reflect.ownKeys(value)) {
+    if (typeof key !== 'string') return false;
+    if (!isDataDescriptor(Object.getOwnPropertyDescriptor(value, key))) return false;
+  }
+  return true;
+}
+
+function safeErrorMessage(error) {
+  if (error === null || (typeof error !== 'object' && typeof error !== 'function')) {
+    return undefined;
+  }
+  const descriptor = Object.getOwnPropertyDescriptor(error, 'message');
+  return isDataDescriptor(descriptor) && typeof descriptor.value === 'string'
+    ? descriptor.value
+    : undefined;
+}
+
 function buildError(error, code, type) {
   return {
     success: false,
     error: {
-      message: error?.message || 'Unknown error',
+      message: safeErrorMessage(error) ?? 'Unknown error',
       code,
       type
     },
