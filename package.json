@@ -5,6 +5,7 @@
   "type": "commonjs",
   "scripts": {
     "test": "node --test tests/*.test.js",
+    "test:ai-providers": "node --test tests/ai-provider-fixtures.test.js",
     "test:external-fixtures": "node --test tests/external-fixtures.test.js",
     "test:metadata": "node --test tests/catalog-integrity.test.js",
     "test:archives": "node --test tests/package-archives.test.js"
