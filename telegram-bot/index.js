@@ -10,6 +10,20 @@ const DEFAULT_BASE_URL = 'https://api.telegram.org';
 const DEFAULT_TIMEOUT_MS = 30000;
 const MAX_TIMEOUT_MS = 120000;
 const RETRIABLE_STATUSES = new Set([408, 425, 429]);
+const INPUT_FIELDS = new Set(['text', 'fileUrl', 'caption']);
+const OPTION_FIELDS = new Set([
+    'baseUrl',
+    'botToken',
+    'chatId',
+    'messageType',
+    'parseMode',
+    'replyToMessageId',
+    'disableNotification',
+    'disableWebPagePreview',
+    'replyMarkup',
+    'timeoutMs'
+]);
+const PARSE_MODES = new Set(['Markdown', 'MarkdownV2', 'HTML']);
 
 class TelegramBotError extends Error {
     constructor(message, { status, retriable, details } = {}) {
@@ -48,6 +62,7 @@ async function execute(input, options = {}, context = {}) {
 
 function buildConfig(input, options, context) {
     requirePlainObject(options, 'options');
+    rejectUnknownFields(options, OPTION_FIELDS, 'options');
     requirePlainObject(context, 'context');
     if (context.secrets !== undefined) {
         requirePlainObject(context.secrets, 'context.secrets');
@@ -119,6 +134,7 @@ function normalizeInput(input) {
     if (!isPlainObject(input)) {
         throw new TelegramBotError('Input must be a string or a plain object');
     }
+    rejectUnknownFields(input, INPUT_FIELDS, 'input');
 
     for (const field of ['text', 'fileUrl', 'caption']) {
         if (input[field] !== undefined && typeof input[field] !== 'string') {
@@ -189,7 +205,11 @@ function isValidChatId(value) {
 }
 
 function validateOperationalOptions(options) {
-    validateOptionalNonBlankString(options.parseMode, 'parseMode');
+    if (options.parseMode !== undefined && !PARSE_MODES.has(options.parseMode)) {
+        throw new TelegramBotError(
+            'parseMode must be Markdown, MarkdownV2, or HTML'
+        );
+    }
     validateOptionalBoolean(options.disableNotification, 'disableNotification');
     validateOptionalBoolean(options.disableWebPagePreview, 'disableWebPagePreview');
 
@@ -204,12 +224,6 @@ function validateOperationalOptions(options) {
     }
 }
 
-function validateOptionalNonBlankString(value, field) {
-    if (value !== undefined && !hasNonBlankString(value)) {
-        throw new TelegramBotError(`${field} must be a non-empty string`);
-    }
-}
-
 function validateOptionalBoolean(value, field) {
     if (value !== undefined && typeof value !== 'boolean') {
         throw new TelegramBotError(`${field} must be a boolean`);
@@ -219,6 +233,17 @@ function validateOptionalBoolean(value, field) {
 function requirePlainObject(value, field) {
     if (!isPlainObject(value)) {
         throw new TelegramBotError(`${field} must be a plain object`);
+    }
+}
+
+function rejectUnknownFields(value, allowedFields, field) {
+    const unknownField = Reflect.ownKeys(value).find(
+        key => typeof key !== 'string' || !allowedFields.has(key)
+    );
+    if (unknownField !== undefined) {
+        throw new TelegramBotError(
+            `${field} contains unsupported field ${String(unknownField)}`
+        );
     }
 }
 

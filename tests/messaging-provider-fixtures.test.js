@@ -665,6 +665,99 @@ test('telegram validates task fields and operational option types before fetch',
   assert.equal(fetchState.calls, 0);
 });
 
+test('telegram rejects unknown and legacy task-content fields before fetch', async t => {
+  const fetchState = forbidFetch(t);
+  const invalidFields = [
+    ['chat_id', '-100-legacy'],
+    ['file_url', 'https://media.example/legacy.png'],
+    ['unknown', true]
+  ];
+
+  for (const [field, value] of invalidFields) {
+    const result = await executeTelegram(
+      { text: 'valid formal content', [field]: value },
+      {
+        baseUrl: 'https://telegram-options.example/api',
+        botToken: 'fixture-token',
+        chatId: '-100-allowlist'
+      }
+    );
+
+    assert.equal(result.success, false);
+    assert.equal(result.error.code, 'TELEGRAM_ERROR');
+    assert.match(result.error.message, new RegExp(`input.*${field}`, 'i'));
+    assert.equal(result.metadata.package, '@maitask/telegram-bot');
+    assert.equal(result.metadata.provider, 'telegram');
+    assert.doesNotMatch(
+      JSON.stringify(result),
+      /fixture-token|telegram-options\.example|https?:\/\//
+    );
+  }
+
+  assert.equal(fetchState.calls, 0);
+});
+
+test('telegram rejects unknown and legacy operational options before fetch', async t => {
+  const fetchState = forbidFetch(t);
+  const invalidOptions = [
+    ['bot_token', 'legacy-token'],
+    ['chat_id', '-100-legacy'],
+    ['message_type', 'text'],
+    ['parse_mode', 'HTML'],
+    ['reply_to_message_id', 12],
+    ['disable_notification', true],
+    ['disable_web_page_preview', true],
+    ['reply_markup', {}],
+    ['file_url', 'https://media.example/legacy.png'],
+    ['caption', 'legacy caption'],
+    ['text', 'legacy text'],
+    ['timeout', 1000],
+    ['unknown', true]
+  ];
+
+  for (const [field, value] of invalidOptions) {
+    const result = await executeTelegram('valid formal content', {
+      baseUrl: 'https://telegram-options.example/api',
+      botToken: 'fixture-token',
+      chatId: '-100-allowlist',
+      [field]: value
+    });
+
+    assert.equal(result.success, false);
+    assert.equal(result.error.code, 'TELEGRAM_ERROR');
+    assert.match(result.error.message, new RegExp(`options.*${field}`, 'i'));
+    assert.equal(result.metadata.package, '@maitask/telegram-bot');
+    assert.equal(result.metadata.provider, 'telegram');
+    assert.doesNotMatch(
+      JSON.stringify(result),
+      /fixture-token|telegram-options\.example|https?:\/\//
+    );
+  }
+
+  assert.equal(fetchState.calls, 0);
+});
+
+test('telegram rejects parse modes outside the formal enum before fetch', async t => {
+  const fetchState = forbidFetch(t);
+
+  for (const parseMode of ['PlainText', 'markdown', null, '', '   ', 42]) {
+    const result = await executeTelegram('valid formal content', {
+      baseUrl: 'https://telegram-options.example/api',
+      botToken: 'fixture-token',
+      chatId: '-100-allowlist',
+      parseMode
+    });
+
+    assert.equal(result.success, false);
+    assert.equal(result.error.code, 'TELEGRAM_ERROR');
+    assert.match(result.error.message, /parseMode.*Markdown.*MarkdownV2.*HTML/i);
+    assert.equal(result.metadata.package, '@maitask/telegram-bot');
+    assert.equal(result.metadata.provider, 'telegram');
+  }
+
+  assert.equal(fetchState.calls, 0);
+});
+
 test('telegram uses the Runtime bot-token secret fallback', async t => {
   const botToken = '123456:runtime_secret';
   const server = await createFixtureServer((url, request, body) => {
