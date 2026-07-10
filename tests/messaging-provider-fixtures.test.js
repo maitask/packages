@@ -8,6 +8,23 @@ const { createFixtureServer } = require('./helpers/http-fixture');
 
 const nativeFetch = global.fetch;
 
+function replaceFetch(t, implementation) {
+  const previousFetch = global.fetch;
+  global.fetch = implementation;
+  t.after(() => {
+    global.fetch = previousFetch;
+  });
+}
+
+function forbidFetch(t) {
+  const state = { calls: 0 };
+  replaceFetch(t, async () => {
+    state.calls += 1;
+    throw new Error('fetch must not be called');
+  });
+  return state;
+}
+
 test.before(() => {
   global.fetch = (url, init) => {
     const target = new URL(String(url));
@@ -206,6 +223,48 @@ test('telegram returns a structured API failure through the Runtime endpoint fal
   assert.doesNotMatch(JSON.stringify(result), /fixture-token/);
 });
 
+test('telegram sanitizes provider descriptions that echo request secrets and URLs', async t => {
+  const botToken = '123456:ABC_def-ghi';
+  const fileUrl = 'https://media.example/private-release.png';
+  const server = await createFixtureServer((url, request) => {
+    assert.equal(url.pathname, `/telegram/bot${encodeURIComponent(botToken)}/sendPhoto`);
+    assert.equal(request.method, 'POST');
+    return {
+      status: 400,
+      body: {
+        ok: false,
+        description: [
+          'delivery rejected',
+          `${server.url}/telegram/bot${botToken}/sendPhoto`,
+          encodeURIComponent(botToken),
+          botToken.replace(':', '%3a'),
+          fileUrl,
+          'ftp://archive.example/private-release.png'
+        ].join(' ')
+      }
+    };
+  });
+  t.after(() => server.close());
+
+  const result = await executeTelegram(
+    { fileUrl, caption: 'private release' },
+    {
+      baseUrl: `${server.url}/telegram`,
+      botToken,
+      chatId: '-100-secret',
+      messageType: 'photo'
+    }
+  );
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.status, 400);
+  assert.match(result.error.message, /delivery rejected/);
+  assert.doesNotMatch(
+    JSON.stringify(result),
+    /[a-z][a-z0-9+.-]*:\/\/|123456:ABC_def-ghi|123456%3AABC_def-ghi|123456%3aABC_def-ghi|media\.example|archive\.example/i
+  );
+});
+
 test('telegram exposes secret-safe retry details for rate limits', async t => {
   const server = await createFixtureServer((url, request) => {
     assert.equal(url.pathname, '/telegram/botfixture-token/sendMessage');
@@ -238,16 +297,115 @@ test('telegram exposes secret-safe retry details for rate limits', async t => {
   assert.doesNotMatch(JSON.stringify(result), /fixture-token/);
 });
 
-test('telegram rejects a non-http base URL without calling fetch', async t => {
-  const guardedFetch = global.fetch;
-  let fetchCalls = 0;
-  global.fetch = async () => {
-    fetchCalls += 1;
-    throw new Error('fetch must not be called');
-  };
-  t.after(() => {
-    global.fetch = guardedFetch;
+test('telegram rejects malformed successful response envelopes', async t => {
+  const envelopes = [{}, [], true, { ok: true }, { ok: true, result: [] }];
+  let requestIndex = 0;
+  const server = await createFixtureServer(() => ({ body: envelopes[requestIndex++] }));
+  t.after(() => server.close());
+
+  for (const envelope of envelopes) {
+    const result = await executeTelegram('malformed response', {
+      baseUrl: `${server.url}/telegram`,
+      botToken: 'fixture-token',
+      chatId: '-100-envelope'
+    });
+
+    assert.equal(result.success, false, `accepted malformed envelope ${JSON.stringify(envelope)}`);
+    assert.equal(result.error.code, 'TELEGRAM_ERROR');
+    assert.match(result.error.message, /response/i);
+  }
+});
+
+test('telegram uses an HTTP-200 API error code for retry classification', async t => {
+  const server = await createFixtureServer(() => ({
+    body: {
+      ok: false,
+      error_code: 429,
+      description: 'Too Many Requests',
+      parameters: { retry_after: 7 }
+    }
+  }));
+  t.after(() => server.close());
+
+  const result = await executeTelegram('retry classified response', {
+    baseUrl: `${server.url}/telegram`,
+    botToken: 'fixture-token',
+    chatId: '-100-envelope'
   });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.status, 429);
+  assert.equal(result.error.retriable, true);
+  assert.equal(result.error.details?.retryAfterSeconds, 7);
+});
+
+test('telegram ignores non-integer retry-after values', async t => {
+  const server = await createFixtureServer(() => ({
+    status: 429,
+    body: {
+      ok: false,
+      description: 'Too Many Requests',
+      parameters: { retry_after: '7' }
+    }
+  }));
+  t.after(() => server.close());
+
+  const result = await executeTelegram('invalid retry metadata', {
+    baseUrl: `${server.url}/telegram`,
+    botToken: 'fixture-token',
+    chatId: '-100-envelope'
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.status, 429);
+  assert.equal(result.error.retriable, true);
+  assert.equal(result.error.details, undefined);
+});
+
+test('telegram structures non-JSON responses as provider errors', async t => {
+  const server = await createFixtureServer(() => ({
+    headers: { 'content-type': 'text/plain; charset=utf-8' },
+    body: 'not json'
+  }));
+  t.after(() => server.close());
+
+  const result = await executeTelegram('non-json response', {
+    baseUrl: `${server.url}/telegram`,
+    botToken: 'fixture-token',
+    chatId: '-100-envelope'
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.status, 200);
+  assert.equal(result.error.retriable, false);
+  assert.match(result.error.message, /non-JSON/);
+});
+
+test('telegram marks server errors retriable without retrying the POST', async t => {
+  let requests = 0;
+  const server = await createFixtureServer(() => {
+    requests += 1;
+    return {
+      status: 503,
+      body: { ok: false, description: 'upstream unavailable' }
+    };
+  });
+  t.after(() => server.close());
+
+  const result = await executeTelegram('server failure', {
+    baseUrl: `${server.url}/telegram`,
+    botToken: 'fixture-token',
+    chatId: '-100-envelope'
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.status, 503);
+  assert.equal(result.error.retriable, true);
+  assert.equal(requests, 1);
+});
+
+test('telegram rejects a non-http base URL without calling fetch', async t => {
+  const fetchState = forbidFetch(t);
 
   const result = await executeTelegram('invalid endpoint', {
     baseUrl: 'file:///tmp/telegram',
@@ -259,17 +417,284 @@ test('telegram rejects a non-http base URL without calling fetch', async t => {
   assert.equal(result.error.code, 'TELEGRAM_ERROR');
   assert.equal(result.error.type, 'TelegramBotError');
   assert.match(result.error.message, /base URL.*HTTP/i);
-  assert.equal(fetchCalls, 0);
+  assert.equal(fetchState.calls, 0);
   assert.doesNotMatch(JSON.stringify(result), /fixture-token/);
 });
 
-test('telegram hides the request URL and bot token when delivery fails', async t => {
-  const guardedFetch = global.fetch;
-  global.fetch = async url => {
-    throw new Error(`network failed at ${url}`);
+test('telegram rejects base URLs with credentials, search, or hash without calling fetch', async t => {
+  const fetchState = forbidFetch(t);
+
+  for (const baseUrl of [
+    'https://user:password@api.telegram.test',
+    'https://api.telegram.test/root?environment=production',
+    'https://api.telegram.test/root#fragment'
+  ]) {
+    const result = await executeTelegram('invalid endpoint', {
+      baseUrl,
+      botToken: 'fixture-token',
+      chatId: '-1005'
+    });
+
+    assert.equal(result.success, false);
+    assert.match(result.error.message, /base URL/i);
+  }
+
+  assert.equal(fetchState.calls, 0);
+});
+
+test('telegram rejects bot tokens that can alter the request target', async t => {
+  const fetchState = forbidFetch(t);
+
+  for (const botToken of ['bad/token', 'bad?token', 'bad#token', 'bad token', 'bad%2Ftoken']) {
+    const result = await executeTelegram('invalid token', {
+      baseUrl: 'https://api.telegram.test',
+      botToken,
+      chatId: '-1005'
+    });
+
+    assert.equal(result.success, false);
+    assert.match(result.error.message, /botToken/);
+  }
+
+  assert.equal(fetchState.calls, 0);
+});
+
+test('telegram rejects invalid options and context containers before fetch', async t => {
+  const fetchState = forbidFetch(t);
+
+  const validOptions = {
+    baseUrl: 'https://api.telegram.test',
+    botToken: 'fixture-token',
+    chatId: '-100-container'
   };
+  const cases = [
+    { options: null, context: {}, field: 'options' },
+    { options: [], context: {}, field: 'options' },
+    { options: validOptions, context: null, field: 'context' },
+    { options: validOptions, context: [], field: 'context' },
+    { options: validOptions, context: { secrets: null }, field: 'context.secrets' },
+    { options: validOptions, context: { env: [] }, field: 'context.env' }
+  ];
+
+  for (const testCase of cases) {
+    const result = await executeTelegram('invalid container', testCase.options, testCase.context);
+    assert.equal(result.success, false);
+    assert.match(result.error.message, new RegExp(`${testCase.field}.*plain object`, 'i'));
+  }
+
+  assert.equal(fetchState.calls, 0);
+});
+
+test('telegram rejects non-number and non-positive timeout values before fetch', async t => {
+  const fetchState = forbidFetch(t);
+
+  for (const timeoutMs of [true, '20', Number.POSITIVE_INFINITY, Number.NaN, 0, -1]) {
+    const result = await executeTelegram('invalid timeout', {
+      baseUrl: 'https://api.telegram.test',
+      botToken: 'fixture-token',
+      chatId: '-100-timeout',
+      timeoutMs
+    });
+
+    assert.equal(result.success, false);
+    assert.match(result.error.message, /timeoutMs.*positive number/i);
+  }
+
+  assert.equal(fetchState.calls, 0);
+});
+
+test('telegram clamps timeout scheduling to 120000 milliseconds', async t => {
+  const guardedSetTimeout = global.setTimeout;
+  const guardedClearTimeout = global.clearTimeout;
+  let scheduledTimeoutMs;
+  let clearedTimeoutId;
+
+  global.setTimeout = (_callback, timeoutMs) => {
+    scheduledTimeoutMs = timeoutMs;
+    return 12345;
+  };
+  global.clearTimeout = timeoutId => {
+    clearedTimeoutId = timeoutId;
+  };
+  replaceFetch(t, async (_url, init) => {
+    assert.equal(init.redirect, 'error');
+    assert.ok(init.signal instanceof AbortSignal);
+    return {
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          ok: true,
+          result: { message_id: 48, chat: { id: -1009 }, text: 'clamped timeout' }
+        })
+    };
+  });
   t.after(() => {
-    global.fetch = guardedFetch;
+    global.setTimeout = guardedSetTimeout;
+    global.clearTimeout = guardedClearTimeout;
+  });
+
+  const result = await executeTelegram('clamped timeout', {
+    baseUrl: 'https://api.telegram.test',
+    botToken: 'fixture-token',
+    chatId: '-1009',
+    timeoutMs: 300000
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(scheduledTimeoutMs, 120000);
+  assert.equal(clearedTimeoutId, 12345);
+});
+
+test('telegram does not treat null critical options as absent', async t => {
+  const fetchState = forbidFetch(t);
+
+  const cases = [
+    {
+      options: {
+        baseUrl: 'https://api.telegram.test',
+        botToken: 'fixture-token',
+        chatId: '-100-null',
+        messageType: null
+      },
+      context: {},
+      field: 'messageType'
+    },
+    {
+      options: { baseUrl: null, botToken: 'fixture-token', chatId: '-100-null' },
+      context: { env: { TELEGRAM_API_BASE_URL: 'https://fallback.telegram.test' } },
+      field: 'baseUrl'
+    },
+    {
+      options: {
+        baseUrl: 'https://api.telegram.test',
+        botToken: null,
+        chatId: '-100-null'
+      },
+      context: { secrets: { TELEGRAM_BOT_TOKEN: 'fallback-token' } },
+      field: 'botToken'
+    }
+  ];
+
+  for (const testCase of cases) {
+    const result = await executeTelegram('null option', testCase.options, testCase.context);
+    assert.equal(result.success, false);
+    assert.match(result.error.message, new RegExp(testCase.field, 'i'));
+  }
+
+  assert.equal(fetchState.calls, 0);
+});
+
+test('telegram validates task fields and operational option types before fetch', async t => {
+  const fetchState = forbidFetch(t);
+
+  const defaults = {
+    baseUrl: 'https://api.telegram.test',
+    botToken: 'fixture-token',
+    chatId: '-100-types'
+  };
+  const cases = [
+    { input: { text: '   ' }, options: {}, field: 'text' },
+    { input: { fileUrl: '   ' }, options: { messageType: 'photo' }, field: 'fileUrl' },
+    { input: { text: true }, options: {}, field: 'text' },
+    { input: { fileUrl: 'https://media.example/a', caption: 7 }, options: { messageType: 'photo' }, field: 'caption' },
+    { input: 'valid', options: { botToken: '   ' }, field: 'botToken' },
+    { input: 'valid', options: { chatId: true }, field: 'chatId' },
+    { input: 'valid', options: { messageType: 1 }, field: 'messageType' },
+    { input: 'valid', options: { parseMode: false }, field: 'parseMode' },
+    { input: 'valid', options: { replyToMessageId: '12' }, field: 'replyToMessageId' },
+    { input: 'valid', options: { disableNotification: 'true' }, field: 'disableNotification' },
+    { input: 'valid', options: { disableWebPagePreview: 1 }, field: 'disableWebPagePreview' },
+    { input: 'valid', options: { replyMarkup: [] }, field: 'replyMarkup' },
+    { input: 'valid', options: { baseUrl: new URL('https://api.telegram.test') }, field: 'baseUrl' }
+  ];
+
+  for (const testCase of cases) {
+    const result = await executeTelegram(testCase.input, {
+      ...defaults,
+      ...testCase.options
+    });
+    assert.equal(result.success, false);
+    assert.match(result.error.message, new RegExp(testCase.field, 'i'));
+  }
+
+  assert.equal(fetchState.calls, 0);
+});
+
+test('telegram uses the Runtime bot-token secret fallback', async t => {
+  const botToken = '123456:runtime_secret';
+  const server = await createFixtureServer((url, request, body) => {
+    assert.equal(url.pathname, `/telegram/bot${encodeURIComponent(botToken)}/sendMessage`);
+    assert.equal(request.method, 'POST');
+    assert.equal(JSON.parse(body).text, 'secret fallback');
+    return {
+      body: {
+        ok: true,
+        result: { message_id: 47, chat: { id: -1008 }, text: 'secret fallback' }
+      }
+    };
+  });
+  t.after(() => server.close());
+
+  const result = await executeTelegram(
+    'secret fallback',
+    { chatId: '-1008' },
+    {
+      secrets: { TELEGRAM_BOT_TOKEN: botToken },
+      env: { TELEGRAM_API_BASE_URL: `${server.url}/telegram` }
+    }
+  );
+
+  assert.equal(result.success, true);
+  assert.deepEqual(result.data, {
+    messageId: 47,
+    chatId: -1008,
+    text: 'secret fallback'
+  });
+  assert.doesNotMatch(JSON.stringify(result), /runtime_secret|123456/);
+});
+
+test('telegram refuses POST redirects without contacting the redirected origin', async t => {
+  let redirectedRequests = 0;
+  const redirectedServer = await createFixtureServer(() => {
+    redirectedRequests += 1;
+    return {
+      body: {
+        ok: true,
+        result: { message_id: 999, chat: { id: -999 }, text: 'redirected' }
+      }
+    };
+  });
+  const redirectingServer = await createFixtureServer((url, request) => {
+    assert.equal(url.pathname, '/telegram/botfixture-token/sendMessage');
+    assert.equal(request.method, 'POST');
+    return {
+      status: 307,
+      headers: { location: `${redirectedServer.url}/telegram/botfixture-token/sendMessage` },
+      body: ''
+    };
+  });
+  t.after(() => redirectingServer.close());
+  t.after(() => redirectedServer.close());
+
+  const result = await executeTelegram('do not redirect', {
+    baseUrl: `${redirectingServer.url}/telegram`,
+    botToken: 'fixture-token',
+    chatId: '-1005'
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.code, 'TELEGRAM_ERROR');
+  assert.equal(redirectedRequests, 0);
+  assert.doesNotMatch(
+    JSON.stringify(result),
+    /fixture-token|127\.0\.0\.1|localhost|https?:\/\//
+  );
+});
+
+test('telegram hides the request URL and bot token when delivery fails', async t => {
+  replaceFetch(t, async url => {
+    throw new Error(`network failed at ${url}`);
   });
 
   const result = await executeTelegram('network failure', {
@@ -281,6 +706,7 @@ test('telegram hides the request URL and bot token when delivery fails', async t
   assert.equal(result.success, false);
   assert.equal(result.error.code, 'TELEGRAM_ERROR');
   assert.equal(result.error.message, 'Telegram request failed');
+  assert.equal(result.error.retriable, true);
   assert.doesNotMatch(JSON.stringify(result), /telegram-fixture\.invalid|fixture-token/);
 });
 

@@ -31,7 +31,7 @@ async function execute(input, options = {}, context = {}) {
         const method = methodForMessageType(config.messageType);
         const payload = buildPayload(config);
         const message = await telegramRequest(
-            `${config.baseUrl}/bot${config.botToken}/${method}`,
+            buildRequestUrl(config.baseUrl, config.botToken, method),
             payload,
             config.timeoutMs
         );
@@ -47,38 +47,53 @@ async function execute(input, options = {}, context = {}) {
 }
 
 function buildConfig(input, options, context) {
+    requirePlainObject(options, 'options');
+    requirePlainObject(context, 'context');
+    if (context.secrets !== undefined) {
+        requirePlainObject(context.secrets, 'context.secrets');
+    }
+    if (context.env !== undefined) {
+        requirePlainObject(context.env, 'context.env');
+    }
+
     const content = normalizeInput(input);
-    const messageType = options.messageType ?? 'text';
-    const botToken = options.botToken ?? context?.secrets?.TELEGRAM_BOT_TOKEN;
+    const messageType = options.messageType === undefined ? 'text' : options.messageType;
+    const botToken =
+        options.botToken === undefined
+            ? context.secrets?.TELEGRAM_BOT_TOKEN
+            : options.botToken;
     const chatId = options.chatId;
 
-    if (!['text', 'photo', 'document'].includes(messageType)) {
+    if (typeof messageType !== 'string' || !['text', 'photo', 'document'].includes(messageType)) {
         throw new TelegramBotError('messageType must be text, photo, or document');
     }
-    if (typeof botToken !== 'string' || botToken.length === 0) {
+    if (typeof botToken !== 'string' || botToken.trim().length === 0) {
         throw new TelegramBotError('botToken is required');
     }
-    if (chatId === undefined || chatId === null || chatId === '') {
+    if (!/^[A-Za-z0-9:_-]+$/u.test(botToken)) {
+        throw new TelegramBotError('botToken contains unsupported characters');
+    }
+    if (!isValidChatId(chatId)) {
         throw new TelegramBotError('chatId is required (user ID, group ID, or channel username)');
     }
-    if (messageType === 'text' && !hasStringContent(content.text)) {
+    if (messageType === 'text' && !hasNonBlankString(content.text)) {
         throw new TelegramBotError('Text content is required for text messages');
     }
-    if (messageType !== 'text' && !hasStringContent(content.fileUrl)) {
+    if (messageType !== 'text' && !hasNonBlankString(content.fileUrl)) {
         throw new TelegramBotError(`fileUrl is required for ${messageType} messages`);
     }
 
+    validateOperationalOptions(options);
+
     return {
-        baseUrl: normalizeBaseUrl(
-            options.baseUrl ?? context?.env?.TELEGRAM_API_BASE_URL ?? DEFAULT_BASE_URL
-        ),
+        baseUrl: normalizeBaseUrl(selectBaseUrl(options, context)),
         botToken,
         chatId,
         messageType,
         text: content.text,
         fileUrl: content.fileUrl,
         caption: content.caption ?? content.text,
-        parseMode: options.parseMode ?? 'Markdown',
+        parseMode: options.parseMode === undefined ? 'Markdown' : options.parseMode,
         replyToMessageId: options.replyToMessageId,
         disableNotification: options.disableNotification === true,
         disableWebPagePreview: options.disableWebPagePreview,
@@ -87,12 +102,22 @@ function buildConfig(input, options, context) {
     };
 }
 
+function selectBaseUrl(options, context) {
+    if (options.baseUrl !== undefined) {
+        return options.baseUrl;
+    }
+    if (context.env?.TELEGRAM_API_BASE_URL !== undefined) {
+        return context.env.TELEGRAM_API_BASE_URL;
+    }
+    return DEFAULT_BASE_URL;
+}
+
 function normalizeInput(input) {
     if (typeof input === 'string') {
         return { text: input };
     }
-    if (!input || typeof input !== 'object' || Array.isArray(input)) {
-        throw new TelegramBotError('Input must be a string or an object');
+    if (!isPlainObject(input)) {
+        throw new TelegramBotError('Input must be a string or a plain object');
     }
 
     for (const field of ['text', 'fileUrl', 'caption']) {
@@ -109,15 +134,32 @@ function normalizeInput(input) {
 }
 
 function normalizeBaseUrl(value) {
+    if (typeof value !== 'string' || value.trim().length === 0) {
+        throw new TelegramBotError(
+            'baseUrl (base URL) must be an absolute HTTP or HTTPS URL'
+        );
+    }
+
     let parsed;
     try {
         parsed = new URL(value);
     } catch {
-        throw new TelegramBotError('base URL must be an absolute HTTP or HTTPS URL');
+        throw new TelegramBotError(
+            'baseUrl (base URL) must be an absolute HTTP or HTTPS URL'
+        );
     }
 
-    if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.host) {
-        throw new TelegramBotError('base URL must be an absolute HTTP or HTTPS URL');
+    if (
+        !['http:', 'https:'].includes(parsed.protocol) ||
+        !parsed.host ||
+        parsed.username ||
+        parsed.password ||
+        parsed.search ||
+        parsed.hash
+    ) {
+        throw new TelegramBotError(
+            'baseUrl (base URL) must be an absolute HTTP or HTTPS URL'
+        );
     }
 
     return parsed.toString().replace(/\/+$/, '');
@@ -128,16 +170,56 @@ function normalizeTimeout(value) {
         return DEFAULT_TIMEOUT_MS;
     }
 
-    const timeoutMs = Number(value);
-    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+    if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
         throw new TelegramBotError('timeoutMs must be a positive number');
     }
 
-    return Math.min(timeoutMs, MAX_TIMEOUT_MS);
+    return Math.min(value, MAX_TIMEOUT_MS);
 }
 
-function hasStringContent(value) {
-    return typeof value === 'string' && value.length > 0;
+function hasNonBlankString(value) {
+    return typeof value === 'string' && value.trim().length > 0;
+}
+
+function isValidChatId(value) {
+    if (typeof value === 'string') {
+        return value.trim().length > 0;
+    }
+    return typeof value === 'number' && Number.isSafeInteger(value);
+}
+
+function validateOperationalOptions(options) {
+    validateOptionalNonBlankString(options.parseMode, 'parseMode');
+    validateOptionalBoolean(options.disableNotification, 'disableNotification');
+    validateOptionalBoolean(options.disableWebPagePreview, 'disableWebPagePreview');
+
+    if (
+        options.replyToMessageId !== undefined &&
+        (!Number.isSafeInteger(options.replyToMessageId) || options.replyToMessageId <= 0)
+    ) {
+        throw new TelegramBotError('replyToMessageId must be a positive integer');
+    }
+    if (options.replyMarkup !== undefined && !isPlainObject(options.replyMarkup)) {
+        throw new TelegramBotError('replyMarkup must be a plain object');
+    }
+}
+
+function validateOptionalNonBlankString(value, field) {
+    if (value !== undefined && !hasNonBlankString(value)) {
+        throw new TelegramBotError(`${field} must be a non-empty string`);
+    }
+}
+
+function validateOptionalBoolean(value, field) {
+    if (value !== undefined && typeof value !== 'boolean') {
+        throw new TelegramBotError(`${field} must be a boolean`);
+    }
+}
+
+function requirePlainObject(value, field) {
+    if (!isPlainObject(value)) {
+        throw new TelegramBotError(`${field} must be a plain object`);
+    }
 }
 
 function methodForMessageType(messageType) {
@@ -148,6 +230,13 @@ function methodForMessageType(messageType) {
         return 'sendDocument';
     }
     return 'sendMessage';
+}
+
+function buildRequestUrl(baseUrl, botToken, method) {
+    const requestUrl = new URL(`${baseUrl}/`);
+    const basePath = requestUrl.pathname.replace(/\/+$/, '');
+    requestUrl.pathname = `${basePath}/bot${encodeURIComponent(botToken)}/${method}`;
+    return requestUrl;
 }
 
 function buildPayload(config) {
@@ -192,7 +281,8 @@ async function telegramRequest(url, payload, timeoutMs) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload),
-            signal: controller.signal
+            signal: controller.signal,
+            redirect: 'error'
         });
         const responseText = await response.text();
         let responseData;
@@ -206,20 +296,33 @@ async function telegramRequest(url, payload, timeoutMs) {
             });
         }
 
+        if (!isPlainObject(responseData)) {
+            throw malformedResponseError(response.status);
+        }
+
         if (!response.ok || responseData.ok === false) {
-            const description = responseData.description || 'Telegram API request failed';
-            const retryAfterSeconds = Number(responseData.parameters?.retry_after);
-            const details = Number.isFinite(retryAfterSeconds)
-                ? { retryAfterSeconds }
-                : undefined;
+            const status = validErrorStatus(responseData.error_code) ?? response.status;
+            const description =
+                typeof responseData.description === 'string'
+                    ? responseData.description
+                    : 'Telegram API request failed';
+            const retryAfterSeconds = responseData.parameters?.retry_after;
+            const details =
+                Number.isInteger(retryAfterSeconds) && retryAfterSeconds > 0
+                    ? { retryAfterSeconds }
+                    : undefined;
             throw new TelegramBotError(
-                `Telegram API error: ${response.status} - ${description}`,
+                `Telegram API error: ${status} - ${description}`,
                 {
-                    status: response.status,
-                    retriable: isRetriableStatus(response.status),
+                    status,
+                    retriable: isRetriableStatus(status),
                     details
                 }
             );
+        }
+
+        if (responseData.ok !== true || !isPlainObject(responseData.result)) {
+            throw malformedResponseError(response.status);
         }
 
         return responseData.result;
@@ -233,7 +336,7 @@ async function telegramRequest(url, payload, timeoutMs) {
         if (error instanceof TelegramBotError) {
             throw error;
         }
-        throw new TelegramBotError('Telegram request failed');
+        throw new TelegramBotError('Telegram request failed', { retriable: true });
     } finally {
         clearTimeout(timeoutId);
     }
@@ -243,12 +346,31 @@ function isRetriableStatus(status) {
     return RETRIABLE_STATUSES.has(status) || status >= 500;
 }
 
+function isPlainObject(value) {
+    if (value === null || typeof value !== 'object') {
+        return false;
+    }
+    const prototype = Object.getPrototypeOf(value);
+    return prototype === Object.prototype || prototype === null;
+}
+
+function validErrorStatus(value) {
+    return Number.isInteger(value) && value >= 100 && value <= 599 ? value : undefined;
+}
+
+function malformedResponseError(status) {
+    return new TelegramBotError('Telegram API returned a malformed response', {
+        status,
+        retriable: isRetriableStatus(status)
+    });
+}
+
 function buildErrorResult(error, botToken) {
     const telegramError =
         error instanceof TelegramBotError
             ? error
             : new TelegramBotError(error?.message || 'Telegram request failed');
-    const safeMessage = redactToken(telegramError.message, botToken);
+    const safeMessage = sanitizeProviderMessage(telegramError.message, botToken);
     const errorData = {
         message: safeMessage,
         code: 'TELEGRAM_ERROR',
@@ -265,11 +387,25 @@ function buildErrorResult(error, botToken) {
     };
 }
 
-function redactToken(message, botToken) {
-    if (!botToken || typeof message !== 'string') {
+function sanitizeProviderMessage(message, botToken) {
+    if (typeof message !== 'string') {
         return message;
     }
-    return message.split(botToken).join('[REDACTED]');
+
+    let sanitized = message;
+    if (botToken) {
+        const encodedToken = encodeURIComponent(botToken);
+        sanitized = sanitized.split(botToken).join('[REDACTED]');
+        sanitized = sanitized.split(encodedToken).join('[REDACTED]');
+        sanitized = sanitized
+            .split(encodedToken.replace(/%[0-9A-F]{2}/gu, value => value.toLowerCase()))
+            .join('[REDACTED]');
+    }
+
+    return sanitized.replace(
+        /\b[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s"'<>]+/gu,
+        '[REDACTED_URL]'
+    );
 }
 
 function buildMetadata(extra = {}) {
