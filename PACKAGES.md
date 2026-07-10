@@ -1,10 +1,10 @@
 # Maitask Package Catalogue
 
-> Total packages: **48** · Maintained by official account **`maitask`** · Versions follow each package manifest
+> Total packages: **49** · Maintained by official account **`maitask`** · Versions follow each package manifest
 >
 > Every package is published to the Maitask registry and validated against the latest engine.
 
-## AI & Cognitive Services (10)
+## AI & Cognitive Services (11)
 
 - [**@maitask/openai**](./openai) `v0.1.0` — OpenAI GPT models integration for Maitask
 - [**@maitask/claude**](./claude) `v0.1.0` — Anthropic Claude models integration with streaming support
@@ -16,6 +16,7 @@
 - [**@maitask/code-generator**](./code-generator) `v0.1.0` — Generate production-oriented code via OpenAI/Claude
 - [**@maitask/data-analyst**](./data-analyst) `v0.1.0` — Analyze structured data and produce insights with LLMs
 - [**@maitask/document-qa**](./document-qa) `v0.1.0` — Answer questions from provided document context
+- [**@maitask/intelligence-briefing**](./intelligence-briefing) `v0.1.0` — Generate source-backed intelligence briefings with configurable AI analysis and delivery-ready output
 
 ## Media & Multimodal Processing (5)
 
