@@ -3024,6 +3024,204 @@ test('kafka does not invoke arbitrary rejected error accessors', async t => {
   });
 
   assert.equal(result.success, false);
-  assert.equal(result.error.message, 'Unknown error');
+  assert.equal(result.error.message, 'Kafka request failed');
   assert.equal(accessorReads, 0);
+});
+
+test('kafka refuses every HTTP redirect without replaying the POST or forwarding headers', async t => {
+  let redirectedRequests = 0;
+  const redirectTarget = await createFixtureServer((_url, request) => {
+    redirectedRequests += 1;
+    assert.notEqual(request.headers['x-api-key'], 'redirect-secret');
+    return { body: { offsets: [{ partition: 0, offset: 1 }] } };
+  });
+  t.after(() => redirectTarget.close());
+
+  for (const status of [301, 302, 303, 307, 308]) {
+    let sourceRequests = 0;
+    const redirectSource = await createFixtureServer((_url, request) => {
+      sourceRequests += 1;
+      assert.equal(request.method, 'POST');
+      assert.equal(request.headers['x-api-key'], 'redirect-secret');
+      return {
+        status,
+        headers: { location: `${redirectTarget.url}/redirected` },
+        body: ''
+      };
+    });
+
+    const result = await executeKafka({
+      proxyUrl: redirectSource.url,
+      topic: 'production-events',
+      messages: ['event'],
+      headers: { 'X-Api-Key': 'redirect-secret' }
+    });
+    await redirectSource.close();
+
+    assert.equal(result.success, false, `followed ${status} redirect`);
+    assert.equal(sourceRequests, 1);
+    assert.doesNotMatch(JSON.stringify(result), /redirect-secret|redirected/);
+  }
+
+  assert.equal(redirectedRequests, 0);
+});
+
+test('kafka validates proxy URLs before delivery', async t => {
+  const fetchState = forbidFetch(t);
+  const invalidUrls = [
+    'file:///tmp/kafka',
+    'https://user:password@proxy.example/api',
+    'https://proxy.example/api?token=secret',
+    'https://proxy.example/api#secret',
+    'not-an-absolute-url'
+  ];
+
+  for (const proxyUrl of invalidUrls) {
+    const result = await executeKafka({
+      proxyUrl,
+      topic: 'production-events',
+      messages: ['event']
+    });
+    assert.equal(result.success, false, `accepted ${proxyUrl}`);
+    assert.match(result.error.message, /proxyUrl/i);
+    assert.doesNotMatch(JSON.stringify(result), /password|token=secret|#secret/);
+  }
+  assert.equal(fetchState.calls, 0);
+});
+
+test('kafka masks proxy URL paths in success metadata', async t => {
+  const server = await createFixtureServer(url => {
+    assert.equal(url.pathname, '/private-proxy-token/topics/production-events');
+    return { body: { offsets: [{ partition: 0, offset: 1 }] } };
+  });
+  t.after(() => server.close());
+
+  const result = await executeKafka({
+    proxyUrl: `${server.url}/private-proxy-token`,
+    topic: 'production-events',
+    messages: ['event']
+  });
+
+  assert.equal(result.success, true);
+  assert.equal(result.metadata.proxyUrl, server.url);
+  assert.doesNotMatch(JSON.stringify(result), /private-proxy-token/);
+});
+
+test('kafka enforces the formal header contract and preserves the protocol content type', async t => {
+  const fetchState = forbidFetch(t);
+  const base = {
+    proxyUrl: 'https://proxy.example',
+    topic: 'production-events',
+    messages: ['event']
+  };
+
+  for (const headers of [[], 'Authorization', 7, true]) {
+    const result = await executeKafka({ ...base, headers });
+    assert.equal(result.success, false, `accepted headers ${JSON.stringify(headers)}`);
+    assert.match(result.error.message, /headers.*plain object/i);
+  }
+
+  for (const headers of [
+    { 'Bad Header': 'value' },
+    { 'Content-Type': 'text/plain' },
+    { 'content-type': 'text/plain' }
+  ]) {
+    const result = await executeKafka({ ...base, headers });
+    assert.equal(result.success, false, `accepted headers ${JSON.stringify(headers)}`);
+    assert.match(result.error.message, /header|content-type/i);
+  }
+  assert.equal(fetchState.calls, 0);
+
+  replaceFetch(t, async (_url, init) => {
+    assert.equal(init.headers.Authorization, 'Bearer fixture-kafka');
+    assert.equal(init.headers['Content-Type'], 'application/vnd.kafka.json.v2+json');
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ offsets: [{ partition: 0, offset: 1 }] })
+    };
+  });
+
+  const result = await executeKafka({
+    ...base,
+    headers: { Authorization: 'Bearer fixture-kafka' }
+  });
+  assert.equal(result.success, true);
+  assert.doesNotMatch(JSON.stringify(result), /fixture-kafka/);
+});
+
+test('kafka does not inspect array Proxy getters', async t => {
+  let getCalls = 0;
+  const proxiedMessages = new Proxy(['event'], {
+    get(target, property, receiver) {
+      getCalls += 1;
+      return Reflect.get(target, property, receiver);
+    }
+  });
+  replaceFetch(t, async () => ({
+    ok: true,
+    status: 200,
+    text: async () => JSON.stringify({ offsets: [{ partition: 0, offset: 1 }] })
+  }));
+  const proxyResult = await executeKafka({
+    proxyUrl: 'https://proxy.example',
+    topic: 'production-events',
+    messages: proxiedMessages
+  });
+
+  assert.equal(proxyResult.success, true);
+  assert.equal(getCalls, 0);
+});
+
+test('kafka hides arbitrary network exception messages', async t => {
+  replaceFetch(t, async () => {
+    throw new Error('socket failed: Bearer leaked-secret at https://proxy.example/private');
+  });
+  const errorResult = await executeKafka({
+    proxyUrl: 'https://proxy.example',
+    topic: 'production-events',
+    messages: ['event'],
+    headers: { Authorization: 'Bearer leaked-secret' }
+  });
+
+  assert.equal(errorResult.success, false);
+  assert.equal(errorResult.error.message, 'Kafka request failed');
+  assert.doesNotMatch(JSON.stringify(errorResult), /leaked-secret|proxy\.example|https?:\/\//);
+});
+
+test('kafka sanitizes provider error messages using proxy and header secrets', async t => {
+  const server = await createFixtureServer(() => ({
+    status: 503,
+    body: {
+      message:
+        'Bearer body-secret at https:\/\/proxy.example\/private and https%253A%252F%252Fencoded.example%252Fsecret'
+    }
+  }));
+  t.after(() => server.close());
+
+  const result = await executeKafka({
+    proxyUrl: `${server.url}/private-proxy-token`,
+    topic: 'production-events',
+    messages: ['event'],
+    headers: { Authorization: 'Bearer body-secret' }
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.code, 'KAFKA_PUBLISHER_ERROR');
+  assert.doesNotMatch(
+    JSON.stringify(result),
+    /body-secret|private-proxy-token|proxy\.example|encoded\.example|https?:\/\//
+  );
+
+  const rootProxyResult = await executeKafka({
+    proxyUrl: server.url,
+    topic: 'production-events',
+    messages: ['event'],
+    headers: { Authorization: 'Bearer body-secret' }
+  });
+  assert.equal(rootProxyResult.success, false);
+  assert.doesNotMatch(
+    JSON.stringify(rootProxyResult),
+    /body-secret|proxy\.example|encoded\.example|https?:|redacted.*proxy/i
+  );
 });
