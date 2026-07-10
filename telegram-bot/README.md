@@ -17,6 +17,8 @@ Send a text message, photo, or document through the Telegram Bot API.
 
 The exact option allowlist is `baseUrl`, `botToken`, `chatId`, `messageType`, `parseMode`, `replyToMessageId`, `disableNotification`, `disableWebPagePreview`, `replyMarkup`, and `timeoutMs`. Message content does not belong in `options`. Before making a request, the Runtime rejects every unknown or legacy field in either `input` or `options`, including Telegram wire names.
 
+Readonly JSON values, including deeply nested `as const` keyboard markup, are accepted. The package snapshots public input and options and deep-copies `replyMarkup` before delivery. Accessors and behavioral `toJSON` functions are rejected without invocation; cycles, non-finite numbers, custom object structures, and other non-JSON values are also rejected.
+
 ## Authentication and endpoint selection
 
 The formal context contains only `secrets.TELEGRAM_BOT_TOKEN` and `env.TELEGRAM_API_BASE_URL`. Prefer the Runtime secret for the bot token; an explicit `options.botToken` takes precedence. `options.baseUrl` takes precedence over the context environment value; otherwise the package uses `https://api.telegram.org`.

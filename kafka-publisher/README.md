@@ -17,7 +17,7 @@ Publish one or more records through a Confluent-compatible Kafka REST Proxy JSON
 
 The public options are the fallback fields `proxyUrl` and `timeoutMs`; other option fields are not used. An own input field is authoritative even when its value is `undefined`, `null`, or otherwise invalid, so explicit invalid input does not fall back to `options`. `proxyUrl` is required after input/options selection.
 
-`context` has no supported fields and is not read. Omit it or pass an empty object.
+The optional third argument accepts an opaque Runtime context object, including readonly Runtime fields such as `executionId`. The package currently does not read any context field; context is not part of the input/options configuration contract.
 
 When neither input nor options supplies `timeoutMs`, the timeout defaults to 30000 milliseconds. A selected timeout must be a finite positive number; invalid explicit values return a structured failure instead of using a fallback or default. Positive values are clamped to 120000 milliseconds.
 
@@ -48,6 +48,8 @@ When neither input nor options supplies `timeoutMs`, the timeout defaults to 300
 
 The package sends one `POST` with content type `application/vnd.kafka.json.v2+json` and a body shaped as `{"records":[...]}`. A string message is sent unchanged as the record `value`; every other JSON message is serialized with `JSON.stringify` and sent as a string. The shared `key` is either a string or `null`.
 
+Readonly messages, keys, and headers, including deeply nested `as const` JSON, are accepted. The package snapshots input and options and deep-copies message, key, and header JSON before serialization. Accessors and behavioral `toJSON` functions are rejected without invocation; cycles, non-finite numbers, custom object structures, and other non-JSON values are also rejected.
+
 The package currently performs no automatic retry. It also does not add redirect restrictions or sanitize arbitrary header values and proxy URLs from errors; callers must avoid placing secrets in returned provider messages and must treat `headers` as sensitive configuration when they contain credentials.
 
 ## Results
@@ -76,6 +78,8 @@ The package currently performs no automatic retry. It also does not add redirect
 Successful HTTP responses must contain a valid plain-object envelope with an `offsets` array. Every offset requires a non-negative safe-integer `partition` and at least one result: a non-negative safe-integer `offset`, or an integer provider error code paired with a string error message. Malformed envelopes and invalid offset entries return the normal structured failure result.
 
 Result offsets expose only the known camelCase fields `partition`, `offset`, `errorCode`, and `error`; unknown provider fields do not enter the result. On the REST Proxy wire, the provider field `error_code` is accepted and translated to `errorCode`.
+
+Unknown provider response data fields are omitted without traversing their values; response accessors still invalidate the envelope. For a non-success HTTP response, the package extracts only an own string `message` or an own nested string `error.message`; otherwise it returns the controlled status fallback.
 
 Failures use the current fixed code `KAFKA_PUBLISHER_ERROR` and type `KafkaPublisherError`:
 

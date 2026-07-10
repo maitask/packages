@@ -2,111 +2,111 @@ export type SlackJsonPrimitive = string | number | boolean | null;
 
 export type SlackJsonValue =
   | SlackJsonPrimitive
-  | SlackJsonValue[]
+  | readonly SlackJsonValue[]
   | SlackJsonObject;
 
 export interface SlackJsonObject {
-  [key: string]: SlackJsonValue;
+  readonly [key: string]: SlackJsonValue;
 }
 
 export interface SlackTextObject extends SlackJsonObject {
-  type: string;
-  text: string;
+  readonly type: string;
+  readonly text: string;
 }
 
 export interface SlackBlock extends SlackJsonObject {
-  type: string;
+  readonly type: string;
 }
 
 export interface SlackAttachment extends SlackJsonObject {}
 
 export interface SlackMessageInput {
-  text?: string;
-  blocks?: SlackBlock[];
-  attachments?: SlackAttachment[];
+  readonly text?: string;
+  readonly blocks?: readonly SlackBlock[];
+  readonly attachments?: readonly SlackAttachment[];
 }
 
 export type SlackInput = string | SlackMessageInput;
 
 export interface SlackOptions {
-  webhookUrl?: string;
-  threadTs?: string;
-  channel?: string;
-  username?: string;
-  iconEmoji?: string;
-  iconUrl?: string;
-  linkNames?: boolean;
-  mrkdwn?: boolean;
-  timeoutMs?: number;
+  readonly webhookUrl?: string;
+  readonly threadTs?: string;
+  readonly channel?: string;
+  readonly username?: string;
+  readonly iconEmoji?: string;
+  readonly iconUrl?: string;
+  readonly linkNames?: boolean;
+  readonly mrkdwn?: boolean;
+  readonly timeoutMs?: number;
 }
 
 export interface SlackSecrets {
-  SLACK_WEBHOOK_URL?: string;
+  readonly SLACK_WEBHOOK_URL?: string;
 }
 
 export interface SlackContext {
-  secrets?: SlackSecrets;
+  readonly secrets?: SlackSecrets;
 }
 
 export interface SlackDeliveryData {
-  webhook: string;
-  username: string;
-  icon?: string;
-  channel?: string;
-  threadTs?: string;
-  hasBlocks: boolean;
-  hasAttachments: boolean;
+  readonly webhook: string;
+  readonly username: string;
+  readonly icon?: string;
+  readonly channel?: string;
+  readonly threadTs?: string;
+  readonly hasBlocks: boolean;
+  readonly hasAttachments: boolean;
 }
 
 export interface SlackSuccessMetadata {
-  package: '@maitask/slack-notifier';
-  version: '0.1.0';
-  provider: 'slack';
-  webhook: string;
-  responseStatus: number;
-  responseTimeMs: number;
-  timestamp: string;
+  readonly package: '@maitask/slack-notifier';
+  readonly version: '0.1.0';
+  readonly provider: 'slack';
+  readonly webhook: string;
+  readonly responseStatus: number;
+  readonly responseTimeMs: number;
+  readonly timestamp: string;
 }
 
 export interface SlackFailureMetadata {
-  package: '@maitask/slack-notifier';
-  version: '0.1.0';
-  provider: 'slack';
-  webhook: string | null;
-  timestamp: string;
+  readonly package: '@maitask/slack-notifier';
+  readonly version: '0.1.0';
+  readonly provider: 'slack';
+  readonly webhook: string | null;
+  readonly timestamp: string;
 }
 
 export interface SlackRetryAfterDetails {
-  retryAfterSeconds: number;
+  readonly retryAfterSeconds: number;
 }
 
 export interface SlackTimeoutDetails {
-  timeoutMs: number;
+  readonly timeoutMs: number;
 }
 
 export type SlackErrorDetails = SlackRetryAfterDetails | SlackTimeoutDetails;
 
 export interface SlackError {
-  message: string;
-  code: 'SLACK_ERROR';
-  type: 'SlackNotificationError';
-  status?: number;
-  retriable?: boolean;
-  details?: SlackErrorDetails;
+  readonly message: string;
+  readonly code: 'SLACK_ERROR';
+  readonly type: 'SlackNotificationError';
+  readonly status?: number;
+  readonly retriable?: boolean;
+  readonly details?: SlackErrorDetails;
 }
 
 export interface SlackSuccess {
-  success: true;
-  data: SlackDeliveryData;
-  metadata: SlackSuccessMetadata;
-  error?: never;
+  readonly success: true;
+  readonly data: SlackDeliveryData;
+  readonly metadata: SlackSuccessMetadata;
+  readonly error?: never;
 }
 
 export interface SlackFailure {
-  success: false;
-  error: SlackError;
-  metadata: SlackFailureMetadata;
-  data?: never;
+  readonly success: false;
+  readonly error: SlackError;
+  readonly metadata: SlackFailureMetadata;
+  readonly data?: never;
 }
 
 export type SlackResult = SlackSuccess | SlackFailure;

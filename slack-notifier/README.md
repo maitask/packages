@@ -8,6 +8,8 @@ Send text, Block Kit layouts, and attachment-compatible JSON through a Slack Inc
 
 The exact option allowlist is `webhookUrl`, `threadTs`, `channel`, `username`, `iconEmoji`, `iconUrl`, `linkNames`, `mrkdwn`, and `timeoutMs`. Message content belongs in `input`, and legacy or unknown fields are rejected.
 
+Readonly Block Kit and attachment JSON, including deeply nested `as const` values, is accepted. The package snapshots public containers and deep-copies blocks and attachments before delivery. Accessors and behavioral `toJSON` functions are rejected without invocation; cycles, non-finite numbers, custom object structures, and other non-JSON values are also rejected.
+
 - `webhookUrl` may be provided explicitly or through `context.secrets.SLACK_WEBHOOK_URL`; that secret is the only formal context configuration.
 - `username` defaults to `Maitask Bot`.
 - `iconEmoji` defaults to `:robot_face:` when neither icon option is set. Explicit `iconEmoji` and `iconUrl` are mutually exclusive.
