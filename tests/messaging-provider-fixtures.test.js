@@ -1575,6 +1575,388 @@ test('slack rejects blocks without an own non-blank string type before fetch', a
   assert.equal(accessorReads, 0);
 });
 
+test('slack snapshots public data without invoking input option or secret accessors', async t => {
+  const fetchState = forbidFetch(t);
+  const webhookUrl = 'https://hooks.slack.test/services/T209/B209/accessor-secret';
+  const cases = [
+    {
+      label: 'input.text getter',
+      create: () => {
+        let reads = 0;
+        const input = {};
+        Object.defineProperty(input, 'text', {
+          enumerable: true,
+          get: () => {
+            reads += 1;
+            throw new Error('input-getter-private-value');
+          }
+        });
+        return {
+          input,
+          options: { webhookUrl },
+          context: {},
+          getReads: () => reads,
+          expectedWebhook: 'https://hooks.slack.test/services/T***/B***/***'
+        };
+      }
+    },
+    {
+      label: 'options.username getter',
+      create: () => {
+        let reads = 0;
+        const options = { webhookUrl };
+        Object.defineProperty(options, 'username', {
+          enumerable: true,
+          get: () => {
+            reads += 1;
+            throw new Error('option-getter-private-value');
+          }
+        });
+        return {
+          input: { text: 'valid task' },
+          options,
+          context: {},
+          getReads: () => reads,
+          expectedWebhook: 'https://hooks.slack.test/services/T***/B***/***'
+        };
+      }
+    },
+    {
+      label: 'context.secrets getter',
+      create: () => {
+        let reads = 0;
+        const context = {};
+        Object.defineProperty(context, 'secrets', {
+          enumerable: true,
+          get: () => {
+            reads += 1;
+            throw new Error('context-getter-private-value');
+          }
+        });
+        return {
+          input: { text: 'valid task' },
+          options: { webhookUrl },
+          context,
+          getReads: () => reads,
+          expectedWebhook: 'https://hooks.slack.test/services/T***/B***/***'
+        };
+      }
+    },
+    {
+      label: 'SLACK_WEBHOOK_URL getter',
+      create: () => {
+        let reads = 0;
+        const secrets = {};
+        Object.defineProperty(secrets, 'SLACK_WEBHOOK_URL', {
+          enumerable: true,
+          get: () => {
+            reads += 1;
+            throw new Error('secret-getter-private-value');
+          }
+        });
+        return {
+          input: { text: 'valid task' },
+          options: {},
+          context: { secrets },
+          getReads: () => reads,
+          expectedWebhook: null
+        };
+      }
+    }
+  ];
+
+  for (const testCase of cases) {
+    const values = testCase.create();
+    const result = await executeSlack(values.input, values.options, values.context);
+
+    assert.equal(result.success, false, `accepted ${testCase.label}`);
+    assert.equal(result.error.code, 'SLACK_ERROR');
+    assert.equal(result.error.type, 'SlackNotificationError');
+    assert.equal(values.getReads(), 0, `invoked ${testCase.label}`);
+    assert.equal(result.metadata.webhook, values.expectedWebhook);
+    assert.doesNotMatch(
+      JSON.stringify(result),
+      /input-getter-private-value|option-getter-private-value|context-getter-private-value|secret-getter-private-value|T209|B209|accessor-secret/
+    );
+  }
+
+  assert.equal(fetchState.calls, 0);
+});
+
+test('slack replaces untrusted thrown errors with a fixed safe message', async t => {
+  const fetchState = forbidFetch(t);
+  const forgedError = new Error('forged-slack-error-private-value');
+  forgedError.code = 'SLACK_ERROR';
+  forgedError.type = 'SlackNotificationError';
+  const input = new Proxy(
+    { text: 'valid task' },
+    {
+      ownKeys() {
+        throw forgedError;
+      }
+    }
+  );
+
+  const result = await executeSlack(input, {
+    webhookUrl: 'https://hooks.slack.test/services/T213/B213/forged-secret'
+  });
+
+  assert.equal(result.success, false);
+  assert.equal(result.error.message, 'Slack notification failed');
+  assert.equal(result.error.code, 'SLACK_ERROR');
+  assert.equal(result.error.type, 'SlackNotificationError');
+  assert.equal(result.metadata.webhook, 'https://hooks.slack.test/services/T***/B***/***');
+  assert.equal(fetchState.calls, 0);
+  assert.doesNotMatch(
+    JSON.stringify(result),
+    /forged-slack-error-private-value|T213|B213|forged-secret/
+  );
+});
+
+test('slack rejects symbols and custom prototypes in public data before fetch', async t => {
+  const fetchState = forbidFetch(t);
+  const webhookUrl = 'https://hooks.slack.test/services/T210/B210/public-secret';
+  const symbol = Symbol('private');
+  const customInput = Object.create({ inherited: true });
+  customInput.text = 'valid task';
+  const customOptions = Object.create({ inherited: true });
+  customOptions.webhookUrl = webhookUrl;
+  const customSecrets = Object.create({ inherited: true });
+  customSecrets.SLACK_WEBHOOK_URL = webhookUrl;
+  const cases = [
+    {
+      label: 'input symbol',
+      input: { text: 'valid task', [symbol]: 'hidden' },
+      options: { webhookUrl },
+      context: {},
+      expectedWebhook: 'https://hooks.slack.test/services/T***/B***/***'
+    },
+    {
+      label: 'options symbol',
+      input: { text: 'valid task' },
+      options: { webhookUrl, [symbol]: 'hidden' },
+      context: {},
+      expectedWebhook: 'https://hooks.slack.test/services/T***/B***/***'
+    },
+    {
+      label: 'secret symbol',
+      input: { text: 'valid task' },
+      options: {},
+      context: { secrets: { SLACK_WEBHOOK_URL: webhookUrl, [symbol]: 'hidden' } },
+      expectedWebhook: 'https://hooks.slack.test/services/T***/B***/***'
+    },
+    {
+      label: 'custom input prototype',
+      input: customInput,
+      options: { webhookUrl },
+      context: {},
+      expectedWebhook: 'https://hooks.slack.test/services/T***/B***/***'
+    },
+    {
+      label: 'custom options prototype',
+      input: { text: 'valid task' },
+      options: customOptions,
+      context: {},
+      expectedWebhook: null
+    },
+    {
+      label: 'custom secrets prototype',
+      input: { text: 'valid task' },
+      options: {},
+      context: { secrets: customSecrets },
+      expectedWebhook: null
+    }
+  ];
+
+  for (const testCase of cases) {
+    const result = await executeSlack(testCase.input, testCase.options, testCase.context);
+    assert.equal(result.success, false, `accepted ${testCase.label}`);
+    assert.equal(result.error.code, 'SLACK_ERROR');
+    assert.equal(result.metadata.webhook, testCase.expectedWebhook);
+    assert.doesNotMatch(JSON.stringify(result), /T210|B210|public-secret|hidden/);
+  }
+
+  assert.equal(fetchState.calls, 0);
+});
+
+test('slack rejects behavioral or non-JSON nested message data before fetch', async t => {
+  const fetchState = forbidFetch(t);
+  const webhookUrl = 'https://hooks.slack.test/services/T211/B211/nested-secret';
+  const symbol = Symbol('nested-private');
+  const cases = [
+    {
+      label: 'block getter',
+      create: () => {
+        let calls = 0;
+        const text = {};
+        Object.defineProperty(text, 'text', {
+          enumerable: true,
+          get: () => {
+            calls += 1;
+            throw new Error('nested-block-getter-secret');
+          }
+        });
+        return {
+          input: { text: 'fallback', blocks: [{ type: 'section', text }] },
+          getBehaviorCalls: () => calls
+        };
+      }
+    },
+    {
+      label: 'attachment getter',
+      create: () => {
+        let calls = 0;
+        const attachment = {};
+        Object.defineProperty(attachment, 'text', {
+          enumerable: true,
+          get: () => {
+            calls += 1;
+            throw new Error('nested-attachment-getter-secret');
+          }
+        });
+        return {
+          input: { text: 'fallback', attachments: [attachment] },
+          getBehaviorCalls: () => calls
+        };
+      }
+    },
+    {
+      label: 'toJSON function',
+      create: () => {
+        let calls = 0;
+        const behavior = {
+          toJSON() {
+            calls += 1;
+            return { leaked: 'nested-tojson-secret' };
+          }
+        };
+        return {
+          input: { text: 'fallback', blocks: [{ type: 'section', behavior }] },
+          getBehaviorCalls: () => calls
+        };
+      }
+    },
+    {
+      label: 'cycle',
+      create: () => {
+        const attachment = {};
+        attachment.self = attachment;
+        return { input: { text: 'fallback', attachments: [attachment] } };
+      }
+    },
+    {
+      label: 'custom prototype',
+      create: () => ({
+        input: {
+          text: 'fallback',
+          blocks: [{ type: 'section', nested: Object.create({ inherited: true }) }]
+        }
+      })
+    },
+    {
+      label: 'array hole',
+      create: () => ({
+        input: { text: 'fallback', blocks: [{ type: 'actions', elements: new Array(1) }] }
+      })
+    },
+    {
+      label: 'function',
+      create: () => ({
+        input: { text: 'fallback', blocks: [{ type: 'section', callback: () => true }] }
+      })
+    },
+    {
+      label: 'bigint',
+      create: () => ({
+        input: { text: 'fallback', attachments: [{ count: 1n }] }
+      })
+    },
+    {
+      label: 'undefined',
+      create: () => ({
+        input: { text: 'fallback', attachments: [{ optional: undefined }] }
+      })
+    },
+    {
+      label: 'symbol',
+      create: () => ({
+        input: { text: 'fallback', blocks: [{ type: 'section', [symbol]: 'hidden' }] }
+      })
+    }
+  ];
+
+  for (const testCase of cases) {
+    const values = testCase.create();
+    const result = await executeSlack(values.input, { webhookUrl });
+
+    assert.equal(result.success, false, `accepted nested ${testCase.label}`);
+    assert.equal(result.error.code, 'SLACK_ERROR');
+    assert.equal(result.error.type, 'SlackNotificationError');
+    assert.match(result.error.message, /blocks|attachments/i);
+    assert.equal(values.getBehaviorCalls?.() || 0, 0, `executed nested ${testCase.label}`);
+    assert.equal(result.metadata.webhook, 'https://hooks.slack.test/services/T***/B***/***');
+    assert.doesNotMatch(
+      JSON.stringify(result),
+      /nested-block-getter-secret|nested-attachment-getter-secret|nested-tojson-secret|T211|B211|nested-secret|hidden/
+    );
+  }
+
+  assert.equal(fetchState.calls, 0);
+});
+
+test('slack sends detached deep JSON message data without mutating the source', async t => {
+  const expectedPayload = {
+    text: 'deep message',
+    blocks: [
+      {
+        type: 'section',
+        text: { type: 'mrkdwn', text: '*Deploy complete*' },
+        accessory: {
+          type: 'button',
+          text: { type: 'plain_text', text: 'Inspect' },
+          value: 'inspect-release'
+        }
+      },
+      {
+        type: 'context',
+        elements: [{ type: 'plain_text', text: 'production' }]
+      }
+    ],
+    attachments: [
+      {
+        color: '#00ff00',
+        fields: [{ title: 'Attempts', value: 1, short: true }],
+        details: { approved: true, note: null, ratios: [0.5, 1] }
+      }
+    ],
+    username: 'Maitask Bot',
+    icon_emoji: ':robot_face:',
+    link_names: true,
+    mrkdwn: true
+  };
+  const server = await createFixtureServer((_url, request, body) => {
+    assert.equal(request.method, 'POST');
+    assert.deepEqual(JSON.parse(body), expectedPayload);
+    return { headers: { 'content-type': 'text/plain' }, body: 'ok' };
+  });
+  t.after(() => server.close());
+
+  const input = {
+    text: expectedPayload.text,
+    blocks: expectedPayload.blocks,
+    attachments: expectedPayload.attachments
+  };
+  const options = { webhookUrl: `${server.url}/services/T212/B212/deep-secret` };
+  const context = { secrets: { UNUSED_SECRET: 'unchanged' } };
+  const originals = [structuredClone(input), structuredClone(options), structuredClone(context)];
+
+  const result = await executeSlack(input, options, context);
+
+  assert.equal(result.success, true);
+  assert.deepEqual([input, options, context], originals);
+  assert.doesNotMatch(JSON.stringify(result), /T212|B212|deep-secret/);
+});
+
 test('slack rejects simultaneous explicit icon settings before fetch', async t => {
   const fetchState = forbidFetch(t);
   const result = await executeSlack('conflicting icon', {

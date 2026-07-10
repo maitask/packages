@@ -11,6 +11,7 @@ const PACKAGE_VERSION = '0.1.0';
 const DEFAULT_TIMEOUT_MS = 30000;
 const MAX_TIMEOUT_MS = 120000;
 const MAX_PROVIDER_NORMALIZATION_PASSES = 4;
+const CONTROLLED_SLACK_ERRORS = new WeakSet();
 const INPUT_FIELDS = new Set(['text', 'blocks', 'attachments']);
 const OPTION_FIELDS = new Set([
   'webhookUrl',
@@ -26,10 +27,39 @@ const OPTION_FIELDS = new Set([
 
 async function execute(input, options = {}, context = {}) {
   let config;
-  const metadataWebhook = extractMetadataWebhook(options, context);
+  let metadataWebhook = null;
 
   try {
-    config = buildConfig(input, options, context);
+    let safeOptions;
+    try {
+      safeOptions = snapshotPublicObject(options, 'options', OPTION_FIELDS);
+    } catch (error) {
+      if (isSlackError(error) && error.snapshot) {
+        metadataWebhook = extractMetadataWebhook(error.snapshot, null);
+      }
+      throw error;
+    }
+    metadataWebhook = extractMetadataWebhook(safeOptions, null);
+
+    const safeContext = snapshotPublicObject(context, 'context');
+    let safeSecrets = Object.create(null);
+    if (Object.hasOwn(safeContext, 'secrets') && safeContext.secrets !== undefined) {
+      try {
+        safeSecrets = snapshotPublicObject(safeContext.secrets, 'context.secrets');
+      } catch (error) {
+        if (
+          isSlackError(error) &&
+          error.snapshot &&
+          !Object.hasOwn(safeOptions, 'webhookUrl')
+        ) {
+          metadataWebhook = extractMetadataWebhook(safeOptions, error.snapshot);
+        }
+        throw error;
+      }
+    }
+    metadataWebhook = extractMetadataWebhook(safeOptions, safeSecrets);
+
+    config = buildConfig(input, safeOptions, safeSecrets);
     const payload = buildSlackPayload(config);
     const response = await sendSlackMessage(config, payload);
     const data = {
@@ -76,18 +106,11 @@ async function execute(input, options = {}, context = {}) {
   }
 }
 
-function buildConfig(input, options, context) {
-  assertPlainObject(options, 'options');
-  assertPlainObject(context, 'context');
-  if (context.secrets !== undefined) {
-    assertPlainObject(context.secrets, 'context.secrets');
-  }
-  assertAllowedFields(options, OPTION_FIELDS, 'options');
-
+function buildConfig(input, options, secrets) {
   const task = normalizeInput(input);
   const webhookValue = Object.hasOwn(options, 'webhookUrl')
     ? options.webhookUrl
-    : context.secrets?.SLACK_WEBHOOK_URL;
+    : secrets.SLACK_WEBHOOK_URL;
   const webhookUrl = normalizeWebhookUrl(webhookValue);
 
   const threadTs = optionalNonEmptyString(options, 'threadTs');
@@ -138,23 +161,20 @@ function normalizeInput(input) {
     return { text: input };
   }
 
-  assertPlainObject(input, 'input');
-  assertAllowedFields(input, INPUT_FIELDS, 'input');
+  const safeInput = snapshotPublicObject(input, 'input', INPUT_FIELDS);
   const task = {};
 
-  if (Object.hasOwn(input, 'text')) {
-    if (typeof input.text !== 'string') {
+  if (Object.hasOwn(safeInput, 'text')) {
+    if (typeof safeInput.text !== 'string') {
       throw slackError('text must be a string');
     }
-    task.text = input.text;
+    task.text = safeInput.text;
   }
-  if (Object.hasOwn(input, 'blocks')) {
-    assertBlockArray(input.blocks);
-    task.blocks = input.blocks;
+  if (Object.hasOwn(safeInput, 'blocks')) {
+    task.blocks = cloneBlockArray(safeInput.blocks);
   }
-  if (Object.hasOwn(input, 'attachments')) {
-    assertRichContentArray(input.attachments, 'attachments');
-    task.attachments = input.attachments;
+  if (Object.hasOwn(safeInput, 'attachments')) {
+    task.attachments = cloneRichContentArray(safeInput.attachments, 'attachments');
   }
 
   const hasRichContent = task.blocks !== undefined || task.attachments !== undefined;
@@ -165,21 +185,23 @@ function normalizeInput(input) {
   return task;
 }
 
-function assertRichContentArray(value, field) {
-  if (!Array.isArray(value) || value.length === 0) {
+function cloneRichContentArray(value, field) {
+  const clone = cloneJsonData(value, field, new WeakSet());
+  if (!Array.isArray(clone) || clone.length === 0) {
     throw slackError(`${field} must be a non-empty array of plain objects`);
   }
-  for (const [index, item] of value.entries()) {
+  for (const [index, item] of clone.entries()) {
     if (!isPlainObject(item)) {
       throw slackError(`${field}[${index}] must be a plain object`);
     }
   }
+  return clone;
 }
 
-function assertBlockArray(value) {
-  assertRichContentArray(value, 'blocks');
+function cloneBlockArray(value) {
+  const clone = cloneRichContentArray(value, 'blocks');
 
-  for (const [index, block] of value.entries()) {
+  for (const [index, block] of clone.entries()) {
     const typeDescriptor = Object.getOwnPropertyDescriptor(block, 'type');
     const type = typeDescriptor && Object.hasOwn(typeDescriptor, 'value')
       ? typeDescriptor.value
@@ -188,6 +210,7 @@ function assertBlockArray(value) {
       throw slackError(`blocks[${index}].type must be an own non-blank string data property`);
     }
   }
+  return clone;
 }
 
 function assertPlainObject(value, field) {
@@ -196,18 +219,158 @@ function assertPlainObject(value, field) {
   }
 }
 
-function assertAllowedFields(object, allowedFields, container) {
-  for (const field of Reflect.ownKeys(object)) {
-    if (typeof field !== 'string' || !allowedFields.has(field)) {
-      throw slackError(`${container}.${String(field)} is not supported`);
+function snapshotPublicObject(value, container, allowedFields = null) {
+  assertPlainObject(value, container);
+  const snapshot = Object.create(null);
+  let validationError;
+
+  for (const field of Reflect.ownKeys(value)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, field);
+    if (typeof field !== 'string') {
+      validationError ||= slackError(`${container} symbol fields are not supported`);
+      continue;
     }
+    if (allowedFields && !allowedFields.has(field)) {
+      validationError ||= slackError(`${container}.${field} is not supported`);
+      continue;
+    }
+    if (!descriptor || !Object.hasOwn(descriptor, 'value')) {
+      validationError ||= slackError(`${container}.${field} must be an own data property`);
+      continue;
+    }
+    defineJsonProperty(snapshot, field, descriptor.value);
   }
+
+  if (validationError) {
+    Object.defineProperty(validationError, 'snapshot', { value: snapshot });
+    throw validationError;
+  }
+  return snapshot;
 }
 
 function isPlainObject(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) return false;
   const prototype = Object.getPrototypeOf(value);
   return prototype === Object.prototype || prototype === null;
+}
+
+function cloneJsonData(value, path, activeObjects) {
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') {
+    return value;
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw slackError(`${path} must contain only finite JSON numbers`);
+    }
+    return value;
+  }
+  if (typeof value !== 'object') {
+    throw slackError(`${path} must contain only JSON data values`);
+  }
+  if (activeObjects.has(value)) {
+    throw slackError(`${path} must not contain cycles`);
+  }
+
+  if (Array.isArray(value)) {
+    if (Object.getPrototypeOf(value) !== Array.prototype) {
+      throw slackError(`${path} arrays must use the standard Array prototype`);
+    }
+    activeObjects.add(value);
+    try {
+      return cloneJsonArray(value, path, activeObjects);
+    } finally {
+      activeObjects.delete(value);
+    }
+  }
+
+  if (!isPlainObject(value)) {
+    throw slackError(`${path} objects must be plain objects`);
+  }
+  activeObjects.add(value);
+  try {
+    return cloneJsonObject(value, path, activeObjects);
+  } finally {
+    activeObjects.delete(value);
+  }
+}
+
+function cloneJsonArray(value, path, activeObjects) {
+  const descriptors = new Map();
+  let length;
+
+  for (const field of Reflect.ownKeys(value)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, field);
+    if (typeof field !== 'string') {
+      throw slackError(`${path} arrays must not contain symbol fields`);
+    }
+    if (!descriptor || !Object.hasOwn(descriptor, 'value')) {
+      throw slackError(`${path} arrays must contain only own data properties`);
+    }
+    if (field === 'length') {
+      length = descriptor.value;
+      continue;
+    }
+    descriptors.set(field, descriptor);
+  }
+
+  if (!Number.isSafeInteger(length) || length < 0) {
+    throw slackError(`${path} arrays must have a valid length`);
+  }
+  for (const field of descriptors.keys()) {
+    if (!isArrayIndex(field, length)) {
+      throw slackError(`${path} arrays must not contain extra fields`);
+    }
+  }
+
+  const clone = new Array(length);
+  for (let index = 0; index < length; index += 1) {
+    const descriptor = descriptors.get(String(index));
+    if (!descriptor) {
+      throw slackError(`${path} arrays must not contain holes`);
+    }
+    clone[index] = cloneJsonData(descriptor.value, `${path}[${index}]`, activeObjects);
+  }
+  return clone;
+}
+
+function cloneJsonObject(value, path, activeObjects) {
+  const clone = Object.create(null);
+
+  for (const field of Reflect.ownKeys(value)) {
+    const descriptor = Object.getOwnPropertyDescriptor(value, field);
+    if (typeof field !== 'string') {
+      throw slackError(`${path} objects must not contain symbol fields`);
+    }
+    if (!descriptor || !Object.hasOwn(descriptor, 'value')) {
+      if (field === 'type' && path.startsWith('blocks[')) {
+        throw slackError(`${path}.type must be an own non-blank string data property`);
+      }
+      throw slackError(`${path} objects must contain only own data properties`);
+    }
+    if (field === 'toJSON' && typeof descriptor.value === 'function') {
+      throw slackError(`${path} objects must not define toJSON functions`);
+    }
+    defineJsonProperty(
+      clone,
+      field,
+      cloneJsonData(descriptor.value, path, activeObjects)
+    );
+  }
+  return clone;
+}
+
+function isArrayIndex(field, length) {
+  const index = Number(field);
+  return Number.isInteger(index) && index >= 0 && index < length && String(index) === field;
+}
+
+function defineJsonProperty(object, field, value) {
+  Object.defineProperty(object, field, {
+    value,
+    enumerable: true,
+    configurable: true,
+    writable: true
+  });
 }
 
 function optionalNonEmptyString(object, field) {
@@ -272,17 +435,13 @@ function normalizeWebhookUrl(value) {
   return `${parsed.origin}${normalizedPath}`;
 }
 
-function extractMetadataWebhook(options, context) {
+function extractMetadataWebhook(options, secrets) {
   try {
     let value;
-    if (isPlainObject(options) && Object.hasOwn(options, 'webhookUrl')) {
+    if (options && Object.hasOwn(options, 'webhookUrl')) {
       value = options.webhookUrl;
-    } else if (
-      isPlainObject(context) &&
-      isPlainObject(context.secrets) &&
-      Object.hasOwn(context.secrets, 'SLACK_WEBHOOK_URL')
-    ) {
-      value = context.secrets.SLACK_WEBHOOK_URL;
+    } else if (secrets && Object.hasOwn(secrets, 'SLACK_WEBHOOK_URL')) {
+      value = secrets.SLACK_WEBHOOK_URL;
     }
 
     if (value === undefined) return null;
@@ -467,6 +626,7 @@ function ensureFetch() {
 
 function slackError(message, fields = {}) {
   const error = new Error(message);
+  CONTROLLED_SLACK_ERRORS.add(error);
   error.code = 'SLACK_ERROR';
   error.type = 'SlackNotificationError';
   if (fields.status !== undefined) error.status = fields.status;
@@ -476,7 +636,7 @@ function slackError(message, fields = {}) {
 }
 
 function isSlackError(error) {
-  return error?.code === 'SLACK_ERROR' && error?.type === 'SlackNotificationError';
+  return typeof error === 'object' && error !== null && CONTROLLED_SLACK_ERRORS.has(error);
 }
 
 function serializeSlackError(error) {
