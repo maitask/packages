@@ -149,7 +149,7 @@ function normalizeInput(input) {
     task.text = input.text;
   }
   if (Object.hasOwn(input, 'blocks')) {
-    assertRichContentArray(input.blocks, 'blocks');
+    assertBlockArray(input.blocks);
     task.blocks = input.blocks;
   }
   if (Object.hasOwn(input, 'attachments')) {
@@ -169,9 +169,23 @@ function assertRichContentArray(value, field) {
   if (!Array.isArray(value) || value.length === 0) {
     throw slackError(`${field} must be a non-empty array of plain objects`);
   }
-  for (const item of value) {
+  for (const [index, item] of value.entries()) {
     if (!isPlainObject(item)) {
-      throw slackError(`${field} must be a non-empty array of plain objects`);
+      throw slackError(`${field}[${index}] must be a plain object`);
+    }
+  }
+}
+
+function assertBlockArray(value) {
+  assertRichContentArray(value, 'blocks');
+
+  for (const [index, block] of value.entries()) {
+    const typeDescriptor = Object.getOwnPropertyDescriptor(block, 'type');
+    const type = typeDescriptor && Object.hasOwn(typeDescriptor, 'value')
+      ? typeDescriptor.value
+      : undefined;
+    if (typeof type !== 'string' || type.trim().length === 0) {
+      throw slackError(`blocks[${index}].type must be an own non-blank string data property`);
     }
   }
 }

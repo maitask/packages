@@ -1241,7 +1241,7 @@ test('slack sends blocks and attachments without mutating task or runtime inputs
     assert.deepEqual(JSON.parse(body), {
       text: 'fallback',
       blocks: [{ type: 'divider' }],
-      attachments: [{ color: '#00ff00', text: 'details' }],
+      attachments: [{ color: '#00ff00', text: 'details' }, {}],
       channel: '#releases',
       username: 'Maitask Bot',
       icon_url: 'https://assets.example/slack.png',
@@ -1255,7 +1255,7 @@ test('slack sends blocks and attachments without mutating task or runtime inputs
   const input = {
     text: 'fallback',
     blocks: [{ type: 'divider' }],
-    attachments: [{ color: '#00ff00', text: 'details' }]
+    attachments: [{ color: '#00ff00', text: 'details' }, {}]
   };
   const options = {
     webhookUrl: `${server.url}/services/T201/B201/input-secret`,
@@ -1275,6 +1275,46 @@ test('slack sends blocks and attachments without mutating task or runtime inputs
   assert.equal(result.data.hasAttachments, true);
   assert.deepEqual([input, options, context], originals);
   assert.doesNotMatch(JSON.stringify(result), /assets\.example|input-secret|T201|B201/);
+});
+
+test('slack rejects blocks without an own non-blank string type before fetch', async t => {
+  const fetchState = forbidFetch(t);
+  const webhookUrl = 'https://hooks.slack.test/services/T208/B208/block-secret';
+  const inheritedType = Object.create({ type: 'section' });
+  inheritedType.text = { type: 'plain_text', text: 'inherited type' };
+  let accessorReads = 0;
+  const accessorType = {};
+  Object.defineProperty(accessorType, 'type', {
+    enumerable: true,
+    get: () => {
+      accessorReads += 1;
+      return 'section';
+    }
+  });
+  const cases = [
+    { label: 'missing type', block: {}, errorPattern: /blocks\[0\]\.type/i },
+    { label: 'empty type', block: { type: '' }, errorPattern: /blocks\[0\]\.type/i },
+    { label: 'blank type', block: { type: '   ' }, errorPattern: /blocks\[0\]\.type/i },
+    { label: 'non-string type', block: { type: 1 }, errorPattern: /blocks\[0\]\.type/i },
+    { label: 'accessor type', block: accessorType, errorPattern: /blocks\[0\]\.type/i },
+    { label: 'inherited type', block: inheritedType, errorPattern: /blocks\[0\].*plain object/i }
+  ];
+
+  for (const testCase of cases) {
+    const result = await executeSlack(
+      { text: 'valid fallback', blocks: [testCase.block] },
+      { webhookUrl }
+    );
+
+    assert.equal(result.success, false, `accepted block with ${testCase.label}`);
+    assert.equal(result.error.code, 'SLACK_ERROR');
+    assert.match(result.error.message, testCase.errorPattern);
+    assert.equal(result.metadata.webhook, 'https://hooks.slack.test/services/T***/B***/***');
+    assert.doesNotMatch(JSON.stringify(result), /T208|B208|block-secret/);
+  }
+
+  assert.equal(fetchState.calls, 0);
+  assert.equal(accessorReads, 0);
 });
 
 test('slack rejects simultaneous explicit icon settings before fetch', async t => {
