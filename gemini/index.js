@@ -11,7 +11,7 @@
 
 const PACKAGE_NAME = '@maitask/gemini';
 const PACKAGE_VERSION = '0.1.0';
-const API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
+const DEFAULT_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 async function execute(input = {}, options = {}, context = {}) {
   try {
@@ -20,8 +20,8 @@ async function execute(input = {}, options = {}, context = {}) {
     const cfg = buildConfig(input, options, context);
     const requestBody = buildRequestBody(input, cfg);
     const endpoint = cfg.stream
-      ? `${API_BASE}/${cfg.model}:streamGenerateContent?alt=sse`
-      : `${API_BASE}/${cfg.model}:generateContent`;
+      ? `${cfg.baseUrl}/${cfg.model}:streamGenerateContent?alt=sse`
+      : `${cfg.baseUrl}/${cfg.model}:generateContent`;
 
     const response = await requestWithRetry(
       endpoint,
@@ -90,6 +90,10 @@ function buildConfig(input, options, context) {
 
   return {
     apiKey,
+    baseUrl: normalizeBaseUrl(
+      options.baseUrl || context?.env?.GEMINI_API_BASE_URL,
+      DEFAULT_API_BASE_URL
+    ),
     model: String(input.model || options.model || 'gemini-2.5-pro').trim(),
     stream: Boolean(input.stream ?? options.stream ?? false),
     timeoutMs: readBoundedInt(input.timeoutMs ?? options.timeoutMs, 1000, 300000, 60000),
@@ -428,6 +432,22 @@ function readBoundedInt(value, min, max, fallback) {
 function asNonEmptyString(value) {
   if (value === undefined || value === null) return '';
   return String(value).trim();
+}
+
+function normalizeBaseUrl(value, fallback) {
+  const candidate = asNonEmptyString(value) || fallback;
+  let parsed;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new Error('baseUrl must be an absolute HTTP or HTTPS URL');
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('baseUrl must be an absolute HTTP or HTTPS URL');
+  }
+
+  return parsed.toString().replace(/\/$/, '');
 }
 
 function ensureFetch() {

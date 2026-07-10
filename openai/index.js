@@ -11,7 +11,7 @@
 
 const PACKAGE_NAME = '@maitask/openai';
 const PACKAGE_VERSION = '0.1.0';
-const API_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
+const DEFAULT_API_BASE_URL = 'https://api.openai.com/v1';
 
 async function execute(input = {}, options = {}, context = {}) {
   try {
@@ -21,7 +21,7 @@ async function execute(input = {}, options = {}, context = {}) {
     const requestBody = buildRequestBody(input, cfg);
 
     const response = await requestWithRetry(
-      API_ENDPOINT,
+      `${cfg.baseUrl}/chat/completions`,
       {
         method: 'POST',
         headers: {
@@ -83,6 +83,10 @@ function buildConfig(input, options, context) {
 
   return {
     apiKey,
+    baseUrl: normalizeBaseUrl(
+      options.baseUrl || context?.env?.OPENAI_API_BASE_URL,
+      DEFAULT_API_BASE_URL
+    ),
     model: String(input.model || options.model || 'gpt-5').trim(),
     temperature: readNumber(input.temperature ?? options.temperature, 0.7),
     maxTokens: readPositiveInt(input.maxTokens ?? input.max_tokens ?? options.maxTokens ?? options.max_tokens, 1000),
@@ -393,6 +397,22 @@ function asNonEmptyString(value) {
   if (value === undefined || value === null) return '';
   const text = String(value).trim();
   return text;
+}
+
+function normalizeBaseUrl(value, fallback) {
+  const candidate = asNonEmptyString(value) || fallback;
+  let parsed;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new Error('baseUrl must be an absolute HTTP or HTTPS URL');
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('baseUrl must be an absolute HTTP or HTTPS URL');
+  }
+
+  return parsed.toString().replace(/\/$/, '');
 }
 
 function ensureFetch() {

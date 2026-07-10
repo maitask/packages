@@ -11,7 +11,7 @@
 
 const PACKAGE_NAME = '@maitask/deepseek';
 const PACKAGE_VERSION = '0.1.0';
-const API_ENDPOINT = 'https://api.deepseek.com/chat/completions';
+const DEFAULT_API_BASE_URL = 'https://api.deepseek.com';
 
 async function execute(input = {}, options = {}, context = {}) {
   try {
@@ -21,7 +21,7 @@ async function execute(input = {}, options = {}, context = {}) {
     const requestBody = buildRequestBody(input, cfg);
 
     const response = await requestWithRetry(
-      API_ENDPOINT,
+      `${cfg.baseUrl}/chat/completions`,
       {
         method: 'POST',
         headers: {
@@ -91,6 +91,10 @@ function buildConfig(input, options, context) {
 
   return {
     apiKey,
+    baseUrl: normalizeBaseUrl(
+      options.baseUrl || context?.env?.DEEPSEEK_API_BASE_URL,
+      DEFAULT_API_BASE_URL
+    ),
     model,
     stream: Boolean(input.stream ?? options.stream ?? false),
     timeoutMs: readBoundedInt(input.timeoutMs ?? options.timeoutMs, 1000, 300000, 60000),
@@ -411,6 +415,22 @@ function readBoundedInt(value, min, max, fallback) {
 function asNonEmptyString(value) {
   if (value === undefined || value === null) return '';
   return String(value).trim();
+}
+
+function normalizeBaseUrl(value, fallback) {
+  const candidate = asNonEmptyString(value) || fallback;
+  let parsed;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new Error('baseUrl must be an absolute HTTP or HTTPS URL');
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('baseUrl must be an absolute HTTP or HTTPS URL');
+  }
+
+  return parsed.toString().replace(/\/$/, '');
 }
 
 function ensureFetch() {

@@ -11,7 +11,7 @@
 
 const PACKAGE_NAME = '@maitask/claude';
 const PACKAGE_VERSION = '0.1.0';
-const API_ENDPOINT = 'https://api.anthropic.com/v1/messages';
+const DEFAULT_API_BASE_URL = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
 
 async function execute(input = {}, options = {}, context = {}) {
@@ -22,7 +22,7 @@ async function execute(input = {}, options = {}, context = {}) {
     const requestBody = buildRequestBody(input, cfg);
 
     const response = await requestWithRetry(
-      API_ENDPOINT,
+      `${cfg.baseUrl}/messages`,
       {
         method: 'POST',
         headers: {
@@ -87,6 +87,10 @@ function buildConfig(input, options, context) {
 
   return {
     apiKey,
+    baseUrl: normalizeBaseUrl(
+      options.baseUrl || context?.env?.ANTHROPIC_API_BASE_URL,
+      DEFAULT_API_BASE_URL
+    ),
     model: String(input.model || options.model || 'claude-sonnet-4-5').trim(),
     maxTokens: readPositiveInt(input.maxTokens ?? input.max_tokens ?? options.maxTokens ?? options.max_tokens, 1024),
     stream: Boolean(input.stream ?? options.stream ?? false),
@@ -392,6 +396,22 @@ function readBoundedInt(value, min, max, fallback) {
 function asNonEmptyString(value) {
   if (value === undefined || value === null) return '';
   return String(value).trim();
+}
+
+function normalizeBaseUrl(value, fallback) {
+  const candidate = asNonEmptyString(value) || fallback;
+  let parsed;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new Error('baseUrl must be an absolute HTTP or HTTPS URL');
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('baseUrl must be an absolute HTTP or HTTPS URL');
+  }
+
+  return parsed.toString().replace(/\/$/, '');
 }
 
 function ensureFetch() {
