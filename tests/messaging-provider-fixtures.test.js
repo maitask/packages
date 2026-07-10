@@ -828,6 +828,7 @@ test('slack sends the formal webhook payload and masks the result URL', async t 
   });
   assert.equal(result.metadata.package, '@maitask/slack-notifier');
   assert.equal(result.metadata.provider, 'slack');
+  assert.equal(result.metadata.webhook, `${server.url}/services/T***/B***/***`);
   assert.equal(Object.hasOwn(result.metadata, 'response_status'), false);
   assert.equal(Object.hasOwn(result.metadata, 'response_time_ms'), false);
   assert.equal(Object.hasOwn(result.data, 'has_blocks'), false);
@@ -866,6 +867,8 @@ test('slack returns a retriable secret-safe structured webhook failure', async t
 test('slack classifies provider statuses without retrying a failed POST', async t => {
   const responses = [
     { status: 503, body: 'upstream unavailable', retriable: true },
+    { status: 599, body: 'last server error', retriable: true },
+    { status: 600, body: 'outside server range', retriable: false },
     { status: 408, body: 'request timeout', retriable: true },
     { status: 425, body: 'too early', retriable: true },
     { status: 400, body: 'invalid_payload', retriable: false },
@@ -1171,6 +1174,7 @@ test('slack rejects invalid endpoint forms and explicit null without secret fall
     const result = await executeSlack('invalid webhook', { webhookUrl });
     assert.equal(result.success, false);
     assert.match(result.error.message, /webhookUrl/i);
+    assert.equal(result.metadata.webhook, null);
   }
 
   const explicitNull = await executeSlack(
@@ -1180,6 +1184,11 @@ test('slack rejects invalid endpoint forms and explicit null without secret fall
   );
   assert.equal(explicitNull.success, false);
   assert.match(explicitNull.error.message, /webhookUrl/i);
+  assert.equal(explicitNull.metadata.webhook, null);
+
+  const missingWebhook = await executeSlack('missing webhook');
+  assert.equal(missingWebhook.success, false);
+  assert.equal(missingWebhook.metadata.webhook, null);
   assert.equal(fetchState.calls, 0);
 });
 
@@ -1226,42 +1235,94 @@ test('slack rejects invalid containers, content, and option types before fetch',
     assert.match(result.error.message, new RegExp(testCase.field, 'i'));
   }
 
-  for (const input of ['', '   ', {}, { text: ' \n ' }, { message: 'legacy task content' }]) {
+  for (const input of ['', '   ', {}, { text: ' \n ' }]) {
     const result = await executeSlack(input, { webhookUrl });
-    assert.equal(result.success, false, `accepted empty or legacy input ${JSON.stringify(input)}`);
+    assert.equal(result.success, false, `accepted empty input ${JSON.stringify(input)}`);
     assert.match(result.error.message, /content|text|blocks|attachments/i);
   }
 
   assert.equal(fetchState.calls, 0);
 });
 
-test('slack does not read task content or legacy aliases from options', async t => {
+test('slack rejects every unknown or legacy public field with otherwise valid input', async t => {
   const fetchState = forbidFetch(t);
   const formalWebhook = 'https://hooks.slack.test/services/T204/B204/formal-secret';
+  const cases = [
+    { container: 'input', key: 'message', value: 'legacy task content' },
+    { container: 'input', key: 'webhook_url', value: formalWebhook },
+    { container: 'input', key: 'thread_ts', value: '1700000000.1' },
+    { container: 'input', key: 'unexpected', value: true },
+    { container: 'options', key: 'text', value: 'must not become task content' },
+    { container: 'options', key: 'message', value: 'legacy task content' },
+    { container: 'options', key: 'blocks', value: [{ type: 'divider' }] },
+    { container: 'options', key: 'attachments', value: [{ text: 'legacy' }] },
+    { container: 'options', key: 'webhook_url', value: formalWebhook },
+    { container: 'options', key: 'thread_ts', value: '1700000000.1' },
+    { container: 'options', key: 'icon_emoji', value: ':old:' },
+    { container: 'options', key: 'icon_url', value: 'https://assets.example/old.png' },
+    { container: 'options', key: 'link_names', value: false },
+    { container: 'options', key: 'unexpected', value: true }
+  ];
 
-  const contentInOptions = await executeSlack({}, {
-    webhookUrl: formalWebhook,
-    text: 'must not become task content',
-    blocks: [{ type: 'divider' }],
-    attachments: [{ text: 'legacy' }]
-  });
-  assert.equal(contentInOptions.success, false);
-  assert.match(contentInOptions.error.message, /content|text|blocks|attachments/i);
+  for (const testCase of cases) {
+    const input = { text: 'valid formal task content' };
+    const options = { webhookUrl: formalWebhook };
+    if (testCase.container === 'input') input[testCase.key] = testCase.value;
+    if (testCase.container === 'options') options[testCase.key] = testCase.value;
 
-  const messageAlias = await executeSlack({ message: 'legacy alias' }, {
-    webhookUrl: formalWebhook
-  });
-  assert.equal(messageAlias.success, false);
+    const result = await executeSlack(input, options);
+    assert.equal(
+      result.success,
+      false,
+      `accepted unknown ${testCase.container}.${testCase.key}`
+    );
+    assert.equal(result.error.code, 'SLACK_ERROR');
+    assert.match(result.error.message, new RegExp(`${testCase.container}\\.${testCase.key}`, 'i'));
+    assert.equal(result.metadata.webhook, 'https://hooks.slack.test/services/T***/B***/***');
+    assert.doesNotMatch(JSON.stringify(result), /T204|B204|formal-secret/);
+  }
 
-  const legacyOnly = await executeSlack('legacy endpoint', {
-    webhook_url: 'https://hooks.slack.test/services/T205/B205/legacy-secret',
-    thread_ts: '1700000000.1',
-    icon_emoji: ':old:',
-    icon_url: 'https://assets.example/old.png',
-    link_names: false
-  });
-  assert.equal(legacyOnly.success, false);
-  assert.match(legacyOnly.error.message, /webhookUrl/i);
+  assert.equal(fetchState.calls, 0);
+});
+
+test('slack preserves masked webhook metadata for pre-fetch validation failures', async t => {
+  const fetchState = forbidFetch(t);
+  const webhookUrl = 'https://hooks.slack.test/services/T206/B206/validation-secret';
+  const fallbackWebhook = 'https://hooks.slack.test/services/T207/B207/fallback-secret';
+  const cases = [
+    {
+      input: { text: 'icon conflict' },
+      options: { webhookUrl, iconEmoji: ':rocket:', iconUrl: 'https://assets.example/icon.png' },
+      context: {},
+      expectedWebhook: 'https://hooks.slack.test/services/T***/B***/***'
+    },
+    {
+      input: { text: 'invalid type' },
+      options: { webhookUrl, linkNames: 'true' },
+      context: {},
+      expectedWebhook: 'https://hooks.slack.test/services/T***/B***/***'
+    },
+    {
+      input: { text: '   ' },
+      options: { webhookUrl },
+      context: {},
+      expectedWebhook: 'https://hooks.slack.test/services/T***/B***/***'
+    },
+    {
+      input: { text: 'fallback validation' },
+      options: { mrkdwn: 'true' },
+      context: { secrets: { SLACK_WEBHOOK_URL: fallbackWebhook } },
+      expectedWebhook: 'https://hooks.slack.test/services/T***/B***/***'
+    }
+  ];
+
+  for (const testCase of cases) {
+    const result = await executeSlack(testCase.input, testCase.options, testCase.context);
+    assert.equal(result.success, false);
+    assert.equal(result.metadata.webhook, testCase.expectedWebhook);
+    assert.doesNotMatch(JSON.stringify(result), /T206|B206|validation-secret|T207|B207|fallback-secret/);
+  }
+
   assert.equal(fetchState.calls, 0);
 });
 

@@ -10,9 +10,22 @@ const PACKAGE_NAME = '@maitask/slack-notifier';
 const PACKAGE_VERSION = '0.1.0';
 const DEFAULT_TIMEOUT_MS = 30000;
 const MAX_TIMEOUT_MS = 120000;
+const INPUT_FIELDS = new Set(['text', 'blocks', 'attachments']);
+const OPTION_FIELDS = new Set([
+  'webhookUrl',
+  'threadTs',
+  'channel',
+  'username',
+  'iconEmoji',
+  'iconUrl',
+  'linkNames',
+  'mrkdwn',
+  'timeoutMs'
+]);
 
 async function execute(input, options = {}, context = {}) {
   let config;
+  const metadataWebhook = extractMetadataWebhook(options, context);
 
   try {
     config = buildConfig(input, options, context);
@@ -36,6 +49,7 @@ async function execute(input, options = {}, context = {}) {
         package: PACKAGE_NAME,
         version: PACKAGE_VERSION,
         provider: 'slack',
+        webhook: metadataWebhook,
         responseStatus: response.status,
         responseTimeMs: response.responseTimeMs,
         timestamp: new Date().toISOString()
@@ -49,12 +63,9 @@ async function execute(input, options = {}, context = {}) {
       package: PACKAGE_NAME,
       version: PACKAGE_VERSION,
       provider: 'slack',
+      webhook: metadataWebhook,
       timestamp: new Date().toISOString()
     };
-
-    if (config?.webhookUrl) {
-      metadata.webhook = maskWebhookUrl(config.webhookUrl);
-    }
 
     return {
       success: false,
@@ -70,6 +81,7 @@ function buildConfig(input, options, context) {
   if (context.secrets !== undefined) {
     assertPlainObject(context.secrets, 'context.secrets');
   }
+  assertAllowedFields(options, OPTION_FIELDS, 'options');
 
   const task = normalizeInput(input);
   const webhookValue = Object.hasOwn(options, 'webhookUrl')
@@ -126,6 +138,7 @@ function normalizeInput(input) {
   }
 
   assertPlainObject(input, 'input');
+  assertAllowedFields(input, INPUT_FIELDS, 'input');
   const task = {};
 
   if (Object.hasOwn(input, 'text')) {
@@ -165,6 +178,14 @@ function assertRichContentArray(value, field) {
 function assertPlainObject(value, field) {
   if (!isPlainObject(value)) {
     throw slackError(`${field} must be a plain object`);
+  }
+}
+
+function assertAllowedFields(object, allowedFields, container) {
+  for (const field of Reflect.ownKeys(object)) {
+    if (typeof field !== 'string' || !allowedFields.has(field)) {
+      throw slackError(`${container}.${String(field)} is not supported`);
+    }
   }
 }
 
@@ -236,6 +257,26 @@ function normalizeWebhookUrl(value) {
   return `${parsed.origin}${normalizedPath}`;
 }
 
+function extractMetadataWebhook(options, context) {
+  try {
+    let value;
+    if (isPlainObject(options) && Object.hasOwn(options, 'webhookUrl')) {
+      value = options.webhookUrl;
+    } else if (
+      isPlainObject(context) &&
+      isPlainObject(context.secrets) &&
+      Object.hasOwn(context.secrets, 'SLACK_WEBHOOK_URL')
+    ) {
+      value = context.secrets.SLACK_WEBHOOK_URL;
+    }
+
+    if (value === undefined) return null;
+    return maskWebhookUrl(normalizeWebhookUrl(value));
+  } catch {
+    return null;
+  }
+}
+
 function buildSlackPayload(config) {
   const payload = {};
 
@@ -296,7 +337,11 @@ async function sendSlackMessage(config, payload) {
 function providerError(response, body, webhookUrl) {
   const status = response.status;
   const safeBody = sanitizeProviderText(body, webhookUrl);
-  const retriable = status === 408 || status === 425 || status === 429 || status >= 500;
+  const retriable =
+    status === 408 ||
+    status === 425 ||
+    status === 429 ||
+    (status >= 500 && status <= 599);
   const message = safeBody
     ? `Slack webhook rejected with status ${status}: ${safeBody}`
     : `Slack webhook rejected with status ${status}`;
