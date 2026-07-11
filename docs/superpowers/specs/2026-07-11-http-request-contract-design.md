@@ -16,7 +16,7 @@ Legacy string input, merged input/options, snake_case fields, field aliases, exe
 
 `options` contains transport ceilings and trusted secret values: `timeoutMs`, `maxResponseBytes`, `maxRedirects`, `allowInsecureHttp`, `allowedHosts`, and `secrets`. Per-request `timeoutMs`, `maxResponseBytes`, and `maxRedirects` may tighten but never loosen the option ceilings. Secrets are resolved by exact name from `options.secrets` and then `context.secrets`; missing, empty, inherited, accessor-backed, or non-string secrets fail before network access.
 
-Authentication is declared in `input.auth` and always refers to named secrets. Caller headers cannot set `Authorization`, `Cookie`, `Proxy-Authorization`, `Host`, `Content-Length`, transfer or connection headers, or the managed API-key header. The package never returns resolved secret values.
+Authentication is declared in `input.auth` and always refers to named secrets. Caller headers cannot set `Authorization`, `Cookie`, `Proxy-Authorization`, `Host`, `Content-Length`, transfer or connection headers, or the managed API-key header. The package never copies resolved secrets into metadata or failures. Successful response bytes remain exact; an upstream that deliberately echoes request credentials can therefore place them in its own accepted response, as with any byte-preserving HTTP client.
 
 ## URL and redirect policy
 

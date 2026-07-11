@@ -51,7 +51,7 @@
 
 - [**@maitask/web-scraper**](./web-scraper) `v0.1.0` — Extract data from web pages with HTML parsing and CSS selectors
 - [**@maitask/web-search**](./web-search) `v0.1.1` — Search the web using multiple search engines
-- [**@maitask/http-request**](./http-request) `v1.1.0` — Production-grade HTTP client with retries, auth helpers, multipart bodies, and validation
+- [**@maitask/http-request**](./http-request) `v2.0.0` — Strict credential-confined HTTP client with bounded redirects, safe retries, multipart and exact binary bodies, and byte-accurate responses
 - [**@maitask/hackernews-crawler**](./hackernews-crawler) `v0.1.0` — Crawl and extract stories from Hacker News using official API
 - [**@maitask/github-integration**](./github-integration) `v1.0.0` — Credential-confined GitHub REST client for repositories, issues, pull requests, users, and controlled custom requests
 - [**@maitask/url-analyzer**](./url-analyzer) `v0.1.0` — URL parsing, validation, and analysis

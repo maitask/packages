@@ -1,20 +1,32 @@
 {
-  "url": "https://httpbin.org/post",
-  "method": "POST",
+  "url": "https://api.maitask.com/health",
+  "method": "GET",
   "headers": {
-    "Content-Type": "application/json",
+    "Accept": "application/json",
     "X-Trace-Id": "maitask-http-request-example"
   },
-  "body": {
-    "name": "Maitask",
-    "operation": "http-request-smoke"
-  },
-  "timeout": 15000,
-  "maxRetries": 2,
-  "retryDelay": 500,
+  "timeoutMs": 15000,
+  "maxResponseBytes": 1048576,
+  "maxRedirects": 2,
   "responseType": "json",
-  "validateStatus": [
-    200,
-    201
-  ]
+  "acceptedStatuses": [
+    200
+  ],
+  "redirect": "error",
+  "retry": {
+    "maxAttempts": 3,
+    "statuses": [
+      408,
+      429,
+      500,
+      502,
+      503,
+      504
+    ],
+    "initialDelayMs": 250,
+    "maxDelayMs": 2000,
+    "backoffFactor": 2,
+    "jitterRatio": 0.2,
+    "respectRetryAfter": true
+  }
 }

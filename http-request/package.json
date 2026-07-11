@@ -1,9 +1,16 @@
 {
   "name": "@maitask/http-request",
-  "version": "1.1.0",
-  "description": "Advanced HTTP client for Maitask with retries, timeouts, and validation",
+  "version": "2.0.0",
+  "description": "Strict credential-confined HTTP client with bounded redirects, safe retries, and exact response bytes",
   "main": "index.js",
+  "types": "index.d.ts",
   "type": "commonjs",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "example.json"
+  ],
   "author": "Maitask Team <team@maitask.com>",
   "license": "MIT",
   "keywords": [
@@ -23,7 +30,7 @@
     "locales": {
       "en": {
         "display_name": "HTTP Request",
-        "description": "Advanced HTTP client for Maitask with retries, timeouts, and validation",
+        "description": "Strict credential-confined HTTP client with bounded redirects, safe retries, and exact response bytes",
         "category": "Web & API Integration",
         "keywords": [
           "maitask",
@@ -36,7 +43,7 @@
       },
       "zh": {
         "display_name": "HTTP 请求",
-        "description": "面向 Maitask 的高级 HTTP 客户端，支持重试、超时和请求校验。",
+        "description": "具备严格凭据隔离、受限重定向、安全重试和精确响应字节的 HTTP 客户端。",
         "category": "Web 与 API 集成",
         "keywords": [
           "HTTP",
