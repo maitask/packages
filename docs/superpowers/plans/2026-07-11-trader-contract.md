@@ -63,4 +63,4 @@
 - [x] Run focused runtime and strict TypeScript gates.
 - [x] Run metadata, archive, and `npm pack --dry-run --json ./trader` checks.
 - [x] Run `npm test` with zero failures, skips, or todos and `git diff --check`.
-- [ ] Commit, fast-forward `packages/main`, verify the merged result, and remove the isolated worktree and branch.
+- [x] Commit, fast-forward `packages/main`, verify the merged result, and remove the isolated worktree and branch.
