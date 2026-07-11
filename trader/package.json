@@ -1,7 +1,7 @@
 {
   "name": "@maitask/trader",
-  "version": "0.1.0",
-  "description": "Trader orchestration across Binance futures, Binance spot, and paper modes inside Maitask",
+  "version": "1.0.0",
+  "description": "Deterministic market analysis, simulation, paper execution, and controlled exchange trading",
   "main": "index.js",
   "types": "index.d.ts",
   "type": "commonjs",
@@ -14,9 +14,9 @@
     "aster",
     "okx",
     "futures",
-    "websocket",
-    "risk",
-    "automation"
+    "backtesting",
+    "paper-trading",
+    "exchange"
   ],
   "engines": {
     "node": ">=18.0.0"
@@ -33,7 +33,7 @@
     "locales": {
       "en": {
         "display_name": "Trader",
-        "description": "Trader orchestration across Binance futures, Binance spot, and paper modes inside Maitask",
+        "description": "Deterministic market analysis, simulation, paper execution, and controlled exchange trading",
         "category": "Finance & Trading",
         "keywords": [
           "maitask",
@@ -42,23 +42,23 @@
           "aster",
           "okx",
           "futures",
-          "websocket",
-          "risk",
-          "automation"
+          "backtesting",
+          "paper-trading",
+          "exchange"
         ]
       },
       "zh": {
         "display_name": "交易器",
-        "description": "在 Maitask 内编排 Binance 合约、Binance 现货和模拟交易模式，支持交易自动化。",
+        "description": "在 Maitask 中执行确定性市场分析、回测、模拟交易和受控交易所操作。",
         "category": "金融与交易",
         "keywords": [
           "交易",
           "Binance",
           "合约",
           "现货",
+          "回测",
           "模拟交易",
-          "风控",
-          "自动化"
+          "交易所"
         ]
       }
     }

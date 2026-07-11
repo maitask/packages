@@ -14,13 +14,13 @@
 - Create: `tests/trader-fixtures.test.js`
 - Modify: `package.json`
 
-- [ ] Cover Binance spot/futures, Aster futures, and OKX spot/swap public snapshot mapping without credentials.
-- [ ] Cover every analysis strategy and exact indicator parameters over fixed candles.
-- [ ] Cover deterministic long/short backtests, fees, slippage, final closure, drawdown, and chronological validation.
-- [ ] Cover resumable paper market/limit orders, fees, realized PnL, state detachment, and stable paper labelling.
-- [ ] Cover provider signature strings, filter normalization, exact order/cancel/account wires, and controlled response mapping.
-- [ ] Assert live/mainnet authority, secret confinement, aliases, unknown fields, accessors, symbols, custom prototypes, cycles, sparse arrays, invalid decimals, and malformed provider responses fail closed.
-- [ ] Cover redirect zero-contact, timeout, response limits, one-attempt mutations, Runtime transport, and secret-safe errors.
+- [x] Cover Binance spot/futures, Aster futures, and OKX spot/swap public snapshot mapping without credentials.
+- [x] Cover every analysis strategy and exact indicator parameters over fixed candles.
+- [x] Cover deterministic long/short backtests, fees, slippage, final closure, drawdown, and chronological validation.
+- [x] Cover resumable paper market/limit orders, fees, realized PnL, state detachment, and stable paper labelling.
+- [x] Cover provider signature strings, filter normalization, exact order/cancel/account wires, and controlled response mapping.
+- [x] Assert live/mainnet authority, secret confinement, aliases, unknown fields, accessors, symbols, custom prototypes, cycles, sparse arrays, invalid decimals, and malformed provider responses fail closed.
+- [x] Cover redirect zero-contact, timeout, response limits, one-attempt mutations, Runtime transport, and secret-safe errors.
 
 ### Task 2: Replace the package and adapter architecture
 
@@ -32,13 +32,13 @@
 - Modify: `trader/package.json`
 - Test: `tests/trader-fixtures.test.js`
 
-- [ ] Implement strict action, option, context, candle, strategy, paper state, and explicit order snapshots.
-- [ ] Implement bounded public/private transport with manual redirects, one deadline, exact origin policy, and stable failures.
-- [ ] Implement Binance/Aster HMAC SHA-256 and OKX HMAC Base64 signing without Node-only modules.
-- [ ] Implement exchange metadata/filter loading and decimal-safe order normalization before live placement.
-- [ ] Implement controlled provider mappings for market, account, order, and cancellation responses.
-- [ ] Implement reproducible indicators, recommendations, backtests, and versioned paper accounting.
-- [ ] Remove ambiguous execute/status/cancel/stream aliases, credential-bearing input, default live environments, generated bundle drift, and unimplemented leverage/stop claims.
+- [x] Implement strict action, option, context, candle, strategy, paper state, and explicit order snapshots.
+- [x] Implement bounded public/private transport with manual redirects, one deadline, exact origin policy, and stable failures.
+- [x] Implement Binance/Aster HMAC SHA-256 and OKX HMAC Base64 signing without Node-only modules.
+- [x] Implement exchange metadata/filter loading and decimal-safe order normalization before live placement.
+- [x] Implement controlled provider mappings for market, account, order, and cancellation responses.
+- [x] Implement reproducible indicators, recommendations, backtests, and versioned paper accounting.
+- [x] Remove ambiguous execute/status/cancel/stream aliases, credential-bearing input, default live environments, generated bundle drift, and unimplemented leverage/stop claims.
 
 ### Task 3: Publish types and formal documentation
 
@@ -50,17 +50,17 @@
 - Modify: `PACKAGES.md`
 - Create: `tests/trader-contract.ts`
 
-- [ ] Define readonly action-specific inputs, trusted provider options, controlled outputs, paper state, provider receipts, and discriminated failures.
-- [ ] Add strict positive and `@ts-expect-error` assertions for ambiguous execute, stream, input credentials, missing live authority, implicit environments, and readonly results.
-- [ ] Document provider/action scope, authority gates, filter handling, one-attempt mutations, simulation assumptions, errors, migration breaks, and optional live diagnostics.
-- [ ] Publish only reviewed source, declarations, README, and the non-mutating example.
+- [x] Define readonly action-specific inputs, trusted provider options, controlled outputs, paper state, provider receipts, and discriminated failures.
+- [x] Add strict positive and `@ts-expect-error` assertions for ambiguous execute, stream, input credentials, missing live authority, implicit environments, and readonly results.
+- [x] Document provider/action scope, authority gates, filter handling, one-attempt mutations, simulation assumptions, errors, migration breaks, and optional live diagnostics.
+- [x] Publish only reviewed source, declarations, README, and the non-mutating example.
 
 ### Task 4: Complete verification and integration
 
 **Files:**
 - No additional files unless a gate identifies a defect.
 
-- [ ] Run focused runtime and strict TypeScript gates.
-- [ ] Run metadata, archive, and `npm pack --dry-run --json ./trader` checks.
-- [ ] Run `npm test` with zero failures, skips, or todos and `git diff --check`.
+- [x] Run focused runtime and strict TypeScript gates.
+- [x] Run metadata, archive, and `npm pack --dry-run --json ./trader` checks.
+- [x] Run `npm test` with zero failures, skips, or todos and `git diff --check`.
 - [ ] Commit, fast-forward `packages/main`, verify the merged result, and remove the isolated worktree and branch.

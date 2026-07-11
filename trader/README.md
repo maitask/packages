@@ -1,263 +1,257 @@
 # @maitask/trader
 
-High-level trader orchestration for Maitask workflows. The package combines market analysis, risk evaluation, order execution, and paper trading so you can build self-contained automations without deploying the NOFX stack.
-
-## Highlights
-
-- **Multi-step pipeline** – fetches market data, computes SMA/EMA/RSI/volatility, derives trade signals, and exposes recommended targets.
-- **Multi-market support** – plug into Binance (futures/spot), Aster, OKX, or the deterministic paper simulator; add more providers by dropping files into `providers/`.
-- **Risk control** – configurable loss/drawdown guards, position sizing rules, leverage caps, and directional toggles.
-- **Execution modes** – route live orders to Binance futures (mainnet/testnet) or use the deterministic paper simulator that tracks positions, equity, and fills.
-- **Lifecycle coverage** – analyze-only flows, execute with optional manual overrides, cancel outstanding orders, pull account status, or backtest strategies on historical candles.
-- **Streaming taps** – subscribe to provider WebSocket feeds (tickers, book updates, trades) with bounded windows for downstream automation.
-
-## Directory Layout
-
-```text
-packages/trader/
-├── package.json
-├── README.md
-├── example.json
-├── index.js                # Orchestrator + risk/strategy logic
-├── index.d.ts              # Types consumed by Maitask tooling/IDEs
-├── providers/              # Exchange adapters (binance, aster, okx, paper)
-└── shared/                 # Common helpers: constants, crypto/fetch wrappers, paper state
-```
-
-Adding a venue is as simple as dropping a file into `providers/` and registering it inside `providers/factory.js`.
-
-## Inputs
-
-| Field                        | Description                                                                                                                                                  |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `action`                     | `analyze` (default), `execute`, `status`, `cancel`, or `backtest`.                                                                                           |
-| `symbol`                     | Trading pair, e.g., `BTCUSDT`.                                                                                                                               |
-| `interval`                   | Kline interval (`5m`, `1h`, etc.).                                                                                                                           |
-| `strategy`                   | Strategy config – choose `type` from `sma-crossover`, `rsi-mean-reversion`, `momentum-breakout`, or `manual`.                                                |
-| `decision`                   | Optional manual decision `{ signal, confidence, reason }` that skips indicator logic.                                                                        |
-| `quantity` / `quoteQuantity` | Absolute size (base) or notional amount in quote currency. If omitted, the package sizes positions using `positionRiskPct`.                                  |
-| `execution`                  | Order parameters: `{ type, timeInForce, reduceOnly, quantityPrecision, orderId/clientOrderId }`.                                                             |
-| `risk`                       | `{ maxDailyLoss, maxDrawdown, positionRiskPct, stopLossPct, takeProfitPct, allowLong, allowShort }`.                                                         |
-| `performance`                | Live metrics (`dailyLoss`, `drawdown`, `equity`) used for guardrails.                                                                                        |
-| `exchange`                   | `{ provider: 'binance' \\ 'aster' \\ 'okx' \\ 'paper', market?, apiKey, apiSecret, testnet?, passphrase? }`. Keys can also live in `context.secrets`.        |
-| `exchange.market`            | Market flavor per provider (`'futures'`, `'spot'`, `'swap'`). Defaults to `'futures'` for Binance, `'swap'` for OKX, and is ignored for the paper simulator. |
-| `stream`                     | Streaming preferences `{ channel, interval, limit, duration_ms }` used by the `stream` action.                                                                |
-| `paperState`                 | Persisted simulator state from the previous invocation (positions, balance, equity curve).                                                                   |
-| `backtest`                   | Optional `{ candles, capital }` override for the `backtest` action.                                                                                          |
-
-## Supported Providers
-
-- **`binance`** – native support for USDⓈ-M futures (`exchange.market: "futures"`, default) and spot (`exchange.market: "spot"`). Set `exchange.testnet: true` to target Binance testnets.
-- **`aster`** – Binance-compatible perpetuals hosted at `https://fapi.asterdex.com`. Uses the same HMAC signing as Binance futures.
-- **`okx`** – Connect to OKX swap (`exchange.market: "swap"`, default) or spot markets (`"spot"`). Requires `apiKey`, `apiSecret`, and `passphrase`.
-- **`paper`** – Deterministic simulator backed by Binance public market data.
-
-Each adapter lives under `packages/trader/providers`, so adding an exchange is as simple as creating a new provider file and registering it in `providers/factory.js`.
+Production trading primitives for Maitask Runtime. The package keeps market reads, local analysis, historical simulation, paper execution, account inspection, cancellation, and real-money order placement as separate actions with explicit authority.
 
 ## Actions
 
-### Analyze
+| Action | Network | Credentials | Mutation |
+| --- | --- | --- | --- |
+| `marketSnapshot` | Public exchange API | No | No |
+| `analyze` | None | No | No |
+| `backtest` | None | No | No |
+| `paperOrder` | None | No | Caller-owned paper state only |
+| `accountSnapshot` | Private exchange API | Yes | No |
+| `cancelOrder` | Private exchange API | Yes | Yes |
+| `placeOrder` | Public metadata plus private exchange API | Yes | Yes |
 
-Collects the latest market snapshot, computes indicators, and returns a structured decision. Useful before routing the result into other packages or custom logic.
+The package does not expose the legacy `execute`, `status`, `cancel`, or `stream` actions. Recommendations never become orders automatically.
 
-```json
-{
-  "action": "analyze",
-  "symbol": "ETHUSDT",
-  "strategy": {
-    "type": "sma-crossover",
-    "fastLength": 12,
-    "slowLength": 34
+## Provider scope
+
+| Provider | Market | Environment | Public data | Account | Place/cancel |
+| --- | --- | --- | --- | --- | --- |
+| Binance | Spot | Testnet, mainnet | Yes | Yes | Yes |
+| Binance | USD-M futures | Testnet, mainnet | Yes | Yes | Yes |
+| Aster | Perpetual futures | Mainnet only | Yes | Yes | Yes |
+| OKX | Spot | Demo trading, mainnet | Yes | Yes | Yes |
+| OKX | Swap | Demo trading, mainnet | Yes | Yes | Yes |
+
+Aster does not have a verified public testnet origin in this contract. Supplying `environment: "testnet"` for Aster is rejected instead of routing a simulated label to mainnet.
+
+Managed Runtime does not provide a formal WebSocket operation, so streaming is not claimed. The package also does not configure leverage or create stop-loss/take-profit orders; those require separate, explicit provider mutations before they can be represented as supported capabilities.
+
+## Basic usage
+
+```js
+const { execute } = require('@maitask/trader');
+
+const result = await execute({
+  action: 'marketSnapshot',
+  symbol: 'BTCUSDT',
+  interval: '5m',
+  limit: 120,
+  exchange: {
+    provider: 'binance',
+    market: 'spot',
+    environment: 'testnet'
   }
-}
+});
 ```
 
-### Execute (Futures)
+Every execution returns the standard Maitask result envelope. Provider bodies, URLs, signatures, credentials, passphrases, account identifiers, and raw exceptions are never returned.
 
-Runs the analysis pipeline (unless a `decision` is provided), enforces risk limits, and routes an order. In `paper` mode the simulator updates and returns the latest `paperState`. For hosted exchanges (Binance, Aster, OKX) provide API credentials or mount them via secrets.
+## Local analysis
 
-```json
-{
-  "action": "execute",
-  "symbol": "BTCUSDT",
-  "exchange": {
-    "provider": "binance",
-    "market": "futures",
-    "testnet": true,
-    "apiKey": "${BINANCE_API_KEY}",
-    "apiSecret": "${BINANCE_API_SECRET}"
-  },
-  "risk": {
-    "positionRiskPct": 0.015,
-    "stopLossPct": 0.008,
-    "takeProfitPct": 0.02
+`analyze` requires controlled chronological candles:
+
+```js
+await execute({
+  action: 'analyze',
+  symbol: 'BTCUSDT',
+  interval: '1m',
+  candles,
+  strategy: {
+    type: 'smaCrossover',
+    fastLength: 9,
+    slowLength: 26,
+    emaLength: 21,
+    rsiLength: 14,
+    volatilityLength: 20,
+    momentumLookback: 5
   }
+});
+```
+
+Formal strategies are `smaCrossover`, `rsiMeanReversion`, `momentum`, and `manual`. Results include SMA, EMA, RSI, population volatility, close-to-close momentum, exact parameters, and `executionAuthorized: false`.
+
+Candles use this exact representation:
+
+```ts
+{
+  openTime: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
 }
 ```
 
-### Execute (Spot)
+Prices must be finite and positive, volume must be non-negative, timestamps must be strictly increasing, and each high/low range must contain the open and close. Arrays are bounded and must contain enough history for every configured indicator.
 
-```json
-{
-  "action": "execute",
-  "symbol": "ETHUSDT",
-  "exchange": {
-    "provider": "binance",
-    "market": "spot",
-    "apiKey": "${BINANCE_SPOT_KEY}",
-    "apiSecret": "${BINANCE_SPOT_SECRET}"
-  },
-  "quoteQuantity": 200,
-  "strategy": { "type": "manual", "manualSignal": "long" }
-}
-```
+## Backtesting
 
-### Execute (Aster)
+`backtest` uses only caller-supplied candles and never contacts an exchange:
 
-```json
-{
-  "action": "execute",
-  "symbol": "BTCUSDT",
-  "exchange": {
-    "provider": "aster",
-    "apiKey": "${ASTER_API_KEY}",
-    "apiSecret": "${ASTER_API_SECRET}"
-  },
-  "risk": {
-    "positionRiskPct": 0.01,
-    "stopLossPct": 0.007,
-    "takeProfitPct": 0.02
+```js
+await execute({
+  action: 'backtest',
+  symbol: 'BTCUSDT',
+  interval: '1m',
+  candles,
+  strategy: { type: 'momentum', momentumLookback: 5 },
+  simulation: {
+    initialCapital: 10000,
+    positionFraction: 0.25,
+    feeBps: 5,
+    slippageBps: 2,
+    allowLong: true,
+    allowShort: true
   }
-}
+});
 ```
 
-### Execute (OKX)
+The engine is one-position-at-a-time and does not use future candles. Entry and exit fees are charged once, slippage is directional, reversals close the existing position first, and the final position is always closed. The result reports gross and net PnL, all fees, return, wins, losses, win rate, maximum drawdown, an equity curve, and a controlled trade ledger.
 
-```json
-{
-  "action": "execute",
-  "symbol": "BTCUSDT",
-  "exchange": {
-    "provider": "okx",
-    "market": "swap",
-    "apiKey": "${OKX_API_KEY}",
-    "apiSecret": "${OKX_API_SECRET}",
-    "passphrase": "${OKX_PASSPHRASE}"
+## Paper orders
+
+Paper execution is deterministic and caller-owned. `eventTime` is required so identifiers, receipts, and equity history do not depend on the worker clock.
+
+```js
+const paper = await execute({
+  action: 'paperOrder',
+  symbol: 'BTCUSDT',
+  referencePrice: '100.00',
+  eventTime: 1700000000000,
+  order: { side: 'sell', type: 'market', quantity: '2' },
+  simulation: {
+    feeBps: 5,
+    slippageBps: 2,
+    allowLong: true,
+    allowShort: true
   },
-  "quantity": 0.01,
-  "strategy": {
-    "type": "momentum-breakout",
-    "momentumLookback": 8
+  paperState: {
+    version: 1,
+    quoteBalance: '1000',
+    positions: [],
+    orders: [],
+    realizedPnl: '0',
+    feesPaid: '0',
+    equityHistory: []
   }
-}
+});
 ```
 
-### Stream (WebSocket)
+Paper positions are unlevered collateral reservations. Each position records `side`, `quantity`, `entryPrice`, and `reservedNotional`; opening exposure cannot exceed available paper collateral. Opposite orders close, partially close, or reverse positions. `reduceOnly` prevents increases and reversals. Limit orders remain `open` unless the reference price crosses the limit. Every receipt is labelled `simulated: true` and `mode: "paper"`.
 
-Capture live ticks via provider WebSocket feeds. The task connects for a bounded window, collects messages, and returns the sampled payloads so downstream steps can react.
+Persist `paperState` from one result and pass it into the next call. Input state is synchronously detached and is never mutated in place.
 
-```json
-{
-  "action": "stream",
-  "symbol": "BTCUSDT",
-  "stream": {
-    "channel": "bookTicker",
-    "limit": 25,
-    "duration_ms": 8000
+## Credentials and trusted options
+
+Private actions resolve named secrets from `options.secrets` or `context.secrets`. Credentials are not accepted in business input.
+
+```js
+const options = {
+  apiKeySecret: 'BINANCE_API_KEY',
+  apiSecretSecret: 'BINANCE_API_SECRET',
+  secrets: {
+    BINANCE_API_KEY: configuredApiKey,
+    BINANCE_API_SECRET: configuredApiSecret
+  }
+};
+```
+
+Default secret names are:
+
+- Binance: `BINANCE_API_KEY`, `BINANCE_API_SECRET`
+- Aster: `ASTER_API_KEY`, `ASTER_API_SECRET`
+- OKX: `OKX_API_KEY`, `OKX_API_SECRET`, `OKX_PASSPHRASE`
+
+`baseUrl`, timeouts, response limits, secret names, secrets, and live-trading policy are trusted options. `baseUrl` must be an exact origin without credentials, path, query, or fragment. HTTPS is required outside explicitly enabled loopback or RFC 1918 fixture endpoints.
+
+## Live authority
+
+Testnet or OKX demo mutations require trusted live authority:
+
+```js
+await execute({
+  action: 'placeOrder',
+  symbol: 'BTCUSDT',
+  exchange: {
+    provider: 'binance',
+    market: 'spot',
+    environment: 'testnet'
   },
-  "exchange": {
-    "provider": "binance",
-    "market": "futures"
+  order: {
+    side: 'buy',
+    type: 'limit',
+    quantity: '0.01',
+    price: '50000',
+    timeInForce: 'GTC',
+    clientOrderId: 'workflow-order-1'
   }
-}
+}, {
+  ...options,
+  allowLiveTrading: true
+});
 ```
 
-For OKX streaming, set `exchange.provider: "okx"` and optionally change `stream.channel` to channels such as `"tickers"` or `"trades"`.
+Mainnet placement or cancellation additionally requires `allowMainnetTrading: true`. `accountSnapshot` is read-only and does not require mutation authority, but it always requires private credentials.
 
-### Status
+Each exchange mutation is sent once. Redirects are rejected and uncertain writes are never replayed.
 
-Fetches account balances, equity, and open positions. Works for both live Binance accounts and the paper simulator.
+## Order contract
 
-```json
-{
-  "action": "status",
-  "symbol": "SOLUSDT",
-  "exchange": { "provider": "paper" },
-  "paperState": { ... }
-}
-```
+Quantities, quote quantities, prices, account values, and live receipts use decimal strings. Live normalization uses decimal strings and `BigInt`, not floating-point arithmetic.
 
-### Cancel
+- Market orders must provide exactly one size field.
+- Binance spot market orders may use either `quantity` (base asset) or `quoteQuantity`.
+- OKX spot uses `quantity` as base currency and sends `tgtCcy: "base_ccy"` for market orders.
+- Binance futures, Aster futures, and OKX swap require `quantity`.
+- Limit orders require `price` and explicit `timeInForce` (`GTC`, `IOC`, or `FOK`).
+- Spot orders reject `reduceOnly` and `positionSide`.
+- Derivative orders may use `positionSide` for hedge/long-short mode or `reduceOnly` for one-way/net mode, but never both.
+- Cancellation accepts exactly one of `orderId` or `clientOrderId`.
 
-Cancels an order by `execution.orderId` or `execution.clientOrderId`.
+Before Binance or Aster placement, the package loads exchange information and enforces symbol status, tick size, price range, lot/market-lot step, quantity range, quote-order permission, and minimum/maximum notional rules. A base-quantity market order also loads the current ticker when a notional rule must be checked.
 
-```json
-{
-  "action": "cancel",
-  "symbol": "BTCUSDT",
-  "execution": {
-    "orderId": 123456789
-  },
-  "exchange": {
-    "provider": "binance",
-    "apiKey": "...",
-    "apiSecret": "..."
-  }
-}
-```
+Before OKX placement, the package loads the formal instrument and enforces live state, tick size, lot size, minimum size, market/limit maximum size, and contract value metadata. Swap quantity is the exchange contract count.
 
-### Backtest
+## Transport guarantees
 
-Runs a lightweight historical walkthrough using either on-demand candles (Binance public data) or user-provided OHLC arrays.
+- Maitask Runtime `op_http_request` is preferred when available.
+- Fetch is the local Node.js fallback.
+- All responses use strict UTF-8 JSON decoding.
+- Redirect mode is always manual and every redirect is rejected.
+- One total deadline covers metadata reads, signing, account reads, and mutation.
+- Response bodies are streamed into a configured byte limit.
+- Credentials are attached only after an exact same-origin request URL is constructed.
+- No request is retried by this package.
 
-```json
-{
-  "action": "backtest",
-  "symbol": "HYPEUSDT",
-  "interval": "15m",
-  "backtest": {
-    "capital": 20000
-  },
-  "strategy": {
-    "type": "rsi-mean-reversion",
-    "lowerBand": 28,
-    "upperBand": 72
-  }
-}
-```
+## Stable errors
 
-## Paper Trading Lifecycle
+| Code | Meaning |
+| --- | --- |
+| `TRADER_VALIDATION` | Input or normalized order is invalid |
+| `TRADER_SECRET_UNAVAILABLE` | Required named credentials are unavailable |
+| `TRADER_POLICY` | Origin or live-trading policy denied the operation |
+| `TRADER_TIMEOUT` | The total operation deadline expired |
+| `TRADER_RESPONSE_TOO_LARGE` | A response exceeded the byte limit |
+| `TRADER_REDIRECT` | An exchange attempted to redirect |
+| `TRADER_PROVIDER` | The exchange rejected the request or instrument state |
+| `TRADER_UPSTREAM` | Transport or provider data was malformed |
 
-1. Run the package with `exchange.provider: "paper"` (no keys required).
-2. Persist the returned `paperState` object.
-3. Feed that state into the next invocation to continue the virtual portfolio.
-4. Inspect `paperState.equityCurve` for performance telemetry or downstream visualization.
+Errors are stable, controlled, and secret-safe. Raw provider messages are intentionally omitted.
 
-## Authentication Notes
+## Migration from 0.1
 
-- **Binance & Aster** – require API key + secret. Store them in Maitask secrets (`BINANCE_API_KEY`, `BINANCE_API_SECRET`, `ASTER_API_KEY`, …) or embed via the `exchange` object. Set `exchange.testnet: true` to access Binance testnets.
-- **OKX** – requires `apiKey`, `apiSecret`, and `passphrase`. The package signs each call following OKX's spec.
-- **Paper** – ignores credentials; persist the returned `paperState` to progress a rehearsal portfolio across steps.
+- Replace `execute`, `status`, `cancel`, and `stream` with the seven formal actions.
+- Replace kebab-case strategy names with `smaCrossover`, `rsiMeanReversion`, `momentum`, or `manual`.
+- Move all credentials and endpoint controls out of input and into trusted options or context secrets.
+- Replace `testnet: boolean` with explicit `exchange.environment`.
+- Replace merged risk/execution objects with explicit `simulation`, `paperState`, and `order` contracts.
+- Do not convert analysis recommendations into live orders. Construct a separate `placeOrder` request under explicit authority.
+- Remove leverage, stop-loss, take-profit, precision, and WebSocket fields; they did not represent complete provider operations.
+- Persist versioned paper state with position side and reserved notional fields.
 
-## Example Payloads
-
-See [`example.json`](./example.json) for a ready-to-run Binance futures configuration. Change `exchange.provider` / `exchange.market` (and credentials) to try Aster, OKX, or paper flows. For streaming payloads, reference [`example-stream.json`](./example-stream.json).
-
-## Outputs
-
-Each action returns `success: true`, a `timestamp`, and structured fields:
-
-- `analysis` → `decision`, `indicators`, and raw market snapshot.
-- `order` → routed order payload (real or simulated) with optional `targets`.
-- `account` → balances, equity, and open positions.
-- `paperState` → the updated simulator snapshot when applicable.
-- `statistics` → backtest KPIs (trades, ROI, max drawdown).
-
-Leverage the data with follow-up Maitask steps (notifications, logging, dashboards, etc.).
-
-## Response Contract
-
-The package returns a formal envelope for all actions:
-
-- Success: `{ success: true, data: {...actionPayload}, metadata: { package, version, action, symbol, provider, mode, timestamp } }`
-- Failure: `{ success: false, error: { message, code, type }, metadata: { package, version, action, symbol, timestamp } }`
+See `index.d.ts` for readonly action-specific contracts.

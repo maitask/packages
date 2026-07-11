@@ -75,4 +75,4 @@
 
 ## Finance & Trading (1)
 
-- [**@maitask/trader**](./trader) `v0.1.0` — Trader orchestration across Binance, Aster, OKX, and paper providers
+- [**@maitask/trader**](./trader) `v1.0.0` — Deterministic analysis, backtesting, paper execution, and controlled Binance, Aster, and OKX trading

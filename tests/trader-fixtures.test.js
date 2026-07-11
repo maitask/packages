@@ -167,6 +167,7 @@ test('trader applies deterministic resumable paper orders without exchange crede
     action: 'paperOrder',
     symbol: 'BTCUSDT',
     referencePrice: '100.00',
+    eventTime: 1_700_000_000_000,
     order: { side: 'buy', type: 'market', quantity: '2.000' },
     simulation: { feeBps: 10, slippageBps: 5 },
     paperState: {
@@ -192,6 +193,7 @@ test('trader applies deterministic resumable paper orders without exchange crede
     action: 'paperOrder',
     symbol: 'BTCUSDT',
     referencePrice: '110.00',
+    eventTime: 1_700_000_060_000,
     order: { side: 'sell', type: 'market', quantity: '2.000', reduceOnly: true },
     simulation: { feeBps: 10, slippageBps: 5 },
     paperState: first.paperState
@@ -327,7 +329,7 @@ test('trader maps Binance futures, Aster futures, and OKX spot and swap public s
 
   const cases = [
     { exchange: { provider: 'binance', market: 'futures', environment: 'testnet' }, path: '/fapi/v1/klines' },
-    { exchange: { provider: 'aster', market: 'futures', environment: 'testnet' }, path: '/fapi/v1/klines' },
+    { exchange: { provider: 'aster', market: 'futures', environment: 'mainnet' }, path: '/fapi/v1/klines' },
     { exchange: { provider: 'okx', market: 'spot', environment: 'testnet' }, instrument: 'BTC-USDT' },
     { exchange: { provider: 'okx', market: 'swap', environment: 'testnet' }, instrument: 'BTC-USDT-SWAP' }
   ];
@@ -354,7 +356,7 @@ test('trader signs, normalizes, places, cancels, and maps Binance and Aster live
     if (request.url.includes('exchangeInfo')) {
       json(response, 200, {
         symbols: [{
-          symbol: 'BTCUSDT', status: 'TRADING',
+          symbol: 'BTCUSDT', status: 'TRADING', quoteOrderQtyMarketAllowed: true,
           filters: [
             { filterType: 'PRICE_FILTER', tickSize: '0.10' },
             { filterType: 'LOT_SIZE', minQty: '0.001', stepSize: '0.001' },
@@ -366,17 +368,25 @@ test('trader signs, normalizes, places, cancels, and maps Binance and Aster live
       return;
     }
     if (request.url.startsWith('/api/v3/order') && request.method === 'POST') {
+      const requestUrl = new URL(request.url, 'http://fixture.local');
       json(response, 200, {
-        symbol: 'BTCUSDT', orderId: 123, clientOrderId: 'spot-order', status: 'NEW',
-        side: 'BUY', type: 'LIMIT', origQty: '1.234', price: '100.10', executedQty: '0'
+        symbol: 'BTCUSDT', orderId: 123,
+        clientOrderId: requestUrl.searchParams.get('newClientOrderId'), status: 'NEW',
+        side: requestUrl.searchParams.get('side'), type: requestUrl.searchParams.get('type'),
+        origQty: requestUrl.searchParams.get('quantity') || '0',
+        price: requestUrl.searchParams.get('price') || '0', executedQty: '0'
       });
       return;
     }
     if (request.url.startsWith('/fapi/v1/order') && request.method === 'POST') {
+      const requestUrl = new URL(request.url, 'http://fixture.local');
       json(response, 200, {
-        symbol: 'BTCUSDT', orderId: 456, clientOrderId: 'future-order', status: 'NEW',
-        side: 'SELL', type: 'LIMIT', origQty: '2.345', price: '101.20', avgPrice: '0', reduceOnly: true,
-        positionSide: 'LONG'
+        symbol: 'BTCUSDT', orderId: 456,
+        clientOrderId: requestUrl.searchParams.get('newClientOrderId'), status: 'NEW',
+        side: requestUrl.searchParams.get('side'), type: requestUrl.searchParams.get('type'),
+        origQty: requestUrl.searchParams.get('quantity'), price: requestUrl.searchParams.get('price'),
+        avgPrice: '0', reduceOnly: requestUrl.searchParams.get('reduceOnly') === 'true',
+        positionSide: requestUrl.searchParams.get('positionSide') || 'BOTH'
       });
       return;
     }
@@ -405,26 +415,41 @@ test('trader signs, normalizes, places, cancels, and maps Binance and Aster live
   assert.equal(item(spot).order.quantity, '1.234');
   assert.equal(item(spot).order.price, '100.1');
 
+  const quoteMarket = await execute({
+    action: 'placeOrder', symbol: 'BTCUSDT',
+    exchange: { provider: 'binance', market: 'spot', environment: 'testnet' },
+    order: { side: 'buy', type: 'market', quoteQuantity: '25.00', clientOrderId: 'spot-market' }
+  }, providerOptions(server, 'binance'));
+  assert.equal(item(quoteMarket).order.quoteQuantity, '25');
+
   const future = await execute({
     action: 'placeOrder', symbol: 'BTCUSDT',
-    exchange: { provider: 'aster', market: 'futures', environment: 'testnet' },
-    order: { side: 'sell', type: 'limit', quantity: '2.3459', price: '101.299', timeInForce: 'GTC', reduceOnly: true, positionSide: 'long', clientOrderId: 'future-order' }
-  }, providerOptions(server, 'aster'));
+    exchange: { provider: 'aster', market: 'futures', environment: 'mainnet' },
+    order: { side: 'sell', type: 'limit', quantity: '2.3459', price: '101.299', timeInForce: 'GTC', reduceOnly: true, clientOrderId: 'future-order' }
+  }, providerOptions(server, 'aster', { allowMainnetTrading: true }));
   assert.equal(item(future).order.provider, 'aster');
   assert.equal(item(future).order.reduceOnly, true);
 
+  const binanceFuture = await execute({
+    action: 'placeOrder', symbol: 'BTCUSDT',
+    exchange: { provider: 'binance', market: 'futures', environment: 'testnet' },
+    order: { side: 'sell', type: 'limit', quantity: '2.3459', price: '101.299', timeInForce: 'GTC', positionSide: 'long', clientOrderId: 'future-order' }
+  }, providerOptions(server, 'binance'));
+  assert.equal(item(binanceFuture).order.provider, 'binance');
+  assert.equal(item(binanceFuture).order.positionSide, 'long');
+
   const account = await execute({
     action: 'accountSnapshot', symbol: 'BTCUSDT',
-    exchange: { provider: 'aster', market: 'futures', environment: 'testnet' }
+    exchange: { provider: 'aster', market: 'futures', environment: 'mainnet' }
   }, providerOptions(server, 'aster'));
   assert.equal(item(account).account.totalEquity, '1005');
   assert.equal(item(account).account.positions[0].quantity, '0.25');
 
   const cancelled = await execute({
     action: 'cancelOrder', symbol: 'BTCUSDT',
-    exchange: { provider: 'aster', market: 'futures', environment: 'testnet' },
-    order: { side: 'sell', type: 'limit', orderId: '456' }
-  }, providerOptions(server, 'aster'));
+    exchange: { provider: 'aster', market: 'futures', environment: 'mainnet' },
+    order: { orderId: '456' }
+  }, providerOptions(server, 'aster', { allowMainnetTrading: true }));
   assert.equal(item(cancelled).cancellation.cancelled, true);
 
   for (const request of observed.filter(entry => /\/order|\/account/.test(entry.url))) {
@@ -432,6 +457,7 @@ test('trader signs, normalizes, places, cancels, and maps Binance and Aster live
     verifyBinanceSignature(request.url, 'exchange-secret');
   }
   assert.ok(observed.some(entry => entry.url.includes('quantity=1.234') && entry.url.includes('price=100.1')));
+  assert.ok(observed.some(entry => entry.url.includes('quoteOrderQty=25')));
   assert.ok(observed.some(entry => entry.url.includes('quantity=2.345') && entry.url.includes('price=101.2')));
 });
 
@@ -476,6 +502,14 @@ test('trader signs and maps OKX spot and swap orders, account snapshots, and can
   assert.equal(item(placed).order.quantity, '2.345');
   assert.equal(item(placed).order.price, '100.1');
 
+  const spotPlaced = await execute({
+    action: 'placeOrder', symbol: 'BTCUSDT',
+    exchange: { provider: 'okx', market: 'spot', environment: 'testnet' },
+    order: { side: 'buy', type: 'market', quantity: '1.2349', clientOrderId: 'client-1' }
+  }, providerOptions(server, 'okx'));
+  assert.equal(item(spotPlaced).order.market, 'spot');
+  assert.equal(item(spotPlaced).order.quantity, '1.234');
+
   const account = await execute({
     action: 'accountSnapshot', symbol: 'BTCUSDT',
     exchange: { provider: 'okx', market: 'swap', environment: 'testnet' }
@@ -486,7 +520,7 @@ test('trader signs and maps OKX spot and swap orders, account snapshots, and can
   const cancelled = await execute({
     action: 'cancelOrder', symbol: 'BTCUSDT',
     exchange: { provider: 'okx', market: 'swap', environment: 'testnet' },
-    order: { side: 'buy', type: 'limit', orderId: 'okx-1' }
+    order: { orderId: 'okx-1' }
   }, providerOptions(server, 'okx'));
   assert.equal(item(cancelled).cancellation.cancelled, true);
 
@@ -501,6 +535,14 @@ test('trader signs and maps OKX spot and swap orders, account snapshots, and can
     instId: 'BTC-USDT-SWAP', tdMode: 'cross', side: 'buy', ordType: 'limit',
     sz: '2.345', px: '100.1', posSide: 'long', clOrdId: 'client-1'
   });
+  const spotOrderWire = observed.find(entry => {
+    if (entry.url !== '/api/v5/trade/order') return false;
+    return JSON.parse(entry.body).instId === 'BTC-USDT';
+  });
+  assert.deepEqual(JSON.parse(spotOrderWire.body), {
+    instId: 'BTC-USDT', tdMode: 'cash', side: 'buy', ordType: 'market',
+    sz: '1.234', tgtCcy: 'base_ccy', clOrdId: 'client-1'
+  });
 });
 
 test('trader enforces redirect, deadline, response limits, and one-attempt live mutations', async t => {
@@ -511,12 +553,12 @@ test('trader enforces redirect, deadline, response limits, and one-attempt live 
     json(response, 200, { price: '1' });
   });
   t.after(target.close);
+  const redirectServer = await listen((_request, response) => {
+    response.writeHead(302, { location: `${target.url}/target` });
+    response.end();
+  });
+  t.after(redirectServer.close);
   const server = await listen((request, response) => {
-    if (request.url.includes('redirect')) {
-      response.writeHead(302, { location: `${target.url}/target` });
-      response.end();
-      return;
-    }
     if (request.url.includes('slow')) return;
     if (request.url.includes('large')) {
       json(response, 200, { payload: 'x'.repeat(4096) });
@@ -539,8 +581,8 @@ test('trader enforces redirect, deadline, response limits, and one-attempt live 
     action: 'marketSnapshot', symbol: 'BTCUSDT', interval: '1m', limit: 20,
     exchange: { provider: 'binance', market: 'spot', environment: 'testnet' }
   };
-  const redirected = await execute(baseInput, { baseUrl: `${server.url}/redirect`, allowInsecureHttp: true });
-  assertFailure(redirected, 'TRADER_VALIDATION');
+  const redirected = await execute(baseInput, { baseUrl: redirectServer.url, allowInsecureHttp: true });
+  assertFailure(redirected, 'TRADER_REDIRECT');
 
   const slowServer = await listen((_request, _response) => {});
   t.after(slowServer.close);
@@ -560,6 +602,147 @@ test('trader enforces redirect, deadline, response limits, and one-attempt live 
   assertFailure(mutation, 'TRADER_PROVIDER');
   assert.equal(mutationRequests, 1);
   assert.equal(redirectTargetRequests, 0);
+});
+
+test('trader applies deterministic short paper positions and reduce-only closure', async () => {
+  const initialState = {
+    version: 1,
+    quoteBalance: '1000',
+    positions: [],
+    orders: [],
+    realizedPnl: '0',
+    feesPaid: '0',
+    equityHistory: []
+  };
+  const opened = await execute({
+    action: 'paperOrder', symbol: 'BTCUSDT', referencePrice: '100', eventTime: 1_700_000_000_000,
+    order: { side: 'sell', type: 'market', quantity: '2' },
+    simulation: { feeBps: 10, slippageBps: 0, allowLong: true, allowShort: true },
+    paperState: initialState
+  });
+  const first = item(opened);
+  assert.deepEqual(first.paperState.positions[0], {
+    symbol: 'BTCUSDT', side: 'short', quantity: '2', entryPrice: '100', reservedNotional: '200'
+  });
+  assert.equal(first.order.id, 'paper-1');
+  assert.equal(first.order.createdAt, '2023-11-14T22:13:20.000Z');
+
+  const closed = await execute({
+    action: 'paperOrder', symbol: 'BTCUSDT', referencePrice: '90', eventTime: 1_700_000_060_000,
+    order: { side: 'buy', type: 'market', quantity: '2', reduceOnly: true },
+    simulation: { feeBps: 10, slippageBps: 0, allowLong: true, allowShort: true },
+    paperState: first.paperState
+  });
+  const second = item(closed);
+  assert.equal(second.paperState.positions.length, 0);
+  assert.equal(second.paperState.realizedPnl, '20');
+  assert.equal(second.order.id, 'paper-2');
+  assert.equal(first.paperState.positions.length, 1, 'prior state remains detached');
+});
+
+test('trader preserves an uncrossed paper limit order without changing positions or collateral', async () => {
+  const result = await execute({
+    action: 'paperOrder', symbol: 'BTCUSDT', referencePrice: '100', eventTime: 1_700_000_000_000,
+    order: { side: 'buy', type: 'limit', quantity: '2', price: '90', timeInForce: 'GTC' },
+    simulation: { feeBps: 10, slippageBps: 5, allowLong: true, allowShort: true },
+    paperState: {
+      version: 1, quoteBalance: '1000', positions: [], orders: [],
+      realizedPnl: '0', feesPaid: '0', equityHistory: []
+    }
+  });
+  const paper = item(result);
+  assert.equal(paper.order.status, 'open');
+  assert.equal(paper.order.fillPrice, null);
+  assert.equal(paper.paperState.quoteBalance, '1000');
+  assert.equal(paper.paperState.feesPaid, '0');
+  assert.deepEqual(paper.paperState.positions, []);
+});
+
+test('trader computes every formal strategy and a short-only backtest without execution authority', async () => {
+  const fixtures = [
+    { strategy: { type: 'smaCrossover', fastLength: 3, slowLength: 8 }, signal: 'short' },
+    { strategy: { type: 'rsiMeanReversion', rsiLength: 5, lowerBand: 30, upperBand: 70 }, signal: 'long' },
+    { strategy: { type: 'momentum', momentumLookback: 3 }, signal: 'short' },
+    { strategy: { type: 'manual', manualSignal: 'short', confidence: 0.8, reason: 'Controlled fixture.' }, signal: 'short' }
+  ];
+  const falling = candles(60, 200, -1);
+  for (const fixture of fixtures) {
+    const result = await execute({
+      action: 'analyze', symbol: 'BTCUSDT', interval: '1m', candles: falling,
+      strategy: fixture.strategy
+    });
+    const analysis = item(result);
+    assert.equal(analysis.recommendation.signal, fixture.signal);
+    assert.equal(analysis.recommendation.executionAuthorized, false);
+  }
+
+  const backtested = await execute({
+    action: 'backtest', symbol: 'BTCUSDT', interval: '1m', candles: falling,
+    strategy: { type: 'momentum', momentumLookback: 3 },
+    simulation: { initialCapital: 10_000, positionFraction: 0.5, feeBps: 5, slippageBps: 2, allowLong: false, allowShort: true }
+  });
+  const result = item(backtested);
+  assert.ok(result.trades.length > 0);
+  assert.ok(result.trades.every(trade => trade.side === 'short'));
+  assert.equal(result.openPosition, null);
+  assert.ok(result.statistics.finalCapital > result.statistics.initialCapital);
+});
+
+test('trader rejects unavailable secrets, unsupported Aster testnet, hostile structures, and malformed provider data', async t => {
+  const server = await listen((_request, response) => json(response, 200, { symbols: 'invalid' }));
+  t.after(server.close);
+  const missingSecret = await execute({
+    action: 'accountSnapshot', symbol: 'BTCUSDT',
+    exchange: { provider: 'binance', market: 'spot', environment: 'testnet' }
+  }, { baseUrl: server.url, allowInsecureHttp: true });
+  assertFailure(missingSecret, 'TRADER_SECRET_UNAVAILABLE');
+
+  const unsupported = await execute({
+    action: 'marketSnapshot', symbol: 'BTCUSDT', interval: '1m',
+    exchange: { provider: 'aster', market: 'futures', environment: 'testnet' }
+  }, { baseUrl: server.url, allowInsecureHttp: true });
+  assertFailure(unsupported, 'TRADER_VALIDATION');
+
+  const sparse = new Array(20);
+  sparse[0] = candles(1)[0];
+  const hostileCases = [
+    { action: 'analyze', symbol: 'BTCUSDT', interval: '1m', candles: sparse },
+    Object.assign(Object.create({ inherited: true }), { action: 'analyze', symbol: 'BTCUSDT', interval: '1m', candles: candles() }),
+    { action: 'analyze', symbol: 'BTCUSDT', interval: '1m', candles: candles(), [Symbol('hidden')]: true },
+    { action: 'paperOrder', symbol: 'BTCUSDT', referencePrice: '100', order: { side: 'buy', type: 'market', quantity: '1' }, paperState: {} }
+  ];
+  for (const input of hostileCases) assertFailure(await execute(input), 'TRADER_VALIDATION');
+
+  const malformed = await execute({
+    action: 'placeOrder', symbol: 'BTCUSDT',
+    exchange: { provider: 'binance', market: 'spot', environment: 'testnet' },
+    order: { side: 'buy', type: 'limit', quantity: '1', price: '100', timeInForce: 'GTC' }
+  }, providerOptions(server, 'binance'));
+  assertFailure(malformed, 'TRADER_UPSTREAM');
+});
+
+test('trader resolves private credentials from trusted Runtime context without option aliases', async t => {
+  let observedKey = null;
+  const server = await listen((request, response) => {
+    observedKey = request.headers['x-mbx-apikey'];
+    json(response, 200, { balances: [{ asset: 'USDT', free: '100', locked: '0' }] });
+  });
+  t.after(server.close);
+  const result = await execute({
+    action: 'accountSnapshot', symbol: 'BTCUSDT',
+    exchange: { provider: 'binance', market: 'spot', environment: 'testnet' }
+  }, {
+    baseUrl: server.url,
+    allowInsecureHttp: true,
+    apiKeySecret: 'TRADER_KEY',
+    apiSecretSecret: 'TRADER_SECRET'
+  }, {
+    executionId: 'execution-1',
+    secrets: { TRADER_KEY: 'context-key', TRADER_SECRET: 'context-secret' }
+  });
+  assert.equal(item(result).account.balances[0].total, '100');
+  assert.equal(observedKey, 'context-key');
+  assert.equal(result.metadata.executionId, 'execution-1');
 });
 
 test('trader uses canonical Runtime HTTP transport and keeps provider secrets out of results', async () => {
@@ -592,6 +775,24 @@ test('trader uses canonical Runtime HTTP transport and keeps provider secrets ou
     assert.equal(observed[0].request.maxResponseBytes, 1024 * 1024);
   } finally {
     globalThis.Deno = originalDeno;
+    global.fetch = originalFetch;
+  }
+});
+
+test('trader normalizes opaque transport exceptions without inspecting hostile error objects', async () => {
+  const originalFetch = global.fetch;
+  const hostile = new Proxy({}, {
+    get() { throw new Error('error object must remain opaque'); },
+    getPrototypeOf() { throw new Error('prototype must remain opaque'); }
+  });
+  global.fetch = async () => Promise.reject(hostile);
+  try {
+    const result = await execute({
+      action: 'marketSnapshot', symbol: 'BTCUSDT', interval: '1m', limit: 20,
+      exchange: { provider: 'binance', market: 'spot', environment: 'testnet' }
+    }, { baseUrl: 'https://fixture.example' });
+    assertFailure(result, 'TRADER_UPSTREAM');
+  } finally {
     global.fetch = originalFetch;
   }
 });
