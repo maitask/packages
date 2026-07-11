@@ -1,10 +1,19 @@
 {
   "input": {
-    "action": "get-repo",
-    "owner": "maitask",
-    "repo": "engine"
+    "action": "createIssue",
+    "owner": "acme",
+    "repository": "service",
+    "title": "Production incident follow-up",
+    "body": "Track remediation and verification work.",
+    "labels": ["operations"]
   },
   "options": {
-    "token": "ghp_yourgithubtoken"
+    "timeoutMs": 30000,
+    "maxResponseBytes": 4194304
+  },
+  "context": {
+    "secrets": {
+      "GITHUB_TOKEN": "provided-by-runtime-secret-storage"
+    }
   }
 }

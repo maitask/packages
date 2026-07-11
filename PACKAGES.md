@@ -53,9 +53,9 @@
 - [**@maitask/web-search**](./web-search) `v0.1.1` — Search the web using multiple search engines
 - [**@maitask/http-request**](./http-request) `v1.1.0` — Production-grade HTTP client with retries, auth helpers, multipart bodies, and validation
 - [**@maitask/hackernews-crawler**](./hackernews-crawler) `v0.1.0` — Crawl and extract stories from Hacker News using official API
-- [**@maitask/github-integration**](./github-integration) `v0.2.0` — GitHub REST API integration for repositories, issues, pull requests, users, and custom REST calls
+- [**@maitask/github-integration**](./github-integration) `v1.0.0` — Credential-confined GitHub REST client for repositories, issues, pull requests, users, and controlled custom requests
 - [**@maitask/url-analyzer**](./url-analyzer) `v0.1.0` — URL parsing, validation, and analysis
-- [**@maitask/cf-proxy**](./cf-proxy) `v0.1.0` — Cloudflare Worker proxy for GitHub and Docker registry acceleration
+- [**@maitask/cf-proxy**](./cf-proxy) `v0.1.0` — Validated read-only transport for GitHub resources and container registry content
 - [**@maitask/database-query**](./database-query) `v0.1.0` — Execute SQL via HTTP database proxy services
 - [**@maitask/graphql-client**](./graphql-client) `v0.1.0` — Execute GraphQL queries and mutations over HTTP
 - [**@maitask/grpc-client**](./grpc-client) `v0.1.0` — Invoke gRPC services via HTTP/JSON transcoding gateways

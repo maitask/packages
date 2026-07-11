@@ -10,6 +10,8 @@
     "test:messaging-providers": "node --test tests/messaging-provider-fixtures.test.js",
     "test:cf-proxy": "node --test tests/cf-proxy-fixtures.test.js",
     "test:cf-proxy-types": "tsc --strict --noEmit --target ES2022 --module commonjs --moduleResolution node tests/cf-proxy-contract.ts",
+    "test:github-integration": "node --test tests/github-integration-fixtures.test.js",
+    "test:github-integration-types": "tsc --strict --noEmit --target ES2022 --module commonjs --moduleResolution node tests/github-integration-contract.ts",
     "test:metadata": "node --test tests/catalog-integrity.test.js",
     "test:archives": "node --test tests/package-archives.test.js"
   },
