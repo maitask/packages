@@ -2,9 +2,9 @@
   "name": "@maitask/trader",
   "version": "0.1.0",
   "description": "Trader orchestration across Binance futures, Binance spot, and paper modes inside Maitask",
-  "main": "dist/index.cjs",
+  "main": "index.js",
   "types": "index.d.ts",
-  "type": "module",
+  "type": "commonjs",
   "author": "Maitask Team <team@maitask.com>",
   "license": "MIT",
   "keywords": [
@@ -22,7 +22,7 @@
     "node": ">=18.0.0"
   },
   "files": [
-    "dist/index.cjs",
+    "index.js",
     "index.d.ts",
     "README.md",
     "example.json"

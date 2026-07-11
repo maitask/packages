@@ -16,6 +16,8 @@
     "test:http-request-types": "tsc --strict --noEmit --target ES2022 --module commonjs --moduleResolution node tests/http-request-contract.ts",
     "test:email-sender": "node --test tests/email-sender-fixtures.test.js",
     "test:email-sender-types": "tsc --strict --noEmit --target ES2022 --module commonjs --moduleResolution node tests/email-sender-contract.ts",
+    "test:trader": "node --test tests/trader-fixtures.test.js",
+    "test:trader-types": "tsc --strict --noEmit --target ES2022 --module commonjs --moduleResolution node tests/trader-contract.ts",
     "test:metadata": "node --test tests/catalog-integrity.test.js",
     "test:archives": "node --test tests/package-archives.test.js"
   },
