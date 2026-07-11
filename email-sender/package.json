@@ -1,7 +1,7 @@
 {
   "name": "@maitask/email-sender",
-  "version": "0.1.0",
-  "description": "Powerful email sending service with multiple providers and templates",
+  "version": "1.0.0",
+  "description": "Credential-confined SendGrid and Mailgun delivery with safe templates and exact attachments",
   "main": "index.js",
   "types": "index.d.ts",
   "type": "commonjs",
@@ -19,7 +19,6 @@
   "keywords": [
     "maitask",
     "email",
-    "smtp",
     "sendgrid",
     "mailgun",
     "notification",
@@ -42,12 +41,11 @@
     "locales": {
       "en": {
         "display_name": "Email Sender",
-        "description": "Powerful email sending service with multiple providers and templates",
+        "description": "Credential-confined SendGrid and Mailgun delivery with safe templates and exact attachments",
         "category": "Communications & Automation",
         "keywords": [
           "maitask",
           "email",
-          "smtp",
           "sendgrid",
           "mailgun",
           "notification",
@@ -58,11 +56,10 @@
       },
       "zh": {
         "display_name": "邮件发送器",
-        "description": "支持多服务商和模板的邮件发送能力，适用于通知、营销邮件和自动化消息。",
+        "description": "具备凭据隔离、安全模板和精确附件的 SendGrid 与 Mailgun 邮件投递能力。",
         "category": "通信与自动化",
         "keywords": [
           "邮件",
-          "SMTP",
           "SendGrid",
           "Mailgun",
           "通知",

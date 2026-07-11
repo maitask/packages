@@ -41,7 +41,7 @@
 
 ## Communications & Automation (5)
 
-- [**@maitask/email-sender**](./email-sender) `v0.1.0` — Powerful email sending service with multiple providers and templates
+- [**@maitask/email-sender**](./email-sender) `v1.0.0` — Credential-confined SendGrid and Mailgun delivery with recipient privacy, safe templates, and exact attachments
 - [**@maitask/slack-notifier**](./slack-notifier) `v0.1.0` — Send notifications and messages to Slack channels via incoming webhooks
 - [**@maitask/telegram-bot**](./telegram-bot) `v0.1.0` — Send messages to Telegram users and groups via Bot API
 - [**@maitask/stream-publisher**](./stream-publisher) `v0.1.0` — Publish data streams via HTTP chunked transfer or SSE

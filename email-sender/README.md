@@ -1,478 +1,265 @@
 # @maitask/email-sender
 
-Powerful email sending service with multiple providers and templates.
+Credential-confined SendGrid and Mailgun delivery for Maitask Runtime. Version 1 validates and snapshots the complete message before contact, supports recipient privacy and exact attachments, renders safe local templates or provider-native templates, executes exactly one provider POST, and returns only a controlled receipt.
 
-## Features
+## Provider scope
 
-- **Multiple Providers**: Support for SendGrid, Mailgun, and SMTP
-- **Template Engine**: Built-in templates with variable substitution
-- **HTML & Text Email**: Support for both HTML and plain text content
-- **Pre-built Templates**: Notification, alert, and report templates
-- **Secure Configuration**: API key and credential management
-- **Error Handling**: Comprehensive error reporting and retry logic
-- **Batch Recipients**: Send to multiple recipients efficiently
-- **Format Conversion**: Automatic HTML-to-text conversion
+The managed package supports:
 
-## Installation
+- SendGrid v3 Mail Send over HTTPS.
+- Mailgun v3 Messages over HTTPS, including multipart attachments.
 
-```bash
-npm install @maitask/email-sender
-```
+SMTP is intentionally not exposed. Managed Maitask Runtime is a compact native worker sandbox with HTTP operations, not raw TCP or Node `net`/`tls` modules. The previous SMTP branch could run only in a separate Node process and was therefore not a real managed-package capability. SMTP environments should expose a separately managed HTTPS relay and integrate that relay through a purpose-built package.
 
-## Usage
+## Guarantees
 
-### Basic Email Sending
+- Credentials and provider endpoints are accepted only through trusted options and Runtime secrets.
+- Business input cannot provide API keys, Mailgun domains, API origins, timeout policy, or retries.
+- `to`, `cc`, and `bcc` recipients are validated, deduplicated across fields, and omitted from results and errors.
+- Direct text/HTML, safe local interpolation, and provider-native templates are distinct formal modes.
+- Attachments preserve canonical Base64 bytes in SendGrid JSON and Mailgun multipart requests.
+- All redirects are rejected before the target is contacted.
+- Every execution performs one delivery POST. Timeout, network, 429, and 5xx outcomes are never replayed by the package.
+- One total deadline covers the POST and bounded response reading.
+- Provider bodies, message content, subjects, recipient addresses, attachment bytes, credentials, URLs, and arbitrary exception messages are not returned.
+- Strict readonly TypeScript overloads associate SendGrid and Mailgun input with their trusted options.
 
-```javascript
-const result = execute({
-  provider: "sendgrid",
-  api_key: "your-api-key",
-  from: {
-    email: "sender@example.com",
-    name: "Your App"
+## Basic SendGrid delivery
+
+```js
+const { execute } = require('@maitask/email-sender');
+
+const result = await execute({
+  provider: 'sendgrid',
+  from: { email: 'reports@example.com', name: 'Maitask Reports' },
+  to: [{ email: 'owner@example.com', name: 'Workflow Owner' }],
+  cc: [{ email: 'operations@example.com' }],
+  bcc: [{ email: 'audit@example.com' }],
+  replyTo: { email: 'support@example.com', name: 'Support' },
+  subject: 'Weekly production report',
+  content: {
+    text: 'The weekly report is attached.',
+    html: '<p>The weekly report is attached.</p>'
   },
-  to: [
-    { email: "user@example.com", name: "User Name" }
-  ],
-  subject: "Welcome to our service!",
-  html: "<h1>Welcome!</h1><p>Thanks for joining us.</p>",
-  text: "Welcome! Thanks for joining us."
-});
-
-console.log(result.success); // true
-console.log(result.metadata.message_id); // Email message ID
-```
-
-### Using Templates
-
-```javascript
-const result = execute({
-  provider: "sendgrid",
-  api_key: "your-api-key",
-  from: { email: "alerts@example.com", name: "Alert System" },
-  to: [{ email: "admin@example.com" }],
-  subject: "System Alert",
-  template: "alert",
-  template_data: {
-    alert_type: "High CPU Usage",
-    message: "Server CPU usage exceeded 90%",
-    timestamp: new Date().toISOString(),
-    details: "CPU: 95%, Memory: 78%, Disk: 45%"
-  }
+  headers: { 'X-Trace-Id': 'trace-1' },
+  tags: ['production', 'report'],
+  metadata: { workflowId: 'workflow-1' },
+  attachments: [{
+    filename: 'report.pdf',
+    contentType: 'application/pdf',
+    bodyBase64: 'JVBERi0xLjQK'
+  }]
+}, {
+  apiKeySecret: 'SENDGRID_API_KEY',
+  timeoutMs: 30000,
+  maxResponseBytes: 65536
+}, {
+  secrets: { SENDGRID_API_KEY: 'runtime-managed-secret' },
+  executionId: 'execution-1'
 });
 ```
 
-### Custom HTML Template
+The default SendGrid secret name is `SENDGRID_API_KEY` and the default origin is `https://api.sendgrid.com`.
 
-```javascript
-const customTemplate = `
-<html>
-  <body style="font-family: Arial, sans-serif;">
-    <h1>Hello {{name}}!</h1>
-    <p>Your order #{{order_id}} has been {{status}}.</p>
-    <div style="background: #f0f0f0; padding: 20px;">
-      <p><strong>Total:</strong> ${{total}}</p>
-      <p><strong>Delivery:</strong> {{delivery_date}}</p>
-    </div>
-  </body>
-</html>
-`;
+## Basic Mailgun delivery
 
-const result = execute({
-  provider: "mailgun",
-  api_key: "your-api-key",
-  domain: "your-domain.com",
-  from: { email: "orders@shop.com", name: "Shop Orders" },
-  to: [{ email: "customer@example.com", name: "John Doe" }],
-  subject: "Order Update",
-  template: customTemplate,
-  template_data: {
-    name: "John",
-    order_id: "12345",
-    status: "shipped",
-    total: "99.99",
-    delivery_date: "March 15, 2023"
-  }
+```js
+const result = await execute({
+  provider: 'mailgun',
+  from: { email: 'reports@example.com', name: 'Maitask Reports' },
+  to: [{ email: 'owner@example.com' }],
+  subject: 'Artifact delivery',
+  content: {
+    text: 'The binary artifact is attached.'
+  },
+  attachments: [{
+    filename: 'artifact.bin',
+    contentType: 'application/octet-stream',
+    bodyBase64: 'AP+AQQ=='
+  }]
+}, {
+  domain: 'mg.example.com',
+  apiKeySecret: 'MAILGUN_API_KEY'
+}, {
+  secrets: { MAILGUN_API_KEY: 'runtime-managed-secret' }
 });
 ```
 
-## Provider Configuration
+The default Mailgun secret name is `MAILGUN_API_KEY` and the default origin is `https://api.mailgun.net`. EU accounts can use trusted `baseUrl: "https://api.eu.mailgun.net"`.
 
-### SendGrid
+## Recipients and addresses
 
-```javascript
-{
-  provider: "sendgrid",
-  api_key: "SG.your-api-key",
-  from: { email: "sender@example.com", name: "Your App" },
-  to: [{ email: "recipient@example.com" }],
-  subject: "Your Subject",
-  html: "<p>Your HTML content</p>"
+`from` is required. `to`, `cc`, and `bcc` are arrays of `{ email, name? }`; at least one combined recipient is required. The package accepts validated ASCII local parts and normalized DNS domains. Display names, subjects, reply-to values, custom headers, filenames, and content IDs reject CR, LF, and NUL characters.
+
+The same normalized email address cannot appear more than once across `to`, `cc`, and `bcc`. The combined recipient limit is 1000. Success receipts expose only `recipientCount`, never the address lists.
+
+## Content modes
+
+Exactly one of `content`, `template`, or `providerTemplate` is required.
+
+### Direct content
+
+```js
+content: {
+  text: 'Plain text message',
+  html: '<p>HTML message</p>'
 }
 ```
 
-### Mailgun
+At least one non-empty representation is required. Direct content requires `subject`. Each representation is limited to 5 MiB of UTF-8 data. The package does not invent fallback text or perform lossy HTML-to-text conversion.
 
-```javascript
-{
-  provider: "mailgun",
-  api_key: "key-your-api-key",
-  domain: "your-domain.mailgun.org",
-  from: { email: "sender@your-domain.com", name: "Your App" },
-  to: [{ email: "recipient@example.com" }],
-  subject: "Your Subject",
-  html: "<p>Your HTML content</p>"
-}
-```
+### Local template
 
-### SMTP (Basic Configuration)
-
-```javascript
-{
-  provider: "smtp",
-  smtp_config: {
-    host: "smtp.gmail.com",
-    port: 587,
-    username: "your-email@gmail.com",
-    password: "your-app-password",
-    secure: true
-  },
-  from: { email: "your-email@gmail.com", name: "Your App" },
-  to: [{ email: "recipient@example.com" }],
-  subject: "Your Subject",
-  text: "Your plain text content"
-}
-```
-
-## Built-in Templates
-
-### Notification Template
-
-```javascript
-{
-  template: "notification",
-  template_data: {
-    title: "System Notification",
-    message: "Your backup completed successfully",
-    details: "Backup size: 2.5GB\nDuration: 5 minutes",
-    timestamp: new Date().toISOString()
+```js
+subject: 'Hello from Maitask',
+template: {
+  text: 'Hello {{ user.name }}, executions={{count}}',
+  html: '<p>Hello {{user.name}}, note={{note}}</p>',
+  variables: {
+    user: { name: 'Workflow owner' },
+    count: 3,
+    note: '<verified>'
   }
 }
 ```
 
-### Alert Template
+Placeholders use exact `{{ path.to.value }}` syntax. Every placeholder must resolve to a JSON primitive; unresolved paths, object/array substitutions, malformed braces, conditionals, loops, and raw interpolation are rejected. HTML substitutions escape `&`, `<`, `>`, quotes, and apostrophes. Text substitutions preserve their string representation. Local templates require `subject`.
 
-```javascript
-{
-  template: "alert",
-  template_data: {
-    alert_type: "Security Alert",
-    message: "Unusual login detected",
-    timestamp: new Date().toISOString(),
-    details: "IP: 192.168.1.100\nLocation: New York, US"
+This is interpolation, not an undocumented Handlebars-compatible engine. The legacy built-in `notification`, `alert`, and `report` names were removed because their conditional and loop syntax was never implemented.
+
+### Provider-native template
+
+```js
+providerTemplate: {
+  id: 'provider-template-id',
+  variables: {
+    name: 'Maitask',
+    metrics: { executions: 42 }
   }
 }
 ```
 
-### Report Template
+SendGrid maps this to `template_id` and `dynamic_template_data`. Mailgun maps it to `template` and `X-Mailgun-Variables`. Variables are detached JSON data. `subject` is optional because the provider template may own it.
 
-```javascript
+## Attachments
+
+```js
+attachments: [{
+  filename: 'chart.png',
+  contentType: 'image/png',
+  bodyBase64: 'iVBORw0KGgo=',
+  disposition: 'inline',
+  contentId: 'chart.png'
+}]
+```
+
+- `bodyBase64` must be canonical RFC 4648 Base64.
+- Default disposition is `attachment`.
+- Inline attachments require `contentId`; ordinary attachments cannot set one.
+- Mailgun addresses inline parts by filename, so Mailgun inline `contentId` must equal `filename`.
+- Maximum 20 attachments, 10 MiB decoded per attachment, and 20 MiB decoded in total.
+- Provider request encoding is bounded at 30 MiB.
+
+SendGrid receives documented JSON attachment fields. Mailgun receives exact multipart bytes through Runtime `bodyBase64`, avoiding UTF-8 corruption.
+
+## Message headers, tags, and metadata
+
+`headers` accepts only unique `X-*` message headers with string values. `X-SMTPAPI` and `X-Mailgun-Variables` are provider-control fields and are reserved. Transport authorization, host, content type, and other provider headers cannot be supplied by business input.
+
+SendGrid supports up to 10 categories; Mailgun supports up to 3 tags. The common `tags` field applies the provider-specific limit.
+
+`metadata` is a bounded string record. It maps to SendGrid `custom_args` and Mailgun `v:*` variables, with a maximum of 50 entries and 10 KiB combined key/value UTF-8 bytes.
+
+## Trusted options
+
+| Option | SendGrid | Mailgun | Contract |
+| --- | --- | --- | --- |
+| `baseUrl` | `https://api.sendgrid.com` | `https://api.mailgun.net` | Exact provider origin without path, query, fragment, or credentials. |
+| `domain` | prohibited | required | Valid Mailgun sending domain. |
+| `apiKeySecret` | `SENDGRID_API_KEY` | `MAILGUN_API_KEY` | Exact secret name. |
+| `timeoutMs` | `30000` | `30000` | One total deadline from 10 through 120000 ms. |
+| `maxResponseBytes` | `65536` | `65536` | Provider response ceiling from 1 byte through 1 MiB. |
+| `allowInsecureHttp` | `false` | `false` | Allows HTTP only for literal private/loopback fixture endpoints. |
+| `secrets` | optional | optional | Trusted string secret record; takes precedence over `context.secrets`. |
+
+Options are strict and cannot contain retry settings, SMTP configuration, literal `apiKey`, or business message data.
+
+## Delivery semantics
+
+The provider request always uses POST with manual redirect handling. Every 301, 302, 303, 307, or 308 is rejected; the target receives no request.
+
+The package never retries a delivery POST. A timeout or lost connection can occur after the provider accepted the message, so automatic replay could create duplicate email. Failures expose `retriable` as operational guidance only. A workflow that chooses to retry must apply its own delivery ledger, provider message search, or business idempotency policy.
+
+## Success result
+
+```json
 {
-  template: "report",
-  template_data: {
-    report_title: "Weekly Analytics",
-    summary: "Here's your weekly performance summary",
-    stats: {
-      "Page Views": "1,234",
-      "Unique Visitors": "892",
-      "Conversion Rate": "3.2%",
-      "Revenue": "$1,567"
-    }
-  }
-}
-```
-
-## Configuration Options
-
-### Core Configuration
-
-| Option | Type | Required | Description |
-|--------|------|----------|-------------|
-| `provider` | string | Yes | Email provider: "sendgrid", "mailgun", or "smtp" |
-| `from` | object | Yes | Sender information with email and optional name |
-| `to` | array | Yes | Array of recipient objects with email and optional name |
-| `subject` | string | Yes | Email subject line |
-
-### Content Options
-
-| Option | Type | Description |
-|--------|------|-------------|
-| `html` | string | HTML email content |
-| `text` | string | Plain text email content |
-| `template` | string | Template name or HTML template string |
-| `template_data` | object | Variables for template substitution |
-
-### Provider-Specific Options
-
-| Provider | Required Options | Optional Options |
-|----------|------------------|------------------|
-| SendGrid | `api_key` | - |
-| Mailgun | `api_key`, `domain` | - |
-| SMTP | `smtp_config` | - |
-
-### SMTP Configuration
-
-```javascript
-{
-  smtp_config: {
-    host: "smtp.example.com",     // SMTP server hostname
-    port: 587,                    // SMTP port (587 for TLS, 465 for SSL)
-    username: "user@example.com", // SMTP username
-    password: "password",         // SMTP password
-    secure: true                  // Use TLS/SSL
-  }
-}
-```
-
-## Output Format
-
-### Success Response
-
-```javascript
-{
-  success: true,
-  data: {
-    message: "Email sent successfully via sendgrid",
-    provider: "sendgrid",
-    from: "sender@example.com",
-    to: ["recipient1@example.com", "recipient2@example.com"],
-    subject: "Your Subject",
-    recipients_count: 2,
-    has_html: true,
-    has_text: true,
-    sent_at: "2023-01-15T10:30:00.000Z",
-    version: "0.1.0"
-  },
-  metadata: {
-    message_id: "msg_12345",
-    provider_response: 202,
-    version: "0.1.0"
-  }
-}
-```
-
-### Error Response
-
-```javascript
-{
-  success: false,
-  error: {
-    message: "SendGrid API error: 401 - Unauthorized",
-    code: "EMAIL_SEND_ERROR",
-    type: "EmailSendingError",
-    provider: "sendgrid",
-    details: null
-  },
-  metadata: {
-    attempted_at: "2023-01-15T10:30:00.000Z",
-    version: "0.1.0"
-  }
-}
-```
-
-## Advanced Examples
-
-### Bulk Email with Different Content
-
-```javascript
-const recipients = [
-  { email: "user1@example.com", name: "Alice" },
-  { email: "user2@example.com", name: "Bob" },
-  { email: "user3@example.com", name: "Charlie" }
-];
-
-// Send personalized emails
-recipients.forEach(recipient => {
-  execute({
-    provider: "sendgrid",
-    api_key: "your-api-key",
-    from: { email: "newsletter@example.com", name: "Newsletter" },
-    to: [recipient],
-    subject: `Hello ${recipient.name}!`,
-    template: "notification",
-    template_data: {
-      title: `Welcome ${recipient.name}`,
-      message: "Thanks for subscribing to our newsletter!",
-      timestamp: new Date().toISOString()
-    }
-  });
-});
-```
-
-### Error Handling and Retry
-
-```javascript
-const sendEmailWithRetry = async (emailConfig, maxRetries = 3) => {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const result = execute(emailConfig);
-
-      if (result.success) {
-        console.log('Email sent successfully:', result.metadata.message_id);
-        return result;
-      } else {
-        console.log(`Attempt ${attempt} failed:`, result.error.message);
-
-        if (attempt === maxRetries) {
-          throw new Error(`Failed to send email after ${maxRetries} attempts`);
-        }
-
-        // Wait before retry
-        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+  "success": true,
+  "data": {
+    "items": [{
+      "index": 0,
+      "id": "provider-message-id",
+      "data": {
+        "provider": "sendgrid",
+        "messageId": "provider-message-id",
+        "status": 202,
+        "recipientCount": 3,
+        "hasText": true,
+        "hasHtml": true,
+        "attachmentCount": 1,
+        "templateMode": "none"
       }
-    } catch (error) {
-      console.error(`Attempt ${attempt} error:`, error.message);
-
-      if (attempt === maxRetries) {
-        throw error;
-      }
+    }],
+    "summary": {
+      "total": 1,
+      "success_count": 1,
+      "failure_count": 0
     }
-  }
-};
+  },
+  "error": null,
+  "metadata": {
+    "contractVersion": "2026-07-11",
+    "package": "@maitask/email-sender",
+    "version": "1.0.0",
+    "provider": "sendgrid",
+    "executionId": "execution-1",
+    "status": 202,
+    "attempts": 1,
+    "executedAt": "2026-07-11T00:00:00.000Z",
+    "executionMs": 24
+  },
+  "citations": []
+}
 ```
 
-### Template with Conditional Content
+SendGrid message IDs come only from `X-Message-Id`. Mailgun message IDs come only from the controlled `id` field in a bounded successful JSON response. Other provider response data is discarded.
 
-```javascript
-const generateDynamicTemplate = (userType, userData) => {
-  let template = `
-    <html>
-      <body style="font-family: Arial, sans-serif;">
-        <h1>Hello {{name}}!</h1>
-        <p>{{welcome_message}}</p>
-  `;
+## Failure codes
 
-  if (userType === 'premium') {
-    template += `
-        <div style="background: gold; padding: 15px; border-radius: 5px;">
-          <h2>🌟 Premium Member Benefits</h2>
-          <ul>
-            <li>Priority support</li>
-            <li>Advanced features</li>
-            <li>Monthly reports</li>
-          </ul>
-        </div>
-    `;
-  }
+| Code | Meaning |
+| --- | --- |
+| `EMAIL_VALIDATION` | Message, options, template, attachment, address, header, tag, metadata, or snapshot validation failed. |
+| `EMAIL_SECRET_UNAVAILABLE` | The named provider API secret was missing or empty. |
+| `EMAIL_POLICY` | Provider endpoint transport policy rejected the configured origin. |
+| `EMAIL_TIMEOUT` | The one total request/response deadline expired. Delivery status may be uncertain. |
+| `EMAIL_RESPONSE_TOO_LARGE` | Provider response bytes exceeded the configured ceiling. |
+| `EMAIL_REDIRECT` | The provider attempted a redirect. |
+| `EMAIL_PROVIDER` | The provider returned a non-2xx status. Only numeric status and retriable classification are exposed. |
+| `EMAIL_UPSTREAM` | Transport or successful-response validation failed without exposing arbitrary details. |
 
-  template += `
-        <p>Best regards,<br>The Team</p>
-      </body>
-    </html>
-  `;
+## Version 1 migration
 
-  return template;
-};
+- `api_key`, `domain`, and `smtp_config` are removed from input. Provider policy and credentials belong in trusted options and secrets.
+- `smtp` is removed because it is not executable in managed Runtime.
+- `template_data` and built-in template names are replaced by formal `template` or `providerTemplate` objects.
+- Snake_case output and option aliases are removed.
+- Empty content no longer generates an implicit Maitask message.
+- Recipient strings become explicit address objects.
+- Provider responses and error bodies are no longer returned.
+- Retry examples are removed; the package intentionally sends each delivery once.
 
-const result = execute({
-  provider: "sendgrid",
-  api_key: "your-api-key",
-  from: { email: "welcome@example.com" },
-  to: [{ email: "user@example.com", name: "John" }],
-  subject: "Welcome to our platform!",
-  template: generateDynamicTemplate('premium', userData),
-  template_data: {
-    name: "John",
-    welcome_message: "We're excited to have you on board!"
-  }
-});
-```
+No compatibility aliases remain because they would preserve ambiguous credential precedence and unverified delivery behavior.
 
-### Multi-Provider Fallback
+## Deterministic verification
 
-```javascript
-const sendWithFallback = (emailData) => {
-  const providers = [
-    { provider: "sendgrid", api_key: "sg-key" },
-    { provider: "mailgun", api_key: "mg-key", domain: "mg-domain.com" }
-  ];
-
-  for (const providerConfig of providers) {
-    try {
-      const result = execute({
-        ...emailData,
-        ...providerConfig
-      });
-
-      if (result.success) {
-        console.log(`Email sent via ${providerConfig.provider}`);
-        return result;
-      }
-    } catch (error) {
-      console.log(`${providerConfig.provider} failed:`, error.message);
-    }
-  }
-
-  throw new Error('All email providers failed');
-};
-```
-
-## Security Considerations
-
-- **API Keys**: Store API keys as environment variables or in secure configuration
-- **Rate Limiting**: Respect provider rate limits to avoid service disruption
-- **Input Validation**: Validate email addresses and content before sending
-- **Template Injection**: Sanitize template variables to prevent XSS
-- **Error Logging**: Avoid logging sensitive information in error messages
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Authentication Errors**
-   - Verify API keys are correct and active
-   - Check provider account status and billing
-
-2. **Delivery Failures**
-   - Validate recipient email addresses
-   - Check sender domain reputation
-   - Review provider-specific requirements
-
-3. **Template Errors**
-   - Ensure template variables match data provided
-   - Check HTML syntax for custom templates
-   - Verify template names for built-in templates
-
-4. **Rate Limiting**
-   - Implement delays between sends
-   - Use provider-specific batch sending features
-   - Monitor usage against provider limits
-
-## Requirements
-
-- Node.js >= 14.0.0
-- Maitask Engine >= 1.0.0
-- Valid email provider account (SendGrid, Mailgun, or SMTP server)
-
-## License
-
-MIT © Maitask Team
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Add comprehensive tests
-4. Submit a pull request
-
-## Changelog
-
-### 0.1.0
-
-- Initial release
-- SendGrid, Mailgun, and SMTP support
-- HTML and text email capabilities
-- Template engine with variable substitution
-- Built-in notification, alert, and report templates
-- Comprehensive error handling
-- Multiple recipient support
+Mandatory tests use controlled loopback fixtures and Runtime operation mocks. They do not call live SendGrid or Mailgun services. Live provider smoke checks are optional diagnostics and require separately managed test accounts and cleanup policy.
