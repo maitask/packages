@@ -1,208 +1,147 @@
 # @maitask/cf-proxy
 
-Cloudflare Worker-style proxy for GitHub and Docker registry acceleration with intelligent redirect handling and AWS S3 signature support.
+Validated read-only HTTP transport for retrieving GitHub resources and container registry content from Maitask workflows.
 
-## Features
+The package accepts only absolute HTTP or HTTPS URLs, only sends `GET` or `HEAD`, validates every redirect target, preserves response bytes as Base64, and confines Docker bearer credentials to the approved registry origin. It does not implement a general forward proxy, write methods, AWS request signing, or transparent credential forwarding.
 
-- ✅ GitHub file acceleration
-- ✅ Docker registry mirroring (Docker Hub, GHCR, Quay.io, GCR)
-- ✅ Intelligent redirect handling (302/307)
-- ✅ Docker authentication (Bearer tokens)
-- ✅ AWS S3 signature headers
-- ✅ Domain and path whitelisting
-- ✅ Configurable redirect limits
+## Capabilities
 
-## Installation
+- Exact content-host and authentication-host allowlists.
+- Optional path-prefix restrictions.
+- Explicit opt-in for literal private and local hosts.
+- Manual handling of HTTP `301`, `302`, `303`, `307`, and `308` responses.
+- Cross-origin removal of `Authorization`, `Cookie`, and `Proxy-Authorization`.
+- Docker Registry v2 bearer challenge support with a separate token-service allowlist.
+- One total request deadline covering the initial request, authentication, and redirects.
+- Per-response byte limits with early `Content-Length` rejection and streamed enforcement.
+- Byte-safe Base64 results without UTF-8 conversion.
+- Stable error codes that do not contain target URLs, credentials, provider bodies, or arbitrary exception messages.
 
-```bash
-maitask install @maitask/cf-proxy
-```
+## Input
 
-## Usage
-
-### Basic GitHub File Proxying
-
-```json
-{
-  "url": "https://github.com/user/repo/releases/download/v1.0.0/file.tar.gz"
+```ts
+interface CfProxyInput {
+  readonly url: string;
+  readonly method?: 'GET' | 'HEAD';
+  readonly headers?: Readonly<Record<string, string>>;
+  readonly config?: CfProxyConfig;
 }
 ```
 
-### Docker Image Proxying
+The input and configuration must be plain own-data objects. Accessors, symbol properties, custom prototypes, unknown fields, legacy snake_case fields, and non-string header values are rejected. Request header names must follow the HTTP token grammar, header values cannot contain CR or LF characters, and callers cannot set managed transport headers such as `Host`, `Content-Length`, or `Transfer-Encoding`.
 
-```json
-{
-  "url": "https://ghcr.io/v2/user/repo/manifests/latest",
-  "method": "GET",
-  "headers": {
-    "Accept": "application/vnd.docker.distribution.manifest.v2+json"
-  }
-}
-```
+### Configuration
 
-### Custom Configuration
+| Field | Default | Contract |
+| --- | --- | --- |
+| `allowedHosts` | Official GitHub and registry hosts | Exact hostnames permitted for content requests and content redirects. Ports are defined by the request URL, not allowlist entries. |
+| `allowedAuthHosts` | Known registry authentication hosts | Exact hostnames permitted for Docker token realms and their redirects. |
+| `dockerRegistryHosts` | Default registry hosts that also appear in `allowedHosts` | Hosts for which a `401` response is processed as a Docker bearer challenge. An explicit list must be a subset of `allowedHosts`. |
+| `restrictPaths` | `false` | Enables path-prefix enforcement for content URLs and every content redirect. |
+| `allowedPaths` | `['/library']` | Exact path prefixes used when `restrictPaths` is enabled. |
+| `maxRedirects` | `5` | Integer from `0` through `10`. |
+| `timeoutMs` | `30000` | Total request deadline from `10` through `120000` milliseconds. |
+| `maxResponseBytes` | `8388608` | Maximum bytes for each response, from `1` through `52428800`. Token responses are additionally capped at 64 KiB. |
+| `allowPrivateHosts` | `false` | Allows literal loopback, private, link-local, `.local`, and localhost targets. Intended for controlled fixtures and private infrastructure only. |
 
-```json
-{
-  "url": "https://quay.io/v2/user/repo/blobs/sha256:abc123...",
-  "config": {
-    "allowedHosts": [
-      "quay.io",
-      "github.com"
-    ],
-    "restrictPaths": true,
-    "allowedPaths": ["user", "repo"],
-    "maxRedirects": 10
-  }
-}
-```
+URL credentials and fragments are rejected. Query strings are allowed because GitHub downloads and registry token services use them, but URLs are never returned in failure results.
 
-## Configuration Options
+## Docker bearer authentication
 
-### `config.allowedHosts` (string[])
+When the target hostname appears in `dockerRegistryHosts` and the registry returns `401`:
 
-Whitelist of allowed domains. Default includes:
+1. The package parses an order-independent `Bearer` challenge.
+2. The challenge realm is validated against `allowedAuthHosts` and the private-host policy.
+3. The token request is sent with only `Accept: application/json`; caller authorization, cookies, and custom headers are not forwarded.
+4. A bounded JSON object containing a non-empty `token` or `access_token` string is required.
+5. The original registry request is retried once with the acquired bearer token.
+6. The token is removed before any cross-origin content redirect.
 
-- `github.com`, `api.github.com`, `raw.githubusercontent.com`
-- `registry-1.docker.io`, `ghcr.io`, `quay.io`, `gcr.io`
-- `k8s.gcr.io`, `registry.k8s.io`, `docker.cloudsmith.io`
+Malformed challenges, rejected realms, invalid token responses, and a second `401` return `CF_PROXY_AUTH`.
 
-### `config.restrictPaths` (boolean)
+## Result
 
-Enable path restrictions. Default: `false`
-
-### `config.allowedPaths` (string[])
-
-Allowed path keywords when `restrictPaths` is `true`. Default: `['library']`
-
-### `config.maxRedirects` (number)
-
-Maximum number of redirects to follow. Default: `5`
-
-## Response Format
+Successful transport returns the upstream HTTP status and byte-safe content. A received non-2xx HTTP response is still a successful transport result; inspect `data.ok` and `data.status` for upstream application status.
 
 ```json
 {
   "success": true,
-  "status": 200,
-  "statusText": "OK",
-  "headers": {
-    "content-type": "application/octet-stream",
-    "content-length": "12345"
+  "data": {
+    "status": 200,
+    "statusText": "OK",
+    "ok": true,
+    "headers": {
+      "content-type": "application/vnd.oci.image.manifest.v1+json"
+    },
+    "bodyBase64": "eyJzY2hlbWFWZXJzaW9uIjoyfQ==",
+    "bodyEncoding": "base64",
+    "bodyBytes": 19,
+    "isDockerRequest": true
   },
-  "body": "...",
   "metadata": {
-    "targetDomain": "github.com",
-    "targetPath": "user/repo/releases/download/v1.0.0/file.tar.gz",
-    "isDockerRequest": false,
-    "isS3": false,
-    "redirectCount": 0,
-    "timestamp": "2025-10-03T15:30:00.000Z"
+    "package": "@maitask/cf-proxy",
+    "version": "0.1.0",
+    "redirects": 0,
+    "registryAuthenticated": true,
+    "timestamp": "2026-07-11T00:00:00.000Z"
   }
 }
 ```
 
-## Docker Registry Support
+Sensitive and hop-by-hop response headers, including `Set-Cookie`, `WWW-Authenticate`, `Location`, `Connection`, and `Transfer-Encoding`, are removed from the result.
 
-The proxy automatically handles Docker V2 API authentication:
+### Error codes
 
-1. Detects 401 authentication challenges
-2. Extracts Bearer realm, service, and scope
-3. Requests authentication token
-4. Retries request with Bearer token
+| Code | Meaning |
+| --- | --- |
+| `CF_PROXY_VALIDATION` | The input does not match the formal contract. |
+| `CF_PROXY_DENIED` | The content host, path, or private-host policy denied the request. |
+| `CF_PROXY_TIMEOUT` | The total request deadline expired. |
+| `CF_PROXY_RESPONSE_TOO_LARGE` | A response exceeded `maxResponseBytes`. |
+| `CF_PROXY_REDIRECT` | A content redirect was missing, invalid, disallowed, or exceeded the configured limit. |
+| `CF_PROXY_AUTH` | Docker bearer challenge or token acquisition failed. |
+| `CF_PROXY_UPSTREAM` | The network transport or Runtime HTTP operation failed. |
 
-### Supported Registries
+Errors contain only a stable message, code, and type. They do not include provider response bodies, exception messages, target URLs, authorization values, cookies, or bearer tokens.
 
-- Docker Hub (`registry-1.docker.io`)
-- GitHub Container Registry (`ghcr.io`)
-- Quay.io (`quay.io`)
-- Google Container Registry (`gcr.io`, `k8s.gcr.io`, `registry.k8s.io`)
-- Docker Cloudsmith (`docker.cloudsmith.io`)
+## Runtime transport requirement
 
-## AWS S3 Support
+In Maitask Runtime, the HTTP operation must return `status`, plain string headers, canonical `bodyBase64`, and matching `bodyBytes`. Text-only Runtime HTTP responses are rejected because converting arbitrary response bytes through UTF-8 would corrupt registry layers and binary GitHub artifacts.
 
-Automatically adds required headers when proxying to AWS S3:
+## Example
 
-- `x-amz-content-sha256`: SHA256 hash of empty body
-- `x-amz-date`: ISO 8601 timestamp
+```js
+const { execute } = require('@maitask/cf-proxy');
 
-## Error Handling
+const result = await execute({
+  url: 'https://registry-1.docker.io/v2/library/ubuntu/manifests/latest',
+  method: 'GET',
+  headers: {
+    Accept: 'application/vnd.oci.image.manifest.v1+json'
+  },
+  config: {
+    restrictPaths: true,
+    allowedPaths: ['/v2/library'],
+    maxRedirects: 4,
+    timeoutMs: 30000,
+    maxResponseBytes: 8388608
+  }
+});
 
-The package throws errors for:
-
-- Missing URL
-- Domain not in whitelist
-- Path not in allowed paths (when restrictPaths is true)
-- Max redirects exceeded
-
-Example error:
-
-```json
-{
-  "error": "Domain example.com not in allowed list"
+if (!result.success) {
+  throw new Error(result.error.code);
 }
+
+const bytes = Buffer.from(result.data.bodyBase64, 'base64');
 ```
 
-## Example Use Cases
+## Verification
 
-### 1. GitHub Release Acceleration
+Mandatory regression uses local loopback fixtures and does not depend on GitHub, Docker Hub, or another third party:
 
-```javascript
-await execute('@maitask/cf-proxy', {
-  url: 'https://github.com/maitask/runtime/releases/download/v1.0.0/engine-linux-amd64.tar.gz'
-});
+```bash
+npm run test:cf-proxy
+npm run test:cf-proxy-types
 ```
 
-### 2. Signed Binary Artifact Download
-
-```javascript
-await execute('@maitask/cf-proxy', {
-  url: 'https://downloads.example.com/maitask/runtime/maitask-runtime-1.0.0-x86_64-unknown-linux-gnu.tar.zst',
-  config: {
-    allowedHosts: ['downloads.example.com'],
-    maxRedirects: 3
-  }
-});
-```
-
-### 3. Custom Domain Whitelist
-
-```javascript
-await execute('@maitask/cf-proxy', {
-  url: 'https://custom-registry.example.com/v2/repo/manifests/tag',
-  config: {
-    allowedHosts: ['custom-registry.example.com'],
-    maxRedirects: 3
-  }
-});
-```
-
-## Security
-
-- **Domain Whitelisting**: Only configured domains are allowed
-- **Path Restrictions**: Optional path-based access control
-- **No Credential Storage**: Authentication tokens are not persisted
-- **Redirect Limits**: Prevents infinite redirect loops
-
-## Performance
-
-- Intelligent redirect handling reduces unnecessary round trips
-- AWS S3 signature pre-computation
-- Connection reuse via HTTP helpers
-- Minimal overhead for proxying
-
-## License
-
-MIT
-
-## Support
-
-- GitHub Issues: <https://github.com/maitask/packages/issues>
-- Documentation: <https://docs.maitask.com>
-
-## Response Contract (Current)
-
-The package uses a standardized envelope:
-
-- Success: `{ success: true, data: { status, headers, body, ... }, metadata: {...} }`
-- Failure: `{ success: false, error: { message, code, type }, metadata: {...} }`
+Live third-party requests are optional operational diagnostics, not the release gate for successful package behavior.

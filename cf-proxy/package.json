@@ -1,7 +1,7 @@
 {
   "name": "@maitask/cf-proxy",
   "version": "0.1.0",
-  "description": "Cloudflare Worker proxy for GitHub and Docker registry acceleration with intelligent redirect handling",
+  "description": "Validated read-only transport for GitHub resources and container registry content",
   "main": "index.js",
   "types": "index.d.ts",
   "type": "commonjs",
@@ -24,8 +24,8 @@
     "github",
     "docker",
     "registry",
-    "acceleration",
-    "mirror"
+    "read-only",
+    "security"
   ],
   "files": [
     "index.js",
@@ -42,7 +42,7 @@
     "locales": {
       "en": {
         "display_name": "Cloudflare Proxy",
-        "description": "Cloudflare Worker proxy for GitHub and Docker registry acceleration with intelligent redirect handling",
+        "description": "Validated read-only transport for GitHub resources and container registry content",
         "category": "Web & API Integration",
         "keywords": [
           "maitask",
@@ -52,22 +52,22 @@
           "github",
           "docker",
           "registry",
-          "acceleration",
-          "mirror"
+          "read-only",
+          "security"
         ]
       },
       "zh": {
         "display_name": "Cloudflare 代理",
-        "description": "基于 Cloudflare Worker 的 GitHub 与 Docker Registry 加速代理，支持智能重定向与镜像加速。",
+        "description": "用于读取 GitHub 资源和容器 Registry 内容的受控只读传输工具，具备逐跳校验与凭据隔离。",
         "category": "Web 与 API 集成",
         "keywords": [
           "Cloudflare",
           "代理",
-          "加速",
+          "只读",
           "GitHub",
           "Docker",
-          "镜像",
-          "Registry"
+          "Registry",
+          "安全"
         ]
       }
     }

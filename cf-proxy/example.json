@@ -3,12 +3,14 @@
     "url": "https://registry-1.docker.io/v2/library/ubuntu/manifests/latest",
     "method": "GET",
     "headers": {
-      "Accept": "application/vnd.docker.distribution.manifest.v2+json"
+      "Accept": "application/vnd.oci.image.manifest.v1+json"
     },
     "config": {
       "restrictPaths": true,
-      "allowedPaths": ["library"],
-      "maxRedirects": 3
+      "allowedPaths": ["/v2/library"],
+      "maxRedirects": 4,
+      "timeoutMs": 30000,
+      "maxResponseBytes": 8388608
     }
   }
 }
