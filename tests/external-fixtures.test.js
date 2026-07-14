@@ -473,7 +473,12 @@ test('intelligence-briefing consumes upstream Hacker News output and filters see
     },
     dedupe: {
       windowHours: 72,
-      seen: [{ key: 'hackernews:1001', seenAt: '2026-07-09T00:30:00Z' }]
+      seen: [
+        {
+          key: 'hackernews:1001',
+          seenAt: new Date(Date.now() - 30 * 60 * 1000).toISOString()
+        }
+      ]
     },
     ai: {
       provider: 'extractive'
