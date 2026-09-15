@@ -1,6 +1,6 @@
 {
   "name": "@maitask/audio-processor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Audio transcription and speech synthesis through Whisper and OpenAI audio APIs",
   "main": "index.js",
   "types": "index.d.ts",
@@ -32,7 +32,8 @@
           "audio",
           "transcription",
           "whisper",
-          "speech-to-text"
+          "speech-to-text",
+          "speech-synthesis"
         ]
       },
       "zh": {
@@ -43,6 +44,7 @@
           "音频",
           "转写",
           "语音转文本",
+          "语音合成",
           "Whisper",
           "AI",
           "语音"

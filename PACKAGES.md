@@ -15,7 +15,7 @@
 
 ## Media & Multimodal Processing (3)
 
-- [**@maitask/audio-processor**](./audio-processor) `v0.1.0` — Audio transcription and speech synthesis through Whisper and OpenAI audio APIs
+- [**@maitask/audio-processor**](./audio-processor) `v0.1.1` — Audio transcription and speech synthesis through Whisper and OpenAI audio APIs
 - [**@maitask/image-metadata**](./image-metadata) `v0.1.0` — Image metadata extraction from headers
 - [**@maitask/image-generator**](./image-generator) `v0.1.0` — AI image generation via OpenAI/Stability APIs
 
