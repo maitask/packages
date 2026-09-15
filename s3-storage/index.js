@@ -1,6 +1,6 @@
 /**
  * @maitask/s3-storage
- * S3-compatible object storage operations via proxy or presigned URLs
+ * S3-compatible object storage operations via presigned URLs
  *
  * @version 0.1.0
  * @license MIT
@@ -14,9 +14,7 @@ async function execute(input, options = {}, context = {}) {
     const operation = normalizeOperation(payload.operation);
     const timeoutMs = readTimeout(payload.timeoutMs ?? options.timeoutMs);
 
-    const result = payload.presignedUrl
-      ? await runWithPresignedUrl(operation, payload, timeoutMs)
-      : await runWithProxy(operation, payload, options, timeoutMs);
+    const result = await runWithPresignedUrl(operation, payload, timeoutMs);
 
     return {
       success: true,
@@ -49,7 +47,7 @@ async function runWithPresignedUrl(operation, payload, timeoutMs) {
   const url = readRequiredString(payload.presignedUrl, 'presignedUrl');
 
   if (operation === 'list') {
-    throw new Error('list operation is not supported with presignedUrl; use proxyUrl instead');
+    throw new Error('list is not supported; provide a presigned upload, download, or delete URL');
   }
 
   if (operation === 'upload') {
@@ -104,39 +102,6 @@ async function runWithPresignedUrl(operation, payload, timeoutMs) {
   };
 }
 
-async function runWithProxy(operation, payload, options, timeoutMs) {
-  const proxyUrl = readRequiredString(payload.proxyUrl || options.proxyUrl, 'proxyUrl');
-  const bucket = readRequiredString(payload.bucket, 'bucket');
-
-  if ((operation === 'upload' || operation === 'download' || operation === 'delete') && !payload.key) {
-    throw new Error('key is required for upload/download/delete operations');
-  }
-
-  const request = {
-    operation,
-    bucket,
-    key: payload.key || null,
-    body: payload.body,
-    region: payload.region || null,
-    endpoint: payload.endpoint || null
-  };
-
-  const response = await fetchJson(proxyUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...asHeaders(payload.headers)
-    },
-    body: request,
-    timeoutMs
-  });
-
-  return {
-    mode: 'proxy',
-    ...response
-  };
-}
-
 async function fetchWithTimeout(url, { method, headers, body, timeoutMs }) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -163,24 +128,6 @@ async function ensureOk(response) {
   const text = await response.text();
   const json = tryParseJson(text);
   throw new Error(json?.message || json?.error?.message || text || `Request failed with status ${response.status}`);
-}
-
-async function fetchJson(url, { method, headers, body, timeoutMs }) {
-  const response = await fetchWithTimeout(url, {
-    method,
-    headers,
-    body: JSON.stringify(body),
-    timeoutMs
-  });
-
-  const text = await response.text();
-  const json = tryParseJson(text);
-
-  if (!response.ok) {
-    throw new Error(json?.message || json?.error?.message || text || `Request failed with status ${response.status}`);
-  }
-
-  return json == null ? {} : json;
 }
 
 function serializeBody(value) {

@@ -1,7 +1,7 @@
 {
   "name": "@maitask/pdf-parser",
   "version": "0.1.0",
-  "description": "High-performance PDF parser and text extractor",
+  "description": "Extract Info metadata and uncompressed text operators from PDF bytes",
   "main": "index.js",
   "types": "index.d.ts",
   "type": "commonjs",
@@ -41,7 +41,7 @@
     "locales": {
       "en": {
         "display_name": "PDF Parser",
-        "description": "High-performance PDF parser and text extractor",
+        "description": "Extract Info metadata and uncompressed text operators from PDF bytes",
         "category": "Data Processing & Transformation",
         "keywords": [
           "maitask",
@@ -56,7 +56,7 @@
       },
       "zh": {
         "display_name": "PDF 解析器",
-        "description": "高性能 PDF 解析与文本提取工具，支持文档文本、元数据和结构化处理。",
+        "description": "从 PDF 字节中提取 Info 元数据和未压缩文本运算符，加密文件直接失败。",
         "category": "数据处理与转换",
         "keywords": [
           "PDF",

@@ -1,28 +1,24 @@
 /**
  * @maitask/audio-processor
- * Audio processing and transcription using AI models
- *
- * Supports OpenAI Whisper (speech-to-text), Gemini 2.5 native audio (dialog, analysis),
- * and audio generation with AI models.
+ * Speech-to-text, translation, audio analysis, and speech synthesis.
  *
  * @version 0.1.0
  * @license MIT
  */
 
 /**
- * Main execution function
- * @param {Object} input - Input configuration
- * @param {string} input.audioUrl - URL of audio file to process
- * @param {string} input.audioData - Base64 encoded audio data
- * @param {string} input.task - Processing task (transcribe, translate, analyze, generate)
- * @param {string} input.prompt - Analysis or generation prompt
- * @param {string} input.language - Audio language (for transcription)
- * @param {string} input.provider - AI provider (whisper, gemini, openai, index-tts, default: whisper)
- * @param {string} input.model - Model name (default depends on provider)
- * @param {Object} options - API configuration
- * @param {string} options.apiKey - AI API key
- * @param {Object} context - Execution context
- * @returns {Object} Audio processing result
+ * @param {Object} input
+ * @param {string} [input.audioUrl]
+ * @param {string} [input.audioData]
+ * @param {string} [input.task] transcribe | translate | analyze | summarize | generate
+ * @param {string} [input.prompt]
+ * @param {string} [input.language]
+ * @param {string} [input.provider] whisper | gemini | openai
+ * @param {string} [input.model]
+ * @param {Object} options
+ * @param {string} options.apiKey
+ * @param {Object} context
+ * @returns {Object}
  */
 async function execute(input, options = {}, context = {}) {
     try {
@@ -44,14 +40,15 @@ async function execute(input, options = {}, context = {}) {
         // Handle different providers and tasks
         let result;
 
-        if (provider === 'whisper' || (provider === 'openai' && task === 'transcribe')) {
+        if (
+            provider === 'whisper' ||
+            (provider === 'openai' && (task === 'transcribe' || task === 'translate'))
+        ) {
             result = await processWithWhisper(input, options, apiKey);
         } else if (provider === 'gemini') {
             result = await processWithGemini(input, options, apiKey);
         } else if (provider === 'openai' && task === 'generate') {
             result = await generateAudioWithOpenAI(input, options, apiKey);
-        } else if (provider === 'index-tts' || provider === 'indextts') {
-            result = await generateAudioWithIndexTTS(input, options, apiKey);
         } else {
             throw new Error(`Unsupported provider: ${provider} with task: ${task}`);
         }
@@ -283,66 +280,6 @@ async function generateAudioWithOpenAI(input, options, apiKey) {
         format: requestBody.response_format,
         model: model,
         voice: voice
-    };
-}
-
-/**
- * Generate audio with Index-TTS (open-source, self-hosted)
- */
-async function generateAudioWithIndexTTS(input, options, apiKey) {
-    const baseUrl = options.baseUrl || options.base_url || 'http://localhost:8000';
-    const text = input.text || input.prompt;
-
-    if (!text) {
-        throw new Error('Text is required for audio generation');
-    }
-
-    // Build request for Index-TTS API
-    const requestBody = {
-        text: text,
-        language: input.language || options.language || 'zh',
-        // Reference audio for voice cloning (base64 or URL)
-        reference_audio: input.referenceAudio || input.reference_audio,
-        // Emotion control (IndexTTS-2 feature)
-        emotion: input.emotion || options.emotion,
-        // Duration control mode
-        duration_control: input.durationControl || input.duration_control || 'auto',
-        // Speed control
-        speed: input.speed || options.speed || 1.0,
-        // Pinyin for pronunciation control (Chinese)
-        pinyin: input.pinyin || options.pinyin
-    };
-
-    // Remove undefined values
-    Object.keys(requestBody).forEach(key => {
-        if (requestBody[key] === undefined) {
-            delete requestBody[key];
-        }
-    });
-
-    const response = await fetch(`${baseUrl}/api/tts`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            ...(apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {})
-        },
-        body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Index-TTS API Error (${response.status}): ${errorText}`);
-    }
-
-    const audioBuffer = await response.arrayBuffer();
-    const audioBase64 = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
-
-    return {
-        audioData: audioBase64,
-        format: 'wav',
-        model: 'index-tts-2',
-        language: requestBody.language,
-        emotion: requestBody.emotion
     };
 }
 

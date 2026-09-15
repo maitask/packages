@@ -1,500 +1,343 @@
 /**
  * @maitask/pdf-parser
- * High-performance PDF parser and text extractor
+ * Extract Info metadata and uncompressed text operators from PDF bytes.
  *
- * Features:
- * - PDF text extraction with structure preservation
- * - Metadata extraction (title, author, creation date, pages)
- * - UTF-8 and Base64 support
- * - Page estimation and content analysis
- * - Comprehensive error handling
- * - Text segmentation and filtering
- *
- * @version 0.1.0
- * @author Maitask Team
- * @license MIT
+ * Encrypted files fail closed. FlateDecode and other filtered streams are
+ * counted and skipped; this extractor does not inflate compressed content.
  */
 
+const PACKAGE_NAME = '@maitask/pdf-parser';
+const PACKAGE_VERSION = '0.1.0';
 const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+const INFO_KEYS = ['Title', 'Author', 'Subject', 'Creator', 'Producer', 'CreationDate', 'ModDate'];
 
-/**
- * Main execution function for PDF parsing
- * @param {Object} input - Input data with text or base64 content
- * @param {Object} options - Parsing options
- * @param {Object} context - Execution context
- * @returns {Object} Parsed PDF data with text and metadata
- */
 function execute(input, options = {}, context = {}) {
-    try {
-        const config = buildParsingConfig(options);
-        const bytes = extractBytesFromInput(input);
-
-        if (!bytes || bytes.length === 0) {
-            return createEmptyResponse(input);
-        }
-
-        // Convert bytes to ASCII text for PDF parsing
-        const rawText = bytesToAscii(bytes);
-        const cleanText = preprocessText(rawText, config);
-
-        // Extract PDF metadata
-        const metadata = extractPdfMetadata(rawText, input);
-
-        // Extract and filter text segments
-        const segments = extractTextSegments(cleanText, config);
-        const filteredSegments = filterSegments(segments, config);
-
-        // Generate preview text
-        const previewText = generatePreviewText(filteredSegments, config);
-
-        return {
-            success: true,
-            parser: 'pdf',
-            fileType: 'pdf',
-            text: previewText,
-            segments: filteredSegments.slice(0, config.maxSegments),
-            pages: metadata.estimatedPages,
-            statistics: {
-                totalSegments: segments.length,
-                filteredSegments: filteredSegments.length,
-                estimatedPages: metadata.estimatedPages || 0,
-                textLength: previewText.length,
-                hasMetadata: !!(metadata.title || metadata.author || metadata.subject),
-                preview: filteredSegments.slice(0, 5)
-            },
-            metadata: {
-                path: input?.path || null,
-                size: input?.size || null,
-                extension: input?.extension || 'pdf',
-                encoding: 'binary-to-ascii',
-                mimeType: 'application/pdf',
-                title: metadata.title,
-                author: metadata.author,
-                subject: metadata.subject,
-                creator: metadata.creator,
-                producer: metadata.producer,
-                creationDate: metadata.creationDate,
-                modificationDate: metadata.modificationDate,
-                estimatedPages: metadata.estimatedPages,
-                parsedAt: new Date().toISOString(),
-                version: '0.1.0'
-            }
-        };
-    } catch (error) {
-        return {
-            success: false,
-            error: {
-                message: error.message || 'Unknown PDF parsing error',
-                code: 'PDF_PARSE_ERROR',
-                type: 'PdfParsingError',
-                details: error.details || null
-            },
-            metadata: {
-                parsedAt: new Date().toISOString(),
-                version: '0.1.0'
-            }
-        };
-    }
-}
-
-/**
- * Build parsing configuration from options
- */
-function buildParsingConfig(options) {
-    return {
-        maxSegments: options.maxSegments || 200,
-        maxPreviewLength: options.maxPreviewLength || 12000,
-        minSegmentLength: options.minSegmentLength || 4,
-        excludeShortWords: options.excludeShortWords !== false,
-        preserveFormatting: options.preserveFormatting === true,
-        extractImages: options.extractImages === true,
-        extractLinks: options.extractLinks === true
+  try {
+    const config = {
+      maxTextLength: clampPositiveInt(options.maxTextLength, 200000, 1, 2_000_000)
     };
-}
+    const bytes = extractBytes(input);
+    if (!bytes.length) {
+      throw Object.assign(new Error('PDF content is required'), { code: 'PDF_INPUT_REQUIRED' });
+    }
 
-/**
- * Create empty response for no input
- */
-function createEmptyResponse(input) {
+    const headerOffset = findPdfHeader(bytes);
+    if (headerOffset < 0) {
+      throw Object.assign(new Error('Input is not a PDF document'), { code: 'PDF_INVALID_HEADER' });
+    }
+
+    const source = bytesToLatin1(bytes.slice(headerOffset));
+    if (isEncrypted(source)) {
+      throw Object.assign(new Error('Encrypted PDFs are not supported'), { code: 'PDF_ENCRYPTED' });
+    }
+
+    const streams = inspectStreams(source);
+    const text = truncateText(extractUncompressedText(source), config.maxTextLength);
+    const info = extractInfoDictionary(source);
+
     return {
-        success: true,
-        parser: 'pdf',
-        fileType: 'pdf',
-        text: '',
-        segments: [],
-        pages: 0,
-        statistics: {
-            totalSegments: 0,
-            filteredSegments: 0,
-            estimatedPages: 0,
-            textLength: 0,
-            hasMetadata: false,
-            preview: []
-        },
-        metadata: {
-            path: input?.path || null,
-            size: input?.size || null,
-            extension: input?.extension || 'pdf',
-            encoding: 'binary-to-ascii',
-            mimeType: 'application/pdf',
-            estimatedPages: 0,
-            parsedAt: new Date().toISOString(),
-            version: '0.1.0'
-        }
+      success: true,
+      data: {
+        text,
+        pages: countPages(source),
+        uncompressedStreams: streams.uncompressed,
+        compressedStreamsSkipped: streams.compressed,
+        metadata: info
+      },
+      metadata: {
+        package: PACKAGE_NAME,
+        extractor: 'uncompressed-pdf',
+        timestamp: new Date().toISOString(),
+        version: PACKAGE_VERSION
+      }
     };
+  } catch (error) {
+    return {
+      success: false,
+      error: {
+        message: error.message || 'PDF parsing failed',
+        code: error.code || 'PDF_PARSE_ERROR',
+        type: error.name || 'PdfParseError'
+      },
+      metadata: {
+        package: PACKAGE_NAME,
+        timestamp: new Date().toISOString(),
+        version: PACKAGE_VERSION
+      }
+    };
+  }
 }
 
-/**
- * Extract bytes from various input formats
- */
-function extractBytesFromInput(input) {
-    if (!input) {
-        return [];
-    }
-
-    // Base64 encoded content
-    if (typeof input.base64 === 'string' && input.base64.length > 0) {
-        try {
-            return decodeBase64ToBytes(input.base64);
-        } catch (error) {
-            throw new Error(`Base64 decoding failed: ${error.message}`);
-        }
-    }
-
-    // Direct text content (treat as binary string)
-    if (typeof input.text === 'string') {
-        return input.text.split('').map(ch => ch.charCodeAt(0) & 0xff);
-    }
-
-    // Handle string input directly
-    if (typeof input === 'string') {
-        return input.split('').map(ch => ch.charCodeAt(0) & 0xff);
-    }
-
-    return [];
+function extractBytes(input) {
+  if (!input) return [];
+  if (typeof input === 'string') {
+    return looksLikeBase64(input) ? decodeBase64ToBytes(input) : stringToBytes(input);
+  }
+  if (Array.isArray(input)) {
+    return input.map(value => Number(value) & 0xff);
+  }
+  if (input instanceof Uint8Array) {
+    return Array.from(input);
+  }
+  if (typeof input.base64 === 'string' && input.base64.length > 0) {
+    return decodeBase64ToBytes(input.base64);
+  }
+  if (typeof input.text === 'string') {
+    return stringToBytes(input.text);
+  }
+  if (Array.isArray(input.bytes)) {
+    return input.bytes.map(value => Number(value) & 0xff);
+  }
+  return [];
 }
 
-/**
- * Extract PDF metadata from raw text
- */
-function extractPdfMetadata(text, input) {
-    const metadata = {};
-
-    // Estimate page count
-    metadata.estimatedPages = estimatePageCount(text);
-
-    // Extract title
-    const titleMatch = text.match(/\/Title\s*\(([^)]+)\)/);
-    if (titleMatch && titleMatch[1]) {
-        metadata.title = cleanMetadataString(titleMatch[1]);
-    }
-
-    // Extract author
-    const authorMatch = text.match(/\/Author\s*\(([^)]+)\)/);
-    if (authorMatch && authorMatch[1]) {
-        metadata.author = cleanMetadataString(authorMatch[1]);
-    }
-
-    // Extract subject
-    const subjectMatch = text.match(/\/Subject\s*\(([^)]+)\)/);
-    if (subjectMatch && subjectMatch[1]) {
-        metadata.subject = cleanMetadataString(subjectMatch[1]);
-    }
-
-    // Extract creator
-    const creatorMatch = text.match(/\/Creator\s*\(([^)]+)\)/);
-    if (creatorMatch && creatorMatch[1]) {
-        metadata.creator = cleanMetadataString(creatorMatch[1]);
-    }
-
-    // Extract producer
-    const producerMatch = text.match(/\/Producer\s*\(([^)]+)\)/);
-    if (producerMatch && producerMatch[1]) {
-        metadata.producer = cleanMetadataString(producerMatch[1]);
-    }
-
-    // Extract creation date
-    const creationDateMatch = text.match(/\/CreationDate\s*\(([^)]+)\)/);
-    if (creationDateMatch && creationDateMatch[1]) {
-        metadata.creationDate = parseePdfDate(creationDateMatch[1]);
-    }
-
-    // Extract modification date
-    const modDateMatch = text.match(/\/ModDate\s*\(([^)]+)\)/);
-    if (modDateMatch && modDateMatch[1]) {
-        metadata.modificationDate = parseePdfDate(modDateMatch[1]);
-    }
-
-    return metadata;
+function looksLikeBase64(value) {
+  const clean = value.replace(/\s+/g, '');
+  return clean.length >= 8 && clean.length % 4 === 0 && /^[A-Za-z0-9+/]+={0,2}$/.test(clean);
 }
 
-/**
- * Estimate page count from PDF content
- */
-function estimatePageCount(text) {
-    // Look for /Type /Page objects
-    const pageMatches = text.match(/\/Type\s*\/Page\b/gi);
-    if (pageMatches && pageMatches.length > 0) {
-        return pageMatches.length;
+function findPdfHeader(bytes) {
+  const limit = Math.min(bytes.length - 4, 1024);
+  for (let index = 0; index <= limit; index += 1) {
+    if (
+      bytes[index] === 0x25 &&
+      bytes[index + 1] === 0x50 &&
+      bytes[index + 2] === 0x44 &&
+      bytes[index + 3] === 0x46 &&
+      bytes[index + 4] === 0x2d
+    ) {
+      return index;
     }
-
-    // Fall back to form feed characters
-    const formFeeds = text.split('\f').length - 1;
-    if (formFeeds > 0) {
-        return formFeeds;
-    }
-
-    // Estimate based on content length (rough heuristic)
-    if (text.length > 50000) {
-        return Math.ceil(text.length / 50000);
-    }
-
-    return 1;
+  }
+  return -1;
 }
 
-/**
- * Clean metadata strings by removing PDF encoding artifacts
- */
-function cleanMetadataString(str) {
-    if (!str) return '';
-
-    return str
-        .replace(/\\[0-7]{3}/g, '') // Remove octal escapes
-        .replace(/\\[rnt]/g, ' ')   // Replace escaped chars with space
-        .replace(/\s+/g, ' ')       // Normalize whitespace
-        .trim();
+function isEncrypted(source) {
+  return /\/Encrypt\b/.test(source.replace(/stream[\s\S]*?endstream/g, 'stream endstream'));
 }
 
-/**
- * Parse PDF date format (D:YYYYMMDDHHmmSSOHH'mm')
- */
-function parseePdfDate(dateStr) {
-    if (!dateStr) return null;
-
-    // Remove D: prefix if present
-    const clean = dateStr.replace(/^D:/, '');
-
-    // Try to parse as ISO date first
-    if (clean.includes('-') || clean.includes('T')) {
-        const date = new Date(clean);
-        if (!isNaN(date.getTime())) {
-            return date.toISOString();
-        }
-    }
-
-    // Parse PDF date format: YYYYMMDDHHMMSS
-    const match = clean.match(/^(\d{4})(\d{2})(\d{2})(\d{2})?(\d{2})?(\d{2})?/);
-    if (match) {
-        const [, year, month, day, hour = '00', minute = '00', second = '00'] = match;
-        try {
-            const date = new Date(
-                parseInt(year),
-                parseInt(month) - 1, // Month is 0-based
-                parseInt(day),
-                parseInt(hour),
-                parseInt(minute),
-                parseInt(second)
-            );
-            return date.toISOString();
-        } catch (e) {
-            return null;
-        }
-    }
-
-    return null;
+function countPages(source) {
+  const matches = source.match(/\/Type\s*\/Page\b/g);
+  return matches ? matches.length : 0;
 }
 
-/**
- * Preprocess text for better extraction
- */
-function preprocessText(text, config) {
-    if (!text) return '';
-
-    let processed = text;
-
-    // Remove binary artifacts and control characters
-    processed = processed.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, ' ');
-
-    // Normalize whitespace
-    processed = processed.replace(/\s+/g, ' ');
-
-    if (config.preserveFormatting) {
-        // Preserve line breaks and paragraph structure
-        processed = processed.replace(/\n\s*\n/g, '\n\n');
+function inspectStreams(source) {
+  let uncompressed = 0;
+  let compressed = 0;
+  const pattern = /<<([\s\S]*?)>>\s*stream/g;
+  let match;
+  while ((match = pattern.exec(source))) {
+    if (/\/Filter\b/.test(match[1])) {
+      compressed += 1;
+    } else {
+      uncompressed += 1;
     }
-
-    return processed.trim();
+  }
+  return { uncompressed, compressed };
 }
 
-/**
- * Extract text segments from PDF content
- */
-function extractTextSegments(text, config) {
-    const segments = [];
-
-    // Regex for better text extraction
-    const patterns = [
-        // Standard text segments
-        /([A-Za-z0-9][A-Za-z0-9\-\s,.!?;:'"()]{3,})/g,
-        // Email addresses
-        /([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g,
-        // URLs
-        /(https?:\/\/[^\s]+)/g,
-        // Numbers and dates
-        /(\b\d{1,4}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}\b|\b\d+\.\d+\b|\b\d{4,}\b)/g
-    ];
-
-    for (const pattern of patterns) {
-        let match;
-        while ((match = pattern.exec(text)) !== null) {
-            const segment = match[1].trim();
-            if (segment.length >= config.minSegmentLength) {
-                segments.push(segment);
-            }
-            if (segments.length >= config.maxSegments * 2) {
-                break;
-            }
-        }
-    }
-
-    return segments;
+function extractUncompressedText(source) {
+  const texts = [];
+  const pattern = /<<([\s\S]*?)>>\s*stream\r?\n?([\s\S]*?)endstream/g;
+  let match;
+  while ((match = pattern.exec(source))) {
+    if (/\/Filter\b/.test(match[1])) continue;
+    const extracted = extractTextOperators(match[2]);
+    if (extracted) texts.push(extracted);
+  }
+  if (texts.length === 0) {
+    const fallback = extractTextOperators(source);
+    if (fallback) texts.push(fallback);
+  }
+  return texts.join('\n').trim();
 }
 
-/**
- * Filter segments to remove noise and short words
- */
-function filterSegments(segments, config) {
-    const filtered = [];
-    const seen = new Set();
-
-    for (const segment of segments) {
-        // Skip duplicates
-        const normalized = segment.toLowerCase();
-        if (seen.has(normalized)) {
-            continue;
-        }
-        seen.add(normalized);
-
-        // Skip very short segments
-        if (segment.length < config.minSegmentLength) {
-            continue;
-        }
-
-        // Skip segments that are just single letters or numbers
-        if (config.excludeShortWords && /^[A-Za-z]{1,2}$/.test(segment)) {
-            continue;
-        }
-
-        // Skip segments that are just whitespace or punctuation
-        if (!/[A-Za-z0-9]/.test(segment)) {
-            continue;
-        }
-
-        filtered.push(segment);
-
-        if (filtered.length >= config.maxSegments) {
-            break;
-        }
+function extractTextOperators(content) {
+  const blocks = [];
+  const btPattern = /\bBT\b([\s\S]*?)\bET\b/g;
+  let block;
+  while ((block = btPattern.exec(content))) {
+    const parts = [];
+    const body = block[1];
+    const tjPattern = /(\((?:\\.|[^\\)])*\)|<[^>]*>)\s*Tj/g;
+    let tj;
+    while ((tj = tjPattern.exec(body))) {
+      parts.push(decodePdfString(tj[1]));
     }
-
-    return filtered;
+    const tjArrayPattern = /\[([\s\S]*?)\]\s*TJ/g;
+    let tjArray;
+    while ((tjArray = tjArrayPattern.exec(body))) {
+      const itemPattern = /(\((?:\\.|[^\\)])*\)|<[^>]*>)/g;
+      let item;
+      while ((item = itemPattern.exec(tjArray[1]))) {
+        parts.push(decodePdfString(item[1]));
+      }
+    }
+    const joined = parts.join('').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, '');
+    if (joined.trim()) blocks.push(joined);
+  }
+  return blocks.join('\n');
 }
 
-/**
- * Generate preview text from segments
- */
-function generatePreviewText(segments, config) {
-    if (segments.length === 0) {
-        return '';
+function extractInfoDictionary(source) {
+  const info = {};
+  const infoRef = source.match(/\/Info\s+(\d+)\s+(\d+)\s+R/);
+  let haystack = source;
+  if (infoRef) {
+    const objectPattern = new RegExp(
+      `${infoRef[1]}\\s+${infoRef[2]}\\s+obj\\s*(<<[\\s\\S]*?>>)`,
+      'm'
+    );
+    const objectMatch = source.match(objectPattern);
+    if (objectMatch) haystack = objectMatch[1];
+  }
+  for (const key of INFO_KEYS) {
+    const match = haystack.match(new RegExp(`/${key}\\s*(\\((?:\\\\.|[^\\\\)])*\\)|<[^>]*>)`));
+    if (!match) continue;
+    const value = decodePdfString(match[1]).trim();
+    if (!value) continue;
+    if (key === 'CreationDate' || key === 'ModDate') {
+      info[key === 'CreationDate' ? 'creationDate' : 'modificationDate'] = parsePdfDate(value);
+    } else {
+      info[key.charAt(0).toLowerCase() + key.slice(1)] = value;
     }
-
-    // Join segments with appropriate spacing
-    let preview = segments.join(' ');
-
-    // Truncate if too long
-    if (preview.length > config.maxPreviewLength) {
-        preview = preview.substring(0, config.maxPreviewLength);
-        // Try to end at a word boundary
-        const lastSpace = preview.lastIndexOf(' ');
-        if (lastSpace > config.maxPreviewLength * 0.8) {
-            preview = preview.substring(0, lastSpace);
-        }
-        preview += '...';
-    }
-
-    return preview;
+  }
+  return info;
 }
 
-/**
- * Convert byte array to ASCII text
- */
-function bytesToAscii(bytes) {
-    if (!bytes || !bytes.length) {
-        return '';
-    }
-
-    let result = '';
-    for (let i = 0; i < bytes.length; i++) {
-        const byte = bytes[i];
-
-        if (byte === 0x0A) {
-            result += '\n';
-        } else if (byte === 0x0D) {
-            continue; // Skip carriage returns
-        } else if (byte === 0x09) {
-            result += '\t';
-        } else if (byte >= 32 && byte <= 126) {
-            // Printable ASCII characters
-            result += String.fromCharCode(byte);
-        } else if (byte >= 128 && byte <= 255) {
-            // Extended ASCII - try to preserve
-            result += String.fromCharCode(byte);
-        }
-        // Skip other control characters
-    }
-
-    return result;
-}
-
-/**
- * Decode Base64 string to byte array
- */
-function decodeBase64ToBytes(base64) {
-    const clean = String(base64).replace(/[^A-Za-z0-9+/=]/g, '');
-
-    if (clean.length % 4 !== 0) {
-        throw new Error('Invalid Base64 string length');
-    }
-
+function decodePdfString(token) {
+  if (!token) return '';
+  if (token.startsWith('<') && token.endsWith('>')) {
+    const hex = token.slice(1, -1).replace(/\s+/g, '');
+    const padded = hex.length % 2 === 0 ? hex : `${hex}0`;
     const bytes = [];
-
-    for (let i = 0; i < clean.length; i += 4) {
-        const enc1 = BASE64_ALPHABET.indexOf(clean[i]);
-        const enc2 = BASE64_ALPHABET.indexOf(clean[i + 1]);
-        const enc3 = BASE64_ALPHABET.indexOf(clean[i + 2]);
-        const enc4 = BASE64_ALPHABET.indexOf(clean[i + 3]);
-
-        if (enc1 < 0 || enc2 < 0) {
-            throw new Error('Invalid Base64 character');
-        }
-
-        const chr1 = (enc1 << 2) | (enc2 >> 4);
-        const chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
-        const chr3 = ((enc3 & 3) << 6) | enc4;
-
-        bytes.push(chr1 & 255);
-        if (enc3 !== 64) {
-            bytes.push(chr2 & 255);
-        }
-        if (enc4 !== 64) {
-            bytes.push(chr3 & 255);
-        }
+    for (let index = 0; index < padded.length; index += 2) {
+      bytes.push(parseInt(padded.slice(index, index + 2), 16));
     }
-
-    return bytes;
+    if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+      let text = '';
+      for (let index = 2; index + 1 < bytes.length; index += 2) {
+        text += String.fromCharCode((bytes[index] << 8) | bytes[index + 1]);
+      }
+      return text;
+    }
+    return bytesToLatin1(bytes);
+  }
+  if (!(token.startsWith('(') && token.endsWith(')'))) return token;
+  const inner = token.slice(1, -1);
+  let output = '';
+  for (let index = 0; index < inner.length; index += 1) {
+    const current = inner[index];
+    if (current !== '\\') {
+      output += current;
+      continue;
+    }
+    const next = inner[index + 1];
+    if (next === 'n') {
+      output += '\n';
+      index += 1;
+    } else if (next === 'r') {
+      output += '\r';
+      index += 1;
+    } else if (next === 't') {
+      output += '\t';
+      index += 1;
+    } else if (next === 'b') {
+      output += '\b';
+      index += 1;
+    } else if (next === 'f') {
+      output += '\f';
+      index += 1;
+    } else if (next === '\\' || next === '(' || next === ')') {
+      output += next;
+      index += 1;
+    } else if (next >= '0' && next <= '7') {
+      let octal = next;
+      let consumed = 1;
+      while (consumed < 3 && index + 1 + consumed < inner.length) {
+        const digit = inner[index + 1 + consumed];
+        if (digit < '0' || digit > '7') break;
+        octal += digit;
+        consumed += 1;
+      }
+      output += String.fromCharCode(parseInt(octal, 8));
+      index += consumed;
+    } else if (next === '\n' || next === '\r') {
+      index += next === '\r' && inner[index + 2] === '\n' ? 2 : 1;
+    } else if (next != null) {
+      output += next;
+      index += 1;
+    }
+  }
+  if (output.charCodeAt(0) === 0xfe && output.charCodeAt(1) === 0xff) {
+    let text = '';
+    for (let index = 2; index + 1 < output.length; index += 2) {
+      text += String.fromCharCode((output.charCodeAt(index) << 8) | output.charCodeAt(index + 1));
+    }
+    return text;
+  }
+  return output;
 }
 
-if (typeof module !== "undefined") {
+function parsePdfDate(value) {
+  const clean = String(value).replace(/^D:/, '');
+  const match = clean.match(/^(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?/);
+  if (!match) return value;
+  const [, year, month = '01', day = '01', hour = '00', minute = '00', second = '00'] = match;
+  const iso = `${year}-${month}-${day}T${hour}:${minute}:${second}Z`;
+  const date = new Date(iso);
+  return Number.isNaN(date.getTime()) ? value : date.toISOString();
+}
+
+function truncateText(text, maxLength) {
+  if (text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength).trimEnd()}…`;
+}
+
+function clampPositiveInt(value, fallback, min, max) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(number)));
+}
+
+function stringToBytes(value) {
+  const bytes = [];
+  for (let index = 0; index < value.length; index += 1) {
+    bytes.push(value.charCodeAt(index) & 0xff);
+  }
+  return bytes;
+}
+
+function bytesToLatin1(bytes) {
+  let result = '';
+  for (let index = 0; index < bytes.length; index += 1) {
+    result += String.fromCharCode(bytes[index] & 0xff);
+  }
+  return result;
+}
+
+function decodeBase64ToBytes(base64) {
+  const clean = String(base64).replace(/[^A-Za-z0-9+/=]/g, '');
+  if (!clean || clean.length % 4 !== 0) {
+    throw Object.assign(new Error('Invalid Base64 PDF payload'), { code: 'PDF_INVALID_BASE64' });
+  }
+  const bytes = [];
+  for (let index = 0; index < clean.length; index += 4) {
+    const enc1 = BASE64_ALPHABET.indexOf(clean[index]);
+    const enc2 = BASE64_ALPHABET.indexOf(clean[index + 1]);
+    const enc3 = BASE64_ALPHABET.indexOf(clean[index + 2]);
+    const enc4 = BASE64_ALPHABET.indexOf(clean[index + 3]);
+    if (enc1 < 0 || enc2 < 0) {
+      throw Object.assign(new Error('Invalid Base64 PDF payload'), { code: 'PDF_INVALID_BASE64' });
+    }
+    bytes.push(((enc1 << 2) | (enc2 >> 4)) & 255);
+    if (enc3 !== 64) bytes.push(((enc2 & 15) << 4) | (enc3 >> 2));
+    if (enc4 !== 64) bytes.push(((enc3 & 3) << 6) | enc4);
+  }
+  return bytes;
+}
+
+if (typeof module !== 'undefined') {
   module.exports = { execute };
 }
 execute;

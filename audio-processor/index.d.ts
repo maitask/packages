@@ -16,7 +16,7 @@ export interface ExecuteInput {
     /** Audio language (for transcription) */
     language?: string;
     /** AI provider */
-    provider?: 'whisper' | 'gemini' | 'openai' | 'index-tts' | 'indextts';
+    provider?: 'whisper' | 'gemini' | 'openai';
     /** Model name */
     model?: string;
     /** Audio MIME type */
@@ -29,18 +29,8 @@ export interface ExecuteInput {
     temperature?: number;
     /** Speed for TTS (0.25 to 4.0) */
     speed?: number;
-    /** Instruction for how to speak (gpt-4o-mini-tts only, 2025 feature) */
+    /** Instruction for how to speak (gpt-4o-mini-tts only) */
     instruction?: string;
-    /** Reference audio for voice cloning (Index-TTS, base64 or URL) */
-    referenceAudio?: string;
-    reference_audio?: string;
-    /** Emotion control (Index-TTS-2: happy, sad, angry, neutral, etc.) */
-    emotion?: string;
-    /** Duration control mode (Index-TTS-2: auto, precise) */
-    durationControl?: 'auto' | 'precise';
-    duration_control?: 'auto' | 'precise';
-    /** Pinyin for pronunciation control (Index-TTS Chinese) */
-    pinyin?: string;
     /** Timestamp granularities for Whisper */
     timestamp_granularities?: ('word' | 'segment')[];
 }
@@ -49,10 +39,6 @@ export interface ExecuteOptions {
     /** AI API key */
     apiKey?: string;
     api_key?: string;
-    /** Base URL for self-hosted services (Index-TTS) */
-    baseUrl?: string;
-    base_url?: string;
-    /** Other provider-specific options */
     [key: string]: any;
 }
 

@@ -35,54 +35,32 @@ function execute(input, options = {}, context = {}) {
             throw new Error('Input data is empty');
         }
 
-        // Build configuration
-        const config = {
-            path: options.path || context.workspace_path + '/output.xlsx',
-            sheet_name: options.sheet_name || options.sheetName || 'Sheet1',
-            headers: options.headers || null,
-            auto_fit: options.auto_fit !== false && options.autoFit !== false
-        };
-
-        // Validate output path
-        if (!config.path.endsWith('.xlsx')) {
-            config.path += '.xlsx';
-        }
-
-        // Detect data structure
+        const sheetName = options.sheet_name || options.sheetName || 'Sheet1';
+        const filename = String(options.filename || options.path || 'export.csv')
+            .replace(/\.xlsx$/i, '.csv');
         const dataType = detectDataType(data);
-        const headers = extractHeaders(data, config.headers, dataType);
-
-        // Structure data for export
+        const headers = extractHeaders(data, options.headers, dataType);
         const structuredData = structureData(data, headers, dataType);
+        const csv = toCsv(headers, structuredData);
 
-        // Return export configuration for the engine's Excel adapter
         return {
             success: true,
-            exporter: 'excel',
-            format: 'xlsx',
-            output_adapter: {
-                adapter: 'excel',
-                config: config,
-                data: structuredData
-            },
-            preview: {
-                headers: headers,
-                rowCount: structuredData.length,
-                sample: structuredData.slice(0, 3)
-            },
-            statistics: {
-                totalRows: structuredData.length,
-                totalColumns: headers.length,
-                dataType: dataType,
-                estimatedSize: estimateFileSize(structuredData, headers)
+            data: {
+                items: structuredData,
+                summary: {
+                    format: 'csv',
+                    filename: filename.endsWith('.csv') ? filename : `${filename}.csv`,
+                    sheetName,
+                    rowCount: structuredData.length,
+                    columnCount: headers.length,
+                    dataType
+                },
+                csv
             },
             metadata: {
-                path: config.path,
-                sheetName: config.sheet_name,
-                hasHeaders: true,
-                autoFit: config.auto_fit,
-                exportedAt: new Date().toISOString(),
-                version: '0.1.0'
+                package: '@maitask/excel-exporter',
+                version: '0.1.0',
+                exportedAt: new Date().toISOString()
             }
         };
     } catch (error) {
@@ -178,17 +156,19 @@ function structureData(data, headers, dataType) {
     return [{ 'Data': JSON.stringify(data) }];
 }
 
-/**
- * Estimate file size in bytes
- */
-function estimateFileSize(data, headers) {
-    const headerSize = headers.reduce((sum, h) => sum + String(h).length, 0);
-    const dataSize = data.reduce((sum, row) => {
-        return sum + Object.values(row).reduce((s, v) => s + String(v).length, 0);
-    }, 0);
+function csvCell(value) {
+    if (value == null) return '';
+    const text = String(value);
+    if (/[",\n\r]/.test(text)) {
+        return `"${text.replace(/"/g, '""')}"`;
+    }
+    return text;
+}
 
-    // Excel has overhead, estimate ~3KB base + data
-    return 3000 + headerSize * 10 + dataSize * 2;
+function toCsv(headers, rows) {
+    const headerLine = headers.map(csvCell).join(',');
+    const body = rows.map(row => headers.map(header => csvCell(row[header])).join(','));
+    return [headerLine, ...body].join('\n');
 }
 
 if (typeof module !== "undefined") {

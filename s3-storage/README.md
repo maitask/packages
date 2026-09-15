@@ -1,12 +1,11 @@
 # @maitask/s3-storage
 
-Work with S3-compatible storage through proxy APIs or presigned URLs.
+Work with S3-compatible storage through presigned object URLs.
 
 ## Features
 
-- Operations: list/upload/download/delete
-- Supports presigned URL mode for object operations
-- Supports proxy mode for centralized credentials
+- Operations: upload, download, delete
+- Requires a presigned URL for each object operation
 - Consistent metadata and timeout handling
 
 ## Input
@@ -14,16 +13,12 @@ Work with S3-compatible storage through proxy APIs or presigned URLs.
 Required:
 
 - `operation`
-- `bucket (for proxy mode) or presignedUrl (for object ops)`
+- `presignedUrl`
 
 Optional:
 
-- `proxyUrl`
-- `key`
-- `body`
+- `body` (required for upload)
 - `headers`
-- `region`
-- `endpoint`
 - `timeoutMs`
 
 ## Example

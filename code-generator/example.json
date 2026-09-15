@@ -1,8 +1,0 @@
-{
-  "prompt": "Write a TypeScript debounce utility with tests.",
-  "language": "typescript",
-  "provider": "openai",
-  "model": "gpt-4o-mini",
-  "apiKey": "sk-xxx",
-  "timeoutMs": 30000
-}

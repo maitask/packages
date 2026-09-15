@@ -1,106 +1,97 @@
 /**
  * @maitask/stream-publisher
- * Publish data streams via HTTP chunked transfer or Server-Sent Events
- *
- * Features:
- * - HTTP chunked transfer encoding (line-delimited JSON)
- * - Server-Sent Events (SSE) format
- * - Real-time data streaming
- * - Custom headers and authentication
- * - Configurable chunk sizes
- * - Event naming for SSE
+ * Publish NDJSON or SSE event streams to an HTTPS endpoint.
  *
  * @version 0.1.0
  * @author Maitask Team
  * @license MIT
  */
-
-/**
- * Main execution function for stream publishing
- * @param {Object|Array} input - Data to stream
- * @param {Object} options - Streaming options
- * @param {Object} context - Execution context
- * @returns {Object} Stream configuration for the engine's HTTP Stream adapter
- */
-function execute(input, options = {}, context = {}) {
+async function execute(input, options = {}, context = {}) {
     try {
-        // Validate input
         if (!input) {
             throw new Error('Input data is required for streaming');
         }
 
-        // Ensure data is array for streaming
         const data = Array.isArray(input) ? input : [input];
-
         if (data.length === 0) {
             throw new Error('Input data is empty');
         }
 
-        // Build streaming configuration
-        const config = {
-            url: options.url || options.endpoint,
-            mode: options.mode || 'chunked',
-            headers: options.headers || {},
-            chunk_size: options.chunk_size || options.chunkSize || 65536,
-            timeout_seconds: options.timeout_seconds || options.timeout || 300,
-            event_name: options.event_name || options.eventName || 'message',
-            include_response_body: options.include_response_body !== false
-        };
-
-        // Validate required fields
-        if (!config.url) {
-            throw new Error('Stream endpoint URL is required (options.url)');
-        }
-
-        // Validate mode
-        if (!['chunked', 'sse'].includes(config.mode)) {
+        const mode = options.mode || 'chunked';
+        if (!['chunked', 'sse'].includes(mode)) {
             throw new Error('Stream mode must be "chunked" or "sse"');
         }
 
-        // Add authentication if provided
-        if (options.auth_token || options.authToken) {
-            config.headers['Authorization'] = `Bearer ${options.auth_token || options.authToken}`;
+        const url = new URL(String(options.url || options.endpoint || '').trim());
+        if (url.username || url.password) {
+            throw new Error('url must not include embedded credentials');
+        }
+        if (url.protocol !== 'https:' && options.allowInsecureHttp !== true) {
+            throw new Error('url must use https unless allowInsecureHttp is enabled');
         }
 
-        // Set content type based on mode
-        if (config.mode === 'sse') {
-            config.headers['Accept'] = 'text/event-stream';
+        const secrets = {
+            ...(context.secrets && typeof context.secrets === 'object' ? context.secrets : {}),
+            ...(options.secrets && typeof options.secrets === 'object' ? options.secrets : {})
+        };
+        const headers = { ...(options.headers || {}) };
+        const tokenSecret = options.tokenSecret;
+        if (tokenSecret) {
+            const token = secrets[tokenSecret];
+            if (!token) {
+                throw new Error(`secret '${tokenSecret}' is required`);
+            }
+            headers.Authorization = `Bearer ${token}`;
+        }
+        if (mode === 'sse') {
+            headers['Content-Type'] = headers['Content-Type'] || 'text/event-stream';
         } else {
-            config.headers['Content-Type'] = config.headers['Content-Type'] || 'application/x-ndjson';
+            headers['Content-Type'] = headers['Content-Type'] || 'application/x-ndjson';
         }
 
-        // Structure stream data
-        const streamData = prepareStreamData(data, config.mode);
+        const streamData = prepareStreamData(data, mode);
+        const eventName = options.event_name || options.eventName || 'message';
+        const body = mode === 'sse'
+            ? streamData.map(item => `event: ${eventName}\ndata: ${JSON.stringify(item.data)}\n\n`).join('')
+            : streamData.map(item => JSON.stringify(item)).join('\n') + '\n';
 
-        // Return streaming configuration for the engine's HTTP Stream adapter
+        const timeoutMs = Math.min(Math.max(Number(options.timeoutMs) || 30000, 1), 120000);
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        let response;
+        try {
+            response = await fetch(url.toString(), {
+                method: 'POST',
+                headers,
+                body,
+                signal: controller.signal
+            });
+        } finally {
+            clearTimeout(timer);
+        }
+
+        const responseText = await response.text();
+        if (!response.ok) {
+            throw new Error(responseText || `Stream publish failed with status ${response.status}`);
+        }
+
         return {
             success: true,
-            publisher: 'stream',
-            mode: config.mode,
-            format: config.mode === 'sse' ? 'text/event-stream' : 'application/x-ndjson',
-            output_adapter: {
-                adapter: 'http_stream',
-                config: config,
-                data: streamData
-            },
-            preview: {
-                eventCount: streamData.length,
-                totalSize: estimateStreamSize(streamData),
-                sample: streamData.slice(0, 3)
-            },
-            statistics: {
-                totalEvents: streamData.length,
-                estimatedBytes: estimateStreamSize(streamData),
-                chunkSize: config.chunk_size,
-                mode: config.mode
+            data: {
+                items: streamData.slice(0, 20),
+                summary: {
+                    mode,
+                    eventCount: streamData.length,
+                    status: response.status,
+                    bytes: body.length
+                }
             },
             metadata: {
-                endpoint: config.url,
-                mode: config.mode,
-                eventName: config.event_name,
-                hasAuth: !!config.headers['Authorization'],
-                publishedAt: new Date().toISOString(),
-                version: '0.1.0'
+                package: '@maitask/stream-publisher',
+                version: '0.1.0',
+                endpoint: `${url.origin}${url.pathname}`,
+                mode,
+                publishedAt: new Date().toISOString()
             }
         };
     } catch (error) {
@@ -134,16 +125,6 @@ function prepareStreamData(data, mode) {
 
     // Chunked mode uses raw data
     return data;
-}
-
-/**
- * Estimate total stream size in bytes
- */
-function estimateStreamSize(data) {
-    return data.reduce((sum, item) => {
-        const json = JSON.stringify(item);
-        return sum + json.length + 1; // +1 for newline
-    }, 0);
 }
 
 if (typeof module !== "undefined") {

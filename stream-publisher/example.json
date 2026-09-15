@@ -19,8 +19,6 @@
     "url": "https://events.example.com/ingest",
     "mode": "sse",
     "event_name": "maitask-event",
-    "headers": {
-      "Authorization": "Bearer stream-token"
-    }
+    "tokenSecret": "STREAM_TOKEN"
   }
 }

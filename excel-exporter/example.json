@@ -5,8 +5,7 @@
     {"name": "Cara", "team": "Platform", "score": 95}
   ],
   "options": {
-    "path": "reports/quarterly-scorecard.xlsx",
-    "sheet_name": "Q4 Metrics",
-    "auto_fit": true
+    "filename": "reports/quarterly-scorecard.csv",
+    "sheet_name": "Q4 Metrics"
   }
 }

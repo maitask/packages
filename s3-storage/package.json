@@ -1,7 +1,7 @@
 {
   "name": "@maitask/s3-storage",
   "version": "0.1.0",
-  "description": "S3-compatible storage operations: upload, download, list, delete",
+  "description": "Upload, download, or delete objects through presigned S3 URLs",
   "main": "index.js",
   "type": "commonjs",
   "author": "Maitask Team <team@maitask.com>",
@@ -23,7 +23,7 @@
     "locales": {
       "en": {
         "display_name": "S3 Storage",
-        "description": "S3-compatible storage operations: upload, download, list, delete",
+        "description": "Upload, download, or delete objects through presigned S3 URLs",
         "category": "Export & Storage",
         "keywords": [
           "maitask",
@@ -36,7 +36,7 @@
       },
       "zh": {
         "display_name": "S3 存储",
-        "description": "兼容 S3 的存储操作，支持上传、下载、列表和删除对象。",
+        "description": "通过预签名 URL 上传、下载或删除 S3 兼容对象。",
         "category": "导出与存储",
         "keywords": [
           "S3",

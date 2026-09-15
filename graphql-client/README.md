@@ -1,11 +1,12 @@
 # @maitask/graphql-client
 
-Execute GraphQL operations against HTTP endpoints.
+Execute GraphQL operations against HTTPS endpoints.
 
 ## Features
 
 - Supports query and mutation payloads
-- Pass-through variables and custom headers
+- Optional bearer tokens via `tokenSecret` and Runtime secrets
+- Rejects embedded URL credentials
 - Handles GraphQL `errors` and partial data
 - Timeout protection with normalized output
 
@@ -18,7 +19,9 @@ Required:
 Optional:
 - `variables`
 - `headers`
+- `tokenSecret`
 - `timeoutMs`
+- `allowInsecureHttp` (options only; for local fixtures)
 
 ## Example
 

@@ -1,7 +1,7 @@
 {
   "name": "@maitask/graphql-client",
   "version": "0.1.0",
-  "description": "Execute GraphQL queries and mutations against any GraphQL endpoint",
+  "description": "Execute GraphQL queries and mutations over HTTPS with secret-backed bearer tokens",
   "main": "index.js",
   "type": "commonjs",
   "author": "Maitask Team <team@maitask.com>",
@@ -22,7 +22,7 @@
     "locales": {
       "en": {
         "display_name": "GraphQL Client",
-        "description": "Execute GraphQL queries and mutations against any GraphQL endpoint",
+        "description": "Execute GraphQL queries and mutations over HTTPS with secret-backed bearer tokens",
         "category": "Web & API Integration",
         "keywords": [
           "maitask",
@@ -34,7 +34,7 @@
       },
       "zh": {
         "display_name": "GraphQL 客户端",
-        "description": "对任意 GraphQL 端点执行查询和变更，适合 API 聚合和数据访问流程。",
+        "description": "通过 HTTPS 执行 GraphQL 查询和变更，凭证使用 Runtime secrets 中的 bearer 令牌。",
         "category": "Web 与 API 集成",
         "keywords": [
           "GraphQL",

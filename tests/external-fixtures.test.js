@@ -151,12 +151,15 @@ test('graphql-client executes queries against a fixture endpoint', async t => {
   });
   t.after(() => server.close());
 
-  const result = await executeGraphql({
-    url: `${server.url}/graphql`,
-    query: 'query MatrixCountries { countries { code name } }',
-    variables: {},
-    timeoutMs: 10000
-  });
+  const result = await executeGraphql(
+    {
+      url: `${server.url}/graphql`,
+      query: 'query MatrixCountries { countries { code name } }',
+      variables: {},
+      timeoutMs: 10000
+    },
+    { allowInsecureHttp: true }
+  );
 
   assert.equal(result.success, true);
   assert.deepEqual(result.data.data.countries, [{ code: 'MT', name: 'Maitask Fixture' }]);

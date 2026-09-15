@@ -1,6 +1,6 @@
 /**
  * @maitask/graphql-client
- * GraphQL query/mutation execution over HTTP
+ * GraphQL query/mutation execution over HTTPS
  *
  * @version 0.1.0
  * @license MIT
@@ -9,21 +9,31 @@
 async function execute(input, options = {}, context = {}) {
   try {
     const payload = asObject(input);
-    const url = readRequiredString(payload.url, 'url');
+    const url = readRequiredUrl(payload.url, options.allowInsecureHttp === true);
     const query = readRequiredString(payload.query, 'query');
     const timeoutMs = readTimeout(payload.timeoutMs ?? options.timeoutMs);
+    const secrets = {
+      ...asObjectOrEmpty(context.secrets),
+      ...asObjectOrEmpty(options.secrets)
+    };
 
     const requestBody = {
       query,
       variables: asObjectOrDefault(payload.variables, {})
     };
 
+    const headers = {
+      'Content-Type': 'application/json',
+      ...asHeaders(payload.headers)
+    };
+    const tokenSecret = readOptionalString(payload.tokenSecret || options.tokenSecret);
+    if (tokenSecret) {
+      headers.Authorization = `Bearer ${readRequiredString(secrets[tokenSecret], tokenSecret)}`;
+    }
+
     const result = await fetchJson(url, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...asHeaders(payload.headers)
-      },
+      headers,
       body: requestBody,
       timeoutMs
     });
@@ -149,6 +159,31 @@ function readRequiredString(value, key) {
   const text = value == null ? '' : String(value).trim();
   if (!text) throw new Error(`${key} is required`);
   return text;
+}
+
+function readOptionalString(value) {
+  return value == null ? '' : String(value).trim();
+}
+
+function asObjectOrEmpty(value) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+  return value;
+}
+
+function readRequiredUrl(value, allowInsecureHttp) {
+  const url = new URL(readRequiredString(value, 'url'));
+  if (url.username || url.password) {
+    throw new Error('url must not include embedded credentials');
+  }
+  if (url.protocol === 'https:') {
+    return url.toString();
+  }
+  if (url.protocol === 'http:' && allowInsecureHttp) {
+    return url.toString();
+  }
+  throw new Error('url must use https unless allowInsecureHttp is enabled');
 }
 
 function readTimeout(value) {
