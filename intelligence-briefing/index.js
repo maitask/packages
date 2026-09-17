@@ -8,7 +8,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/intelligence-briefing';
-const PACKAGE_VERSION = '0.1.2';
+const PACKAGE_VERSION = '0.1.4';
 const CONTRACT_VERSION = '2026-06-27';
 
 async function execute(input = {}, options = {}, context = {}) {
@@ -527,8 +527,23 @@ async function generateBriefing(stories, config) {
     );
   }
 
-  const aiResult = await requestOpenAiCompatible(stories, config);
-  return normalizeAiBriefing(aiResult, stories, config);
+  try {
+    const aiResult = await requestOpenAiCompatible(stories, config);
+    return normalizeAiBriefing(aiResult, stories, config);
+  } catch (error) {
+    const fallback = extractiveBriefing(stories, config);
+    const reason = error instanceof Error ? error.message : String(error);
+    return {
+      ...fallback,
+      provider: {
+        model: config.ai.model,
+        usage: null,
+        parsed: false,
+        fallback: 'extractive',
+        error: reason
+      }
+    };
+  }
 }
 
 async function requestOpenAiCompatible(stories, config) {
@@ -743,23 +758,37 @@ function emptyBriefing(config) {
 }
 
 function buildChannelMessage(briefing, config) {
-  if (briefing.message) {
+  const labels = labelsFor(config.analysis.targetLanguage);
+  if (briefing.message && !briefing.provider?.fallback) {
     return truncate(briefing.message, config.output.maxCharacters);
   }
 
-  const labels = labelsFor(config.analysis.targetLanguage);
-  const lines = [briefing.title, '', briefing.summary].filter(Boolean);
+  const lines = [];
+  if (briefing.title) {
+    lines.push(`**${briefing.title}**`);
+  }
+  if (briefing.summary) {
+    lines.push('');
+    lines.push(briefing.summary);
+  }
+  if (briefing.provider?.fallback) {
+    lines.push('');
+    lines.push(labels.aiUnavailable);
+  }
   briefing.items.forEach((item, index) => {
     lines.push('');
-    lines.push(`${index + 1}. ${item.title}`);
-    if (item.signal) lines.push(`${labels.signal}: ${item.signal}`);
+    if (item.url && config.output.includeSources) {
+      lines.push(`${index + 1}. [${item.title}](${item.url})`);
+    } else {
+      lines.push(`${index + 1}. ${item.title}`);
+    }
+    if (item.signal) lines.push(`**${labels.signal}:** ${item.signal}`);
     if (item.analysis) lines.push(`${labels.analysis}: ${item.analysis}`);
     if (item.impact) lines.push(`${labels.impact}: ${item.impact}`);
     if (item.forecast) lines.push(`${labels.forecast}: ${item.forecast}`);
-    if (item.url && config.output.includeSources) lines.push(item.url);
   });
 
-  return truncate(lines.join('\n'), config.output.maxCharacters);
+  return truncate(lines.join('\n').trim(), config.output.maxCharacters);
 }
 
 function buildOutputItems(stories, briefing, citations) {
@@ -1063,7 +1092,8 @@ function labelsFor(language) {
       impact: '影响',
       forecast: '预测',
       extractiveImpact: '需要 AI 分析或人工复核以形成影响判断。',
-      extractiveForecast: '需要 AI 分析或人工复核以形成情景预测。'
+      extractiveForecast: '需要 AI 分析或人工复核以形成情景预测。',
+      aiUnavailable: 'AI 分析暂不可用，以下为来源摘录简报。'
     };
   }
   return {
@@ -1078,7 +1108,8 @@ function labelsFor(language) {
     impact: 'Impact',
     forecast: 'Forecast',
     extractiveImpact: 'AI analysis or human review is required for impact judgment.',
-    extractiveForecast: 'AI analysis or human review is required for scenario forecasting.'
+    extractiveForecast: 'AI analysis or human review is required for scenario forecasting.',
+    aiUnavailable: 'AI analysis is unavailable; this briefing uses source excerpts.'
   };
 }
 

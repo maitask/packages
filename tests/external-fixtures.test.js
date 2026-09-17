@@ -362,6 +362,64 @@ test('intelligence-briefing generates a fixture-backed AI briefing', async t => 
   assert.equal(result.citations.length, 2);
 });
 
+test('intelligence-briefing falls back to extractive briefing when the AI provider is unavailable', async t => {
+  const server = await createFixtureServer(url => {
+    if (url.pathname === '/v0/topstories.json') {
+      return { body: [1001] };
+    }
+    if (url.pathname === '/v0/item/1001.json') {
+      return {
+        body: {
+          id: 1001,
+          type: 'story',
+          title: 'Database engine improves analytical query latency',
+          by: 'maintainer',
+          score: 180,
+          time: 1783555200,
+          descendants: 4,
+          url: 'https://example.com/database-latency'
+        }
+      };
+    }
+    if (url.pathname === '/v1/chat/completions') {
+      return {
+        status: 503,
+        body: { error: 'Service temporarily unavailable' }
+      };
+    }
+    return null;
+  });
+  t.after(() => server.close());
+
+  const result = await executeIntelligenceBriefing(
+    {
+      sources: [
+        {
+          type: 'hackernews',
+          storyTypes: ['top'],
+          limit: 1,
+          apiBaseUrl: `${server.url}/v0`
+        }
+      ],
+      selection: { maxItems: 1, minScore: 1 }
+    },
+    {
+      apiKey: 'fixture-key',
+      baseUrl: `${server.url}/v1`,
+      model: 'fixture-intelligence'
+    }
+  );
+
+  assert.equal(result.success, true);
+  assert.equal(result.data.summary.failure_count, 0);
+  assert.equal(result.data.briefing.provider.fallback, 'extractive');
+  assert.match(result.data.briefing.provider.error, /503/);
+  assert.doesNotMatch(result.data.briefing.summary, /Service temporarily unavailable/);
+  assert.doesNotMatch(result.data.message, /Service temporarily unavailable/);
+  assert.match(result.data.message, /AI analysis is unavailable/);
+  assert.ok(result.data.message);
+});
+
 test('intelligence-briefing uses Runtime fetch without abort timers', async t => {
   const originalDeno = globalThis.Deno;
   const originalFetch = globalThis.fetch;

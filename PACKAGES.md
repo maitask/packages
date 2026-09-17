@@ -11,7 +11,7 @@
 - [**@maitask/gemini**](./gemini) `v0.1.0` — Google Gemini multimodal models integration
 - [**@maitask/deepseek**](./deepseek) `v0.1.0` — DeepSeek reasoning models integration
 - [**@maitask/ollama**](./ollama) `v0.1.0` — Local Ollama models execution bridge
-- [**@maitask/intelligence-briefing**](./intelligence-briefing) `v0.1.0` — Generate source-backed intelligence briefings with configurable AI analysis and delivery-ready output
+- [**@maitask/intelligence-briefing**](./intelligence-briefing) `v0.1.4` — Generate source-backed intelligence briefings with configurable AI analysis and delivery-ready output
 
 ## Media & Multimodal Processing (3)
 
