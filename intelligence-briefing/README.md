@@ -1,6 +1,8 @@
 # @maitask/intelligence-briefing
 
-Generate multi-source intelligence briefings with filtering, deduplication state, OpenAI-compatible analysis, translation, and channel-neutral output.
+Generate a published Hacker News Daily or a source-backed briefing with filtering, OpenAI-compatible analysis, translation, and channel-neutral output.
+
+When AI writing is enabled, the package fails instead of publishing an extractive stub. Set `output.product` to `hacker_news_daily` for the dated daily digest.
 
 ## Features
 

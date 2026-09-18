@@ -1,7 +1,7 @@
 {
   "name": "@maitask/intelligence-briefing",
-  "version": "0.1.4",
-  "description": "Generate multi-source intelligence briefings with OpenAI-compatible analysis and channel-neutral output",
+  "version": "0.1.5",
+  "description": "Generate published Hacker News Daily and source-backed briefings with OpenAI-compatible analysis",
   "main": "index.js",
   "types": "index.d.ts",
   "type": "commonjs",
@@ -25,13 +25,149 @@
   "engines": {
     "node": ">=18.0.0"
   },
-  "display_name": "Intelligence Briefing",
+  "display_name": "Hacker News Daily",
   "category": "AI & Cognitive Services",
   "maitask": {
+    "schemas": {
+      "options": {
+        "type": "object",
+        "properties": {
+          "analysis": {
+            "type": "object",
+            "title": "Analysis",
+            "properties": {
+              "targetLanguage": {
+                "type": "string",
+                "title": "Language",
+                "enum": ["zh-CN", "en"],
+                "default": "zh-CN"
+              },
+              "profile": {
+                "type": "string",
+                "title": "Focus",
+                "enum": [
+                  "technology",
+                  "forecast",
+                  "business",
+                  "economic",
+                  "market",
+                  "risk",
+                  "policy",
+                  "investment"
+                ],
+                "default": "forecast"
+              },
+              "depth": {
+                "type": "string",
+                "title": "Depth",
+                "enum": ["brief", "standard", "deep"],
+                "default": "standard",
+                "x-advanced": true
+              },
+              "focus": {
+                "type": "array",
+                "title": "Focus topics",
+                "items": { "type": "string" },
+                "x-advanced": true
+              }
+            }
+          },
+          "selection": {
+            "type": "object",
+            "title": "Selection",
+            "properties": {
+              "maxItems": {
+                "type": "integer",
+                "title": "Stories",
+                "minimum": 1,
+                "maximum": 30,
+                "default": 5
+              },
+              "minScore": {
+                "type": "number",
+                "title": "Minimum score",
+                "x-advanced": true
+              },
+              "minComments": {
+                "type": "number",
+                "title": "Minimum comments",
+                "x-advanced": true
+              }
+            }
+          },
+          "ai": {
+            "type": "object",
+            "title": "AI",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "title": "Write with AI",
+                "default": true
+              },
+              "provider": {
+                "type": "string",
+                "title": "Provider",
+                "enum": ["openai_compatible", "extractive"],
+                "default": "openai_compatible"
+              },
+              "apiKey": {
+                "type": "string",
+                "title": "API key",
+                "format": "password"
+              },
+              "baseUrl": {
+                "type": "string",
+                "title": "API base URL",
+                "format": "uri"
+              },
+              "model": {
+                "type": "string",
+                "title": "Model",
+                "default": "gpt-5.5"
+              },
+              "temperature": {
+                "type": "number",
+                "title": "Temperature",
+                "minimum": 0,
+                "maximum": 2,
+                "x-advanced": true
+              },
+              "maxTokens": {
+                "type": "integer",
+                "title": "Max tokens",
+                "x-advanced": true
+              }
+            }
+          },
+          "output": {
+            "type": "object",
+            "title": "Output",
+            "properties": {
+              "product": {
+                "type": "string",
+                "title": "Format",
+                "enum": ["hacker_news_daily", "intelligence_briefing"],
+                "default": "hacker_news_daily"
+              },
+              "includeSources": {
+                "type": "boolean",
+                "title": "Include source links",
+                "default": true
+              },
+              "maxCharacters": {
+                "type": "integer",
+                "title": "Maximum length",
+                "x-advanced": true
+              }
+            }
+          }
+        }
+      }
+    },
     "locales": {
       "en": {
-        "display_name": "Intelligence Briefing",
-        "description": "Generate multi-source intelligence briefings with OpenAI-compatible analysis, translation, filtering, and channel-neutral output.",
+        "display_name": "Hacker News Daily",
+        "description": "Generate a published Hacker News Daily or source-backed briefing with OpenAI-compatible analysis.",
         "category": "AI & Cognitive Services",
         "keywords": [
           "maitask",
@@ -44,8 +180,8 @@
         ]
       },
       "zh": {
-        "display_name": "情报简报",
-        "description": "基于多来源资讯生成情报简报，支持 OpenAI 兼容分析、翻译、筛选与通道中立输出。",
+        "display_name": "Hacker News 日报",
+        "description": "生成可发布的 Hacker News 日报或来源简报，支持 OpenAI 兼容分析、翻译与筛选。",
         "category": "AI 与认知服务",
         "keywords": [
           "情报",

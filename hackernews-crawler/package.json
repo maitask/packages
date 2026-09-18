@@ -1,6 +1,6 @@
 {
   "name": "@maitask/hackernews-crawler",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Crawl and extract stories from Hacker News using official API",
   "main": "index.js",
   "types": "index.d.ts",
@@ -20,6 +20,47 @@
   "display_name": "Hacker News Crawler",
   "category": "Web & API Integration",
   "maitask": {
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "storyType": {
+            "type": "string",
+            "title": "Story list",
+            "enum": ["top", "best", "new", "ask", "show", "job"],
+            "default": "top"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Story count",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 30
+          },
+          "includeComments": {
+            "type": "boolean",
+            "title": "Include comments",
+            "default": true
+          },
+          "commentLimit": {
+            "type": "integer",
+            "title": "Comments per story",
+            "minimum": 0,
+            "maximum": 50,
+            "default": 5,
+            "x-advanced": true
+          },
+          "commentDepth": {
+            "type": "integer",
+            "title": "Comment depth",
+            "minimum": 1,
+            "maximum": 5,
+            "default": 1,
+            "x-advanced": true
+          }
+        }
+      }
+    },
     "locales": {
       "en": {
         "display_name": "Hacker News Crawler",

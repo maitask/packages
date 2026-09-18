@@ -9,7 +9,7 @@
  * - Story normalization and metadata
  * - Async API integration
  *
- * @version 0.1.0
+ * @version 0.1.1
  * @author Maitask Team
  * @license MIT
  */
@@ -45,7 +45,7 @@ async function execute(input, options, context) {
 
         var metadata = {
             package: '@maitask/hackernews-crawler',
-            version: '0.1.0',
+            version: '0.1.1',
             provider: 'hackernews',
             storyType: config.storyType,
             fetchedAt: new Date().toISOString(),
@@ -72,7 +72,7 @@ async function execute(input, options, context) {
             },
             metadata: {
                 package: '@maitask/hackernews-crawler',
-                version: '0.1.0',
+                version: '0.1.1',
                 provider: 'hackernews',
                 fetchedAt: new Date().toISOString()
             }

@@ -124,6 +124,7 @@ export interface BriefingEnrichmentConfig {
 
 export interface BriefingOutputConfig {
   format?: 'channel_message' | 'json' | string;
+  product?: 'hacker_news_daily' | 'intelligence_briefing' | string;
   maxCharacters?: number;
   max_characters?: number;
   includeSources?: boolean;

@@ -8,7 +8,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/intelligence-briefing';
-const PACKAGE_VERSION = '0.1.4';
+const PACKAGE_VERSION = '0.1.5';
 const CONTRACT_VERSION = '2026-06-27';
 
 async function execute(input = {}, options = {}, context = {}) {
@@ -58,6 +58,7 @@ async function execute(input = {}, options = {}, context = {}) {
         target_language: config.analysis.targetLanguage,
         ai_provider: config.ai.enabled ? config.ai.provider : 'extractive',
         model: config.ai.enabled ? config.ai.model : null,
+        product: config.output.product || null,
         briefing_title: briefing.title,
         briefing_summary: briefing.summary,
         channel_message: message,
@@ -188,6 +189,9 @@ function buildConfig(input, options, context) {
     },
     output: {
       format: stringValue(outputInput.format || 'channel_message'),
+      product: normalizeProduct(
+        outputInput.product || source.product || analysisInput.product || ''
+      ),
       maxCharacters: boundedInt(
         outputInput.maxCharacters ?? outputInput.max_characters,
         3500,
@@ -527,39 +531,59 @@ async function generateBriefing(stories, config) {
     );
   }
 
-  try {
-    const aiResult = await requestOpenAiCompatible(stories, config);
-    return normalizeAiBriefing(aiResult, stories, config);
-  } catch (error) {
-    const fallback = extractiveBriefing(stories, config);
-    const reason = error instanceof Error ? error.message : String(error);
-    return {
-      ...fallback,
-      provider: {
-        model: config.ai.model,
-        usage: null,
-        parsed: false,
-        fallback: 'extractive',
-        error: reason
-      }
-    };
+  const aiResult = await requestOpenAiCompatible(stories, config);
+  const briefing = normalizeAiBriefing(aiResult, stories, config);
+  if (!briefing.provider.parsed || !stringValue(briefing.message)) {
+    throw new Error('AI provider returned a briefing that could not be published');
   }
+  return briefing;
 }
 
 async function requestOpenAiCompatible(stories, config) {
   ensureFetch();
   const endpoint = config.ai.endpoint || `${config.ai.baseUrl}/chat/completions`;
   const messages = buildAnalysisMessages(stories, config);
-  const body = {
+  const variants = chatCompletionVariants(config, messages);
+
+  let lastError;
+  for (const body of variants) {
+    try {
+      return await postChatCompletion(endpoint, body, config);
+    } catch (error) {
+      lastError = error;
+      const message = error instanceof Error ? error.message : String(error);
+      if (!isRetryableChatCompletionError(message)) {
+        throw error;
+      }
+    }
+  }
+  throw lastError || new Error('AI provider request failed');
+}
+
+function chatCompletionVariants(config, messages) {
+  const base = {
     model: config.ai.model,
     messages,
-    temperature: config.ai.temperature,
-    max_tokens: config.ai.maxTokens
+    temperature: config.ai.temperature
   };
+  const variants = [];
   if (config.ai.jsonMode) {
-    body.response_format = { type: 'json_object' };
+    variants.push({
+      ...base,
+      max_tokens: config.ai.maxTokens,
+      response_format: { type: 'json_object' }
+    });
   }
+  variants.push({ ...base, max_tokens: config.ai.maxTokens });
+  variants.push({ ...base, max_completion_tokens: config.ai.maxTokens });
+  return variants;
+}
 
+function isRetryableChatCompletionError(message) {
+  return /response_format|json_object|max_tokens|unsupported|invalid_request/i.test(message);
+}
+
+async function postChatCompletion(endpoint, body, config) {
   const response = await requestWithRetry(
     endpoint,
     {
@@ -614,21 +638,29 @@ function buildAnalysisMessages(stories, config) {
     comments: flattenComments(story.comments).slice(0, 8).map(comment => truncate(comment.text, 500))
   }));
 
+  const isDaily = config.output.product === 'hacker_news_daily';
   const system = [
-    'You generate concise intelligence briefings from public information.',
+    isDaily
+      ? 'You write a formal published Hacker News Daily digest from public stories.'
+      : 'You generate concise intelligence briefings from public information.',
     'Return JSON only. Do not include markdown fences.',
     'Do not fabricate facts. Mark uncertain conclusions as uncertain.',
     'Forecasts must be framed as scenarios, not guarantees.',
-    'Investment, trading, legal, and policy statements must be informational, not advice.'
+    'Investment, trading, legal, and policy statements must be informational, not advice.',
+    isDaily
+      ? 'The message field is the official published version for a chat channel: polished prose, no placeholders, no notes about missing AI analysis.'
+      : 'The message field is the published channel version in the target language.'
   ].join(' ');
 
   const user = {
-    task: 'Create an intelligence briefing',
+    task: isDaily ? 'Create the official Hacker News Daily' : 'Create an intelligence briefing',
     target_language: config.analysis.targetLanguage,
     profile: config.analysis.profile,
     depth: config.analysis.depth,
     audience: config.analysis.audience,
     focus: config.analysis.focus,
+    product: config.output.product,
+    title_hint: defaultTitle(config),
     profile_guidance: profileGuide,
     custom_instructions: config.analysis.customInstructions,
     required_json_shape: {
@@ -646,7 +678,7 @@ function buildAnalysisMessages(stories, config) {
           watchlist: ['string']
         }
       ],
-      message: 'bot-ready concise message in target language'
+      message: 'official published channel message in target language'
     },
     stories: sourcePayload
   };
@@ -660,10 +692,13 @@ function buildAnalysisMessages(stories, config) {
 function normalizeAiBriefing(aiResult, stories, config) {
   const parsed = parseJsonObject(aiResult.content);
   if (!parsed) {
-    const fallback = extractiveBriefing(stories, config);
     return {
-      ...fallback,
-      summary: truncate(aiResult.content, 1200),
+      title: defaultTitle(config),
+      profile: config.analysis.profile,
+      language: config.analysis.targetLanguage,
+      summary: '',
+      items: [],
+      message: '',
       provider: {
         model: aiResult.model,
         usage: aiResult.usage,
@@ -719,8 +754,8 @@ function extractiveBriefing(stories, config) {
       story.text || story.articleText || '',
       240
     )}`.trim(),
-    impact: labels.extractiveImpact,
-    forecast: labels.extractiveForecast,
+    impact: '',
+    forecast: '',
     risks: [],
     watchlist: story.domain ? [story.domain] : []
   }));
@@ -759,7 +794,7 @@ function emptyBriefing(config) {
 
 function buildChannelMessage(briefing, config) {
   const labels = labelsFor(config.analysis.targetLanguage);
-  if (briefing.message && !briefing.provider?.fallback) {
+  if (briefing.message && briefing.provider?.parsed !== false && !briefing.provider?.fallback) {
     return truncate(briefing.message, config.output.maxCharacters);
   }
 
@@ -771,10 +806,6 @@ function buildChannelMessage(briefing, config) {
     lines.push('');
     lines.push(briefing.summary);
   }
-  if (briefing.provider?.fallback) {
-    lines.push('');
-    lines.push(labels.aiUnavailable);
-  }
   briefing.items.forEach((item, index) => {
     lines.push('');
     if (item.url && config.output.includeSources) {
@@ -782,10 +813,9 @@ function buildChannelMessage(briefing, config) {
     } else {
       lines.push(`${index + 1}. ${item.title}`);
     }
-    if (item.signal) lines.push(`**${labels.signal}:** ${item.signal}`);
-    if (item.analysis) lines.push(`${labels.analysis}: ${item.analysis}`);
-    if (item.impact) lines.push(`${labels.impact}: ${item.impact}`);
-    if (item.forecast) lines.push(`${labels.forecast}: ${item.forecast}`);
+    if (item.analysis) lines.push(item.analysis);
+    if (item.impact) lines.push(item.impact);
+    if (item.forecast) lines.push(item.forecast);
   });
 
   return truncate(lines.join('\n').trim(), config.output.maxCharacters);
@@ -1074,7 +1104,25 @@ function normalizeSignal(value) {
 
 function defaultTitle(config) {
   const labels = labelsFor(config.analysis.targetLanguage);
+  if (config.output.product === 'hacker_news_daily') {
+    return `${labels.dailyTitle} · ${formatUtcDate()}`;
+  }
   return `${labels.title}: ${config.analysis.profile}`;
+}
+
+function formatUtcDate(value = new Date()) {
+  return value.toISOString().slice(0, 10);
+}
+
+function normalizeProduct(value) {
+  const product = stringValue(value).toLowerCase().replace(/[-\s]+/g, '_');
+  if (['hacker_news_daily', 'hn_daily', 'daily'].includes(product)) {
+    return 'hacker_news_daily';
+  }
+  if (['intelligence_briefing', 'briefing'].includes(product)) {
+    return 'intelligence_briefing';
+  }
+  return product;
 }
 
 function labelsFor(language) {
@@ -1082,6 +1130,7 @@ function labelsFor(language) {
   if (lang === 'zh' || lang.startsWith('zh-')) {
     return {
       title: '情报简报',
+      dailyTitle: 'Hacker News 日报',
       selected: '已选择',
       items: '条内容',
       noItems: '没有符合条件的内容。',
@@ -1090,14 +1139,12 @@ function labelsFor(language) {
       signal: '信号',
       analysis: '分析',
       impact: '影响',
-      forecast: '预测',
-      extractiveImpact: '需要 AI 分析或人工复核以形成影响判断。',
-      extractiveForecast: '需要 AI 分析或人工复核以形成情景预测。',
-      aiUnavailable: 'AI 分析暂不可用，以下为来源摘录简报。'
+      forecast: '预测'
     };
   }
   return {
     title: 'Intelligence Briefing',
+    dailyTitle: 'Hacker News Daily',
     selected: 'Selected',
     items: 'items',
     noItems: 'No qualifying items were found.',
@@ -1106,10 +1153,7 @@ function labelsFor(language) {
     signal: 'Signal',
     analysis: 'Analysis',
     impact: 'Impact',
-    forecast: 'Forecast',
-    extractiveImpact: 'AI analysis or human review is required for impact judgment.',
-    extractiveForecast: 'AI analysis or human review is required for scenario forecasting.',
-    aiUnavailable: 'AI analysis is unavailable; this briefing uses source excerpts.'
+    forecast: 'Forecast'
   };
 }
 

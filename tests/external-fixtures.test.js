@@ -362,7 +362,7 @@ test('intelligence-briefing generates a fixture-backed AI briefing', async t => 
   assert.equal(result.citations.length, 2);
 });
 
-test('intelligence-briefing falls back to extractive briefing when the AI provider is unavailable', async t => {
+test('intelligence-briefing fails closed when the AI provider is unavailable', async t => {
   const server = await createFixtureServer(url => {
     if (url.pathname === '/v0/topstories.json') {
       return { body: [1001] };
@@ -410,14 +410,12 @@ test('intelligence-briefing falls back to extractive briefing when the AI provid
     }
   );
 
-  assert.equal(result.success, true);
-  assert.equal(result.data.summary.failure_count, 0);
-  assert.equal(result.data.briefing.provider.fallback, 'extractive');
-  assert.match(result.data.briefing.provider.error, /503/);
-  assert.doesNotMatch(result.data.briefing.summary, /Service temporarily unavailable/);
-  assert.doesNotMatch(result.data.message, /Service temporarily unavailable/);
-  assert.match(result.data.message, /AI analysis is unavailable/);
-  assert.ok(result.data.message);
+  assert.equal(result.success, false);
+  assert.equal(result.data.summary.failure_count, 1);
+  assert.equal(result.error.code, 'INTELLIGENCE_BRIEFING_ERROR');
+  assert.match(result.error.message, /503/);
+  assert.doesNotMatch(result.error.message, /需要 AI 分析/);
+  assert.doesNotMatch(String(result.data.message || ''), /AI analysis is unavailable/);
 });
 
 test('intelligence-briefing uses Runtime fetch without abort timers', async t => {

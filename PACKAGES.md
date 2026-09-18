@@ -11,7 +11,7 @@
 - [**@maitask/gemini**](./gemini) `v0.1.0` — Google Gemini multimodal models integration
 - [**@maitask/deepseek**](./deepseek) `v0.1.0` — DeepSeek reasoning models integration
 - [**@maitask/ollama**](./ollama) `v0.1.0` — Local Ollama models execution bridge
-- [**@maitask/intelligence-briefing**](./intelligence-briefing) `v0.1.4` — Generate source-backed intelligence briefings with configurable AI analysis and delivery-ready output
+- [**@maitask/intelligence-briefing**](./intelligence-briefing) `v0.1.5` — Generate a published Hacker News Daily or source-backed briefing with OpenAI-compatible analysis
 
 ## Media & Multimodal Processing (3)
 
@@ -45,7 +45,7 @@
 - [**@maitask/web-scraper**](./web-scraper) `v0.1.0` — Extract data from web pages with HTML parsing and CSS selectors
 - [**@maitask/web-search**](./web-search) `v0.1.1` — Search the web using multiple search engines
 - [**@maitask/http-request**](./http-request) `v2.0.0` — Strict credential-confined HTTP client with bounded redirects, safe retries, multipart and exact binary bodies, and byte-accurate responses
-- [**@maitask/hackernews-crawler**](./hackernews-crawler) `v0.1.0` — Crawl and extract stories from Hacker News using official API
+- [**@maitask/hackernews-crawler**](./hackernews-crawler) `v0.1.1` — Crawl and extract stories from Hacker News using official API
 - [**@maitask/github-integration**](./github-integration) `v1.0.0` — Credential-confined GitHub REST client for repositories, issues, pull requests, users, and controlled custom requests
 - [**@maitask/url-analyzer**](./url-analyzer) `v0.1.0` — URL parsing, validation, and analysis
 - [**@maitask/cf-proxy**](./cf-proxy) `v0.1.0` — Validated read-only transport for GitHub resources and container registry content
