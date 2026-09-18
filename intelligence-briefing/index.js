@@ -8,7 +8,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/intelligence-briefing';
-const PACKAGE_VERSION = '0.1.5';
+const PACKAGE_VERSION = '0.1.6';
 const CONTRACT_VERSION = '2026-06-27';
 
 async function execute(input = {}, options = {}, context = {}) {
@@ -211,8 +211,8 @@ function buildConfig(input, options, context) {
       temperature: readNumber(aiInput.temperature, 0.2),
       maxTokens: boundedInt(aiInput.maxTokens ?? aiInput.max_tokens, 1800, 200, 12000),
       timeoutMs: boundedInt(aiInput.timeoutMs ?? aiInput.timeout_ms, 60000, 1000, 300000),
-      retries: boundedInt(aiInput.retries, 2, 0, 5),
-      jsonMode: aiInput.jsonMode !== false && aiInput.json_mode !== false
+      retries: boundedInt(aiInput.retries, 1, 0, 5),
+      jsonMode: aiInput.jsonMode === true || aiInput.json_mode === true
     }
   };
 }
@@ -543,44 +543,26 @@ async function requestOpenAiCompatible(stories, config) {
   ensureFetch();
   const endpoint = config.ai.endpoint || `${config.ai.baseUrl}/chat/completions`;
   const messages = buildAnalysisMessages(stories, config);
-  const variants = chatCompletionVariants(config, messages);
-
-  let lastError;
-  for (const body of variants) {
-    try {
-      return await postChatCompletion(endpoint, body, config);
-    } catch (error) {
-      lastError = error;
-      const message = error instanceof Error ? error.message : String(error);
-      if (!isRetryableChatCompletionError(message)) {
-        throw error;
-      }
-    }
-  }
-  throw lastError || new Error('AI provider request failed');
-}
-
-function chatCompletionVariants(config, messages) {
-  const base = {
+  const body = {
     model: config.ai.model,
     messages,
-    temperature: config.ai.temperature
+    temperature: config.ai.temperature,
+    max_tokens: config.ai.maxTokens
   };
-  const variants = [];
   if (config.ai.jsonMode) {
-    variants.push({
-      ...base,
-      max_tokens: config.ai.maxTokens,
-      response_format: { type: 'json_object' }
-    });
+    body.response_format = { type: 'json_object' };
   }
-  variants.push({ ...base, max_tokens: config.ai.maxTokens });
-  variants.push({ ...base, max_completion_tokens: config.ai.maxTokens });
-  return variants;
-}
 
-function isRetryableChatCompletionError(message) {
-  return /response_format|json_object|max_tokens|unsupported|invalid_request/i.test(message);
+  try {
+    return await postChatCompletion(endpoint, body, config);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (!config.ai.jsonMode || !/response_format|json_object|invalid_request/i.test(message)) {
+      throw error;
+    }
+    delete body.response_format;
+    return await postChatCompletion(endpoint, body, config);
+  }
 }
 
 async function postChatCompletion(endpoint, body, config) {
@@ -633,9 +615,9 @@ function buildAnalysisMessages(stories, config) {
     score: story.score,
     commentCount: story.commentCount,
     time: story.time,
-    text: truncate(story.text, 1200),
-    articleText: truncate(story.articleText, 2500),
-    comments: flattenComments(story.comments).slice(0, 8).map(comment => truncate(comment.text, 500))
+    text: truncate(story.text, 500),
+    articleText: truncate(story.articleText, 800),
+    comments: flattenComments(story.comments).slice(0, 3).map(comment => truncate(comment.text, 240))
   }));
 
   const isDaily = config.output.product === 'hacker_news_daily';
