@@ -8,7 +8,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/intelligence-briefing';
-const PACKAGE_VERSION = '0.1.6';
+const PACKAGE_VERSION = '0.1.7';
 const CONTRACT_VERSION = '2026-06-27';
 
 async function execute(input = {}, options = {}, context = {}) {
@@ -20,7 +20,8 @@ async function execute(input = {}, options = {}, context = {}) {
     const selected = selectStories(collection.stories, config);
     const enriched = await enrichStories(selected, config);
     const briefing = await generateBriefing(enriched, config);
-    const message = buildChannelMessage(briefing, config);
+    briefing.message = finalizePublishedMessage(briefing, enriched, config);
+    const message = briefing.message;
     const citations = buildCitations(enriched);
     const nextDedupeState = buildNextDedupeState(config, enriched);
     const items = buildOutputItems(enriched, briefing, citations);
@@ -623,14 +624,14 @@ function buildAnalysisMessages(stories, config) {
   const isDaily = config.output.product === 'hacker_news_daily';
   const system = [
     isDaily
-      ? 'You write a formal published Hacker News Daily digest from public stories.'
+      ? 'You are a news editor writing the official Hacker News Daily for readers.'
       : 'You generate concise intelligence briefings from public information.',
     'Return JSON only. Do not include markdown fences.',
     'Do not fabricate facts. Mark uncertain conclusions as uncertain.',
     'Forecasts must be framed as scenarios, not guarantees.',
     'Investment, trading, legal, and policy statements must be informational, not advice.',
     isDaily
-      ? 'The message field is the official published version for a chat channel: polished prose, no placeholders, no notes about missing AI analysis.'
+      ? 'The message field is the published article. Write formal news prose. Do not mention AI, models, analysis availability, signal strength, status, or generation time. Do not use template labels such as 分析, 影响, 预测, 信号强度, Signal, Analysis, or Watchlist in the message. Each story must include its source URL as 来源：URL or Source: URL. Start with the dated title.'
       : 'The message field is the published channel version in the target language.'
   ].join(' ');
 
@@ -660,7 +661,9 @@ function buildAnalysisMessages(stories, config) {
           watchlist: ['string']
         }
       ],
-      message: 'official published channel message in target language'
+      message: isDaily
+        ? 'published daily article in target language, with a dated title, a short lead, numbered stories, and a source URL for every story'
+        : 'official published channel message in target language'
     },
     stories: sourcePayload
   };
@@ -774,33 +777,77 @@ function emptyBriefing(config) {
   };
 }
 
-function buildChannelMessage(briefing, config) {
+function finalizePublishedMessage(briefing, stories, config) {
+  let message = stripPublicationNoise(stringValue(briefing.message));
+  if (!message) {
+    message = composeFormalDaily(briefing, stories, config);
+  }
+  message = ensureSources(message, stories, config);
+  return truncate(message, config.output.maxCharacters);
+}
+
+function stripPublicationNoise(message) {
+  if (!message) return '';
+  const noise = [
+    /^\s*maitask intelligence briefing\s*$/i,
+    /^\s*intelligence briefing\s*$/i,
+    /^\s*(状态|Status)\s*[:：]/i,
+    /^\s*(生成时间|Generated(?: at)?)\s*[:：]/i,
+    /^\s*(信号强度|Signal(?: strength)?)\s*[:：]/i,
+    /信号强度/,
+    /需要\s*AI\s*分析/,
+    /AI 分析暂不可用/,
+    /as an AI\b/i
+  ];
+  return message
+    .split('\n')
+    .filter(line => !noise.some(pattern => pattern.test(line)))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+function composeFormalDaily(briefing, stories, config) {
   const labels = labelsFor(config.analysis.targetLanguage);
-  if (briefing.message && briefing.provider?.parsed !== false && !briefing.provider?.fallback) {
-    return truncate(briefing.message, config.output.maxCharacters);
+  const lines = [briefing.title || defaultTitle(config)];
+  if (briefing.summary) {
+    lines.push('', briefing.summary);
   }
 
-  const lines = [];
-  if (briefing.title) {
-    lines.push(`**${briefing.title}**`);
-  }
-  if (briefing.summary) {
+  const items = briefing.items || [];
+  stories.forEach((story, index) => {
+    const insight = items.find(item => item.id === story.key) || items[index] || {};
+    const title = stringValue(insight.title || story.title);
+    const body = [insight.analysis, insight.impact]
+      .map(stringValue)
+      .filter(Boolean)
+      .join('');
     lines.push('');
-    lines.push(briefing.summary);
-  }
-  briefing.items.forEach((item, index) => {
-    lines.push('');
-    if (item.url && config.output.includeSources) {
-      lines.push(`${index + 1}. [${item.title}](${item.url})`);
-    } else {
-      lines.push(`${index + 1}. ${item.title}`);
+    lines.push(`${index + 1}. ${title}`);
+    if (body) {
+      lines.push(body);
+    } else if (story.text) {
+      lines.push(truncate(story.text, 180));
     }
-    if (item.analysis) lines.push(item.analysis);
-    if (item.impact) lines.push(item.impact);
-    if (item.forecast) lines.push(item.forecast);
+    if (config.output.includeSources && story.url) {
+      lines.push(`${labels.source}: ${story.url}`);
+    }
   });
 
-  return truncate(lines.join('\n').trim(), config.output.maxCharacters);
+  return lines.join('\n').trim();
+}
+
+function ensureSources(message, stories, config) {
+  if (!config.output.includeSources) return message;
+  const withUrl = stories.filter(story => story.url);
+  if (!withUrl.length) return message;
+  if (withUrl.every(story => message.includes(story.url))) return message;
+
+  const labels = labelsFor(config.analysis.targetLanguage);
+  const block = withUrl
+    .map((story, index) => `${index + 1}. ${story.title} ${story.url}`)
+    .join('\n');
+  return `${message.trim()}\n\n${labels.sources}\n${block}`;
 }
 
 function buildOutputItems(stories, briefing, citations) {
@@ -1118,6 +1165,8 @@ function labelsFor(language) {
       noItems: '没有符合条件的内容。',
       score: '分数',
       comments: '评论',
+      source: '来源',
+      sources: '来源',
       signal: '信号',
       analysis: '分析',
       impact: '影响',
@@ -1132,6 +1181,8 @@ function labelsFor(language) {
     noItems: 'No qualifying items were found.',
     score: 'Score',
     comments: 'Comments',
+    source: 'Source',
+    sources: 'Sources',
     signal: 'Signal',
     analysis: 'Analysis',
     impact: 'Impact',

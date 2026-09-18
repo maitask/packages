@@ -358,6 +358,8 @@ test('intelligence-briefing generates a fixture-backed AI briefing', async t => 
   assert.equal(result.metadata.contract_version, '2026-06-27');
   assert.equal(result.metadata.ai_provider, 'openai_compatible');
   assert.match(result.metadata.channel_message, /受控情报简报/);
+  assert.match(result.metadata.channel_message, /https:\/\/example.com\/database-latency/);
+  assert.doesNotMatch(result.metadata.channel_message, /信号强度|状态:|生成时间/);
   assert.equal(result.metadata.next_dedupe_state.seen.length, 2);
   assert.equal(result.citations.length, 2);
 });

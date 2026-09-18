@@ -11,7 +11,7 @@
 - [**@maitask/gemini**](./gemini) `v0.1.1` — Google Gemini multimodal models integration
 - [**@maitask/deepseek**](./deepseek) `v0.1.1` — DeepSeek reasoning models integration
 - [**@maitask/ollama**](./ollama) `v0.1.1` — Local Ollama models execution bridge
-- [**@maitask/intelligence-briefing**](./intelligence-briefing) `v0.1.6` — Generate a published Hacker News Daily or source-backed briefing with OpenAI-compatible analysis
+- [**@maitask/intelligence-briefing**](./intelligence-briefing) `v0.1.7` — Generate a published Hacker News Daily or source-backed briefing with OpenAI-compatible analysis
 
 ## Media & Multimodal Processing (3)
 
