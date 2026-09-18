@@ -1,6 +1,6 @@
 {
   "name": "@maitask/file-processor",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Powerful data processing and transformation engine",
   "main": "index.js",
   "types": "index.d.ts",
@@ -68,6 +68,58 @@
           "聚合",
           "ETL"
         ]
+      }
+    },
+    "schemas": {
+      "options": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "title": "Operation",
+            "default": "pipeline"
+          },
+          "pipeline": {
+            "type": "array",
+            "title": "Pipeline",
+            "items": {
+              "type": "object",
+              "title": "Pipeline",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "title": "Type",
+                  "default": "filter"
+                },
+                "rules": {
+                  "type": "array",
+                  "title": "Rules",
+                  "items": {
+                    "type": "object",
+                    "title": "Rules",
+                    "properties": {
+                      "field": {
+                        "type": "string",
+                        "title": "Field",
+                        "default": "team"
+                      },
+                      "operator": {
+                        "type": "string",
+                        "title": "Operator",
+                        "default": "eq"
+                      },
+                      "value": {
+                        "type": "string",
+                        "title": "Value",
+                        "default": "Research"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
   }

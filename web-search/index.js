@@ -22,7 +22,7 @@ async function execute(input, options, context) {
             },
             metadata: {
                 package: '@maitask/web-search',
-                version: '0.1.1',
+                version: '0.1.2',
                 ...searchResult.metadata,
                 timestamp: new Date().toISOString()
             },
@@ -38,7 +38,7 @@ async function execute(input, options, context) {
             },
             metadata: {
                 package: '@maitask/web-search',
-                version: '0.1.1',
+                version: '0.1.2',
                 timestamp: new Date().toISOString()
             }
         };

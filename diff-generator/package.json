@@ -1,6 +1,6 @@
 {
   "name": "@maitask/diff-generator",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Data difference comparison and patch generation",
   "main": "index.js",
   "types": "index.d.ts",
@@ -62,6 +62,78 @@
           "比较",
           "数据"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "old": {
+            "type": "object",
+            "title": "Old",
+            "properties": {
+              "name": {
+                "type": "string",
+                "title": "Name",
+                "default": "Maitask Engine"
+              },
+              "version": {
+                "type": "string",
+                "title": "Version",
+                "default": "0.1.0"
+              },
+              "features": {
+                "type": "array",
+                "title": "Features",
+                "items": {
+                  "type": "string",
+                  "title": "Features",
+                  "default": "packages"
+                }
+              }
+            }
+          },
+          "new": {
+            "type": "object",
+            "title": "New",
+            "properties": {
+              "name": {
+                "type": "string",
+                "title": "Name",
+                "default": "Maitask Engine"
+              },
+              "version": {
+                "type": "string",
+                "title": "Version",
+                "default": "0.2.0"
+              },
+              "features": {
+                "type": "array",
+                "title": "Features",
+                "items": {
+                  "type": "string",
+                  "title": "Features",
+                  "default": "packages"
+                }
+              },
+              "status": {
+                "type": "string",
+                "title": "Status",
+                "default": "beta"
+              }
+            }
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "default": "json"
+          }
+        }
       }
     }
   }

@@ -1,6 +1,6 @@
 {
   "name": "@maitask/excel-exporter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Convert tabular data to CSV for Excel and downstream adapters",
   "main": "index.js",
   "types": "index.d.ts",
@@ -69,6 +69,23 @@
           "Office",
           "表格数据"
         ]
+      }
+    },
+    "schemas": {
+      "options": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "title": "Filename",
+            "default": "reports/quarterly-scorecard.csv"
+          },
+          "sheet_name": {
+            "type": "string",
+            "title": "Sheet name",
+            "default": "Q4 Metrics"
+          }
+        }
       }
     }
   }

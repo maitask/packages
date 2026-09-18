@@ -32,7 +32,7 @@ function execute(input, options, context) {
             inputCount: data.length,
             steps: [],
             executedAt: new Date().toISOString(),
-            version: '0.1.0'
+            version: '0.1.1'
         };
 
         var working = data.slice();
@@ -93,7 +93,7 @@ function execute(input, options, context) {
             },
             metadata: {
                 executedAt: new Date().toISOString(),
-                version: '0.1.0'
+                version: '0.1.1'
             }
         };
     }

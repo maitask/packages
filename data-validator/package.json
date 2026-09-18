@@ -1,6 +1,6 @@
 {
   "name": "@maitask/data-validator",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Comprehensive data validation and quality assurance",
   "main": "index.js",
   "types": "index.d.ts",
@@ -66,6 +66,133 @@
           "校验",
           "JSON Schema"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "array",
+            "title": "Data",
+            "items": {
+              "type": "object",
+              "title": "Data",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "title": "Id",
+                  "default": "u-1001"
+                },
+                "email": {
+                  "type": "string",
+                  "title": "Email",
+                  "default": "alice@example.com"
+                },
+                "age": {
+                  "type": "integer",
+                  "title": "Age",
+                  "default": 29
+                }
+              }
+            }
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "schema": {
+            "type": "object",
+            "title": "Schema",
+            "properties": {
+              "type": {
+                "type": "string",
+                "title": "Type",
+                "default": "object"
+              },
+              "properties": {
+                "type": "object",
+                "title": "Properties",
+                "properties": {
+                  "id": {
+                    "type": "object",
+                    "title": "Id",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "title": "Type",
+                        "default": "string"
+                      },
+                      "required": {
+                        "type": "boolean",
+                        "title": "Required",
+                        "default": true
+                      }
+                    }
+                  },
+                  "email": {
+                    "type": "object",
+                    "title": "Email",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "title": "Type",
+                        "default": "string"
+                      },
+                      "required": {
+                        "type": "boolean",
+                        "title": "Required",
+                        "default": true
+                      }
+                    }
+                  },
+                  "age": {
+                    "type": "object",
+                    "title": "Age",
+                    "properties": {
+                      "type": {
+                        "type": "string",
+                        "title": "Type",
+                        "default": "number"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "required_fields": {
+            "type": "array",
+            "title": "Required fields",
+            "items": {
+              "type": "string",
+              "title": "Required fields",
+              "default": "id"
+            }
+          },
+          "data_types": {
+            "type": "object",
+            "title": "Data types",
+            "properties": {
+              "age": {
+                "type": "string",
+                "title": "Age",
+                "default": "number"
+              }
+            }
+          },
+          "validation_mode": {
+            "type": "string",
+            "title": "Validation mode",
+            "default": "strict"
+          },
+          "stop_on_first_error": {
+            "type": "boolean",
+            "title": "Stop on first error",
+            "default": false
+          }
+        }
       }
     }
   }

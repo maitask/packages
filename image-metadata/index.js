@@ -32,7 +32,7 @@ function execute(input, options = {}, context = {}) {
             metadata: {
                 package: '@maitask/image-metadata',
                 timestamp: new Date().toISOString(),
-                version: '0.1.0'
+                version: '0.1.1'
             }
         };
     } catch (error) {
@@ -46,7 +46,7 @@ function execute(input, options = {}, context = {}) {
             metadata: {
                 package: '@maitask/image-metadata',
                 timestamp: new Date().toISOString(),
-                version: '0.1.0'
+                version: '0.1.1'
             }
         };
     }

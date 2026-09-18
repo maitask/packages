@@ -1,6 +1,6 @@
 {
   "name": "@maitask/csv-parser",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "High-performance CSV parser with advanced features",
   "main": "index.js",
   "types": "index.d.ts",
@@ -68,6 +68,49 @@
           "分隔符",
           "电子表格"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "default": "name,role,team,salary\nAlice,Data Scientist,Research,155000\nBob,Product Manager,Growth,142500\nCara,Engineer,Platform,168000"
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "default": "people.csv"
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "delimiter": {
+            "type": "string",
+            "title": "Delimiter",
+            "default": ","
+          },
+          "headers": {
+            "type": "boolean",
+            "title": "Headers",
+            "default": true,
+            "x-advanced": true
+          },
+          "trimValues": {
+            "type": "boolean",
+            "title": "Trim Values",
+            "default": true
+          },
+          "skipEmpty": {
+            "type": "boolean",
+            "title": "Skip Empty",
+            "default": true
+          }
+        }
       }
     }
   }

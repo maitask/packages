@@ -1,6 +1,6 @@
 {
   "name": "@maitask/graphql-client",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Execute GraphQL queries and mutations over HTTPS with secret-backed bearer tokens",
   "main": "index.js",
   "type": "commonjs",
@@ -44,6 +44,41 @@
           "客户端",
           "数据访问"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "default": "https://api.example.com/graphql",
+            "format": "uri"
+          },
+          "query": {
+            "type": "string",
+            "title": "Query",
+            "default": "query User($id: ID!) { user(id: $id) { id email } }"
+          },
+          "variables": {
+            "type": "object",
+            "title": "Variables",
+            "properties": {
+              "id": {
+                "type": "string",
+                "title": "Id",
+                "default": "42"
+              }
+            }
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout Ms",
+            "default": 20000,
+            "x-advanced": true
+          }
+        }
       }
     }
   }

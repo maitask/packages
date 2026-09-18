@@ -1,6 +1,6 @@
 {
   "name": "@maitask/file-transformer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Convert between file formats: JSON, CSV, XML, YAML, TOML",
   "main": "index.js",
   "type": "commonjs",
@@ -45,6 +45,28 @@
           "YAML",
           "TOML"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "string",
+            "title": "Data",
+            "default": "{\"name\":\"Alice\",\"age\":30}"
+          },
+          "from": {
+            "type": "string",
+            "title": "From",
+            "default": "json"
+          },
+          "to": {
+            "type": "string",
+            "title": "To",
+            "default": "yaml"
+          }
+        }
       }
     }
   }

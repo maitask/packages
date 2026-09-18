@@ -1,6 +1,6 @@
 {
   "name": "@maitask/kafka-publisher",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Publish messages to Kafka topics via REST proxy",
   "main": "index.js",
   "types": "index.d.ts",
@@ -51,6 +51,72 @@
           "Topic",
           "发布"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string",
+            "title": "Topic",
+            "default": "user.events"
+          },
+          "messages": {
+            "type": "array",
+            "title": "Messages",
+            "items": {
+              "type": "object",
+              "title": "Messages",
+              "properties": {
+                "event": {
+                  "type": "string",
+                  "title": "Event",
+                  "default": "signup"
+                },
+                "userId": {
+                  "type": "string",
+                  "title": "User Id",
+                  "default": "u-1"
+                }
+              }
+            }
+          },
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "default": "u-1"
+          },
+          "headers": {
+            "type": "object",
+            "title": "Headers",
+            "properties": {
+              "X-Trace-Source": {
+                "type": "string",
+                "title": "X Trace Source",
+                "default": "maitask"
+              }
+            },
+            "x-advanced": true
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "proxyUrl": {
+            "type": "string",
+            "title": "Proxy Url",
+            "default": "https://kafka-proxy.internal",
+            "format": "uri"
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout Ms",
+            "default": 30000,
+            "x-advanced": true
+          }
+        }
       }
     }
   }

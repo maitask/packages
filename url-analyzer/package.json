@@ -1,6 +1,6 @@
 {
   "name": "@maitask/url-analyzer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "URL parsing, validation, and analysis",
   "main": "index.js",
   "types": "index.d.ts",
@@ -62,6 +62,29 @@
           "分析",
           "链接"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "default": "https://www.example.com/products/42?ref=campaign&utm_source=newsletter#features",
+            "format": "uri"
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "title": "Operation",
+            "default": "analyze"
+          }
+        }
       }
     }
   }

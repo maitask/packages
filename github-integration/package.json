@@ -1,6 +1,6 @@
 {
   "name": "@maitask/github-integration",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Credential-confined GitHub REST client for repositories, issues, pull requests, users, and controlled custom requests",
   "main": "index.js",
   "types": "index.d.ts",
@@ -51,6 +51,64 @@
           "Issue",
           "Pull Request"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "title": "Action",
+            "default": "createIssue"
+          },
+          "owner": {
+            "type": "string",
+            "title": "Owner",
+            "default": "acme"
+          },
+          "repository": {
+            "type": "string",
+            "title": "Repository",
+            "default": "service"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "default": "Production incident follow-up"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body",
+            "default": "Track remediation and verification work."
+          },
+          "labels": {
+            "type": "array",
+            "title": "Labels",
+            "items": {
+              "type": "string",
+              "title": "Labels",
+              "default": "operations"
+            }
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout Ms",
+            "default": 30000,
+            "x-advanced": true
+          },
+          "maxResponseBytes": {
+            "type": "integer",
+            "title": "Max Response Bytes",
+            "default": 4194304,
+            "x-advanced": true
+          }
+        }
       }
     }
   }

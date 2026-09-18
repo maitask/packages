@@ -66,7 +66,7 @@ function execute(input, options = {}, context = {}) {
                 encoding: 'utf-8',
                 mimeType: getMimeType(fileType),
                 parsedAt: new Date().toISOString(),
-                version: '0.1.0'
+                version: '0.1.1'
             }
         };
     } catch (error) {
@@ -79,7 +79,7 @@ function execute(input, options = {}, context = {}) {
             },
             metadata: {
                 parsedAt: new Date().toISOString(),
-                version: '0.1.0'
+                version: '0.1.1'
             }
         };
     }
@@ -110,7 +110,7 @@ function createEmptyResponse(input) {
             encoding: 'utf-8',
             mimeType: 'text/plain',
             parsedAt: new Date().toISOString(),
-            version: '0.1.0'
+            version: '0.1.1'
         }
     };
 }

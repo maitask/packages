@@ -1,6 +1,6 @@
 {
   "name": "@maitask/http-request",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Strict credential-confined HTTP client with bounded redirects, safe retries, and exact response bytes",
   "main": "index.js",
   "types": "index.d.ts",
@@ -54,6 +54,144 @@
           "重试",
           "校验"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "default": "https://api.maitask.com/health",
+            "format": "uri"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE",
+              "HEAD"
+            ],
+            "default": "GET"
+          },
+          "headers": {
+            "type": "object",
+            "title": "Headers",
+            "properties": {
+              "Accept": {
+                "type": "string",
+                "title": "Accept",
+                "default": "application/json"
+              },
+              "X-Trace-Id": {
+                "type": "string",
+                "title": "X Trace Id",
+                "default": "maitask-http-request-example"
+              }
+            },
+            "x-advanced": true
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout Ms",
+            "default": 15000,
+            "x-advanced": true
+          },
+          "maxResponseBytes": {
+            "type": "integer",
+            "title": "Max Response Bytes",
+            "default": 1048576,
+            "x-advanced": true
+          },
+          "maxRedirects": {
+            "type": "integer",
+            "title": "Max Redirects",
+            "default": 2,
+            "x-advanced": true
+          },
+          "responseType": {
+            "type": "string",
+            "title": "Response Type",
+            "enum": [
+              "json",
+              "text",
+              "bytes"
+            ],
+            "default": "json"
+          },
+          "acceptedStatuses": {
+            "type": "array",
+            "title": "Accepted Statuses",
+            "items": {
+              "type": "integer",
+              "title": "Accepted Statuses",
+              "default": 200
+            },
+            "x-advanced": true
+          },
+          "redirect": {
+            "type": "string",
+            "title": "Redirect",
+            "enum": [
+              "error",
+              "follow",
+              "manual"
+            ],
+            "default": "error"
+          },
+          "retry": {
+            "type": "object",
+            "title": "Retry",
+            "properties": {
+              "maxAttempts": {
+                "type": "integer",
+                "title": "Max Attempts",
+                "default": 3
+              },
+              "statuses": {
+                "type": "array",
+                "title": "Statuses",
+                "items": {
+                  "type": "integer",
+                  "title": "Statuses",
+                  "default": 408
+                }
+              },
+              "initialDelayMs": {
+                "type": "integer",
+                "title": "Initial Delay Ms",
+                "default": 250
+              },
+              "maxDelayMs": {
+                "type": "integer",
+                "title": "Max Delay Ms",
+                "default": 2000,
+                "x-advanced": true
+              },
+              "backoffFactor": {
+                "type": "integer",
+                "title": "Backoff Factor",
+                "default": 2
+              },
+              "jitterRatio": {
+                "type": "number",
+                "title": "Jitter Ratio",
+                "default": 0.2
+              },
+              "respectRetryAfter": {
+                "type": "boolean",
+                "title": "Respect Retry After",
+                "default": true
+              }
+            },
+            "x-advanced": true
+          }
+        }
       }
     }
   }

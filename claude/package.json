@@ -1,6 +1,6 @@
 {
   "name": "@maitask/claude",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Anthropic Claude AI models integration for Maitask",
   "main": "index.js",
   "types": "index.d.ts",
@@ -47,6 +47,60 @@
           "聊天",
           "推理"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "default": "claude-3-sonnet-20240229"
+          },
+          "maxTokens": {
+            "type": "integer",
+            "title": "Max Tokens",
+            "default": 400,
+            "x-advanced": true
+          },
+          "messages": {
+            "type": "array",
+            "title": "Messages",
+            "items": {
+              "type": "object",
+              "title": "Messages",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "title": "Role",
+                  "default": "system"
+                },
+                "content": {
+                  "type": "string",
+                  "title": "Content",
+                  "default": "You are a helpful product assistant."
+                }
+              }
+            }
+          },
+          "temperature": {
+            "type": "number",
+            "title": "Temperature",
+            "default": 0.7,
+            "x-advanced": true
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": "string",
+            "title": "Api Key",
+            "format": "password"
+          }
+        }
       }
     }
   }

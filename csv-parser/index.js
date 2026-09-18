@@ -68,7 +68,7 @@ function execute(input, options = {}, context = {}) {
                 escape: config.escape,
                 hasHeaders: config.headers !== false,
                 parsedAt: new Date().toISOString(),
-                version: '0.1.0'
+                version: '0.1.1'
             }
         };
     } catch (error) {
@@ -82,7 +82,7 @@ function execute(input, options = {}, context = {}) {
             },
             metadata: {
                 parsedAt: new Date().toISOString(),
-                version: '0.1.0'
+                version: '0.1.1'
             }
         };
     }
@@ -164,7 +164,7 @@ function createEmptyResponse(input, config) {
             delimiter: config.delimiter,
             hasHeaders: config.headers !== false,
             parsedAt: new Date().toISOString(),
-            version: '0.1.0'
+            version: '0.1.1'
         }
     };
 }

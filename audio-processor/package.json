@@ -1,6 +1,6 @@
 {
   "name": "@maitask/audio-processor",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Audio transcription and speech synthesis through Whisper and OpenAI audio APIs",
   "main": "index.js",
   "types": "index.d.ts",
@@ -49,6 +49,54 @@
           "AI",
           "语音"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "audioUrl": {
+            "type": "string",
+            "title": "Audio Url",
+            "default": "https://storage.googleapis.com/maitask/examples/meeting-snippet.mp3",
+            "format": "uri"
+          },
+          "task": {
+            "type": "string",
+            "title": "Task",
+            "default": "transcribe"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "en"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider",
+            "default": "whisper"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "default": "whisper-1"
+          },
+          "prompt": {
+            "type": "string",
+            "title": "Prompt",
+            "default": "Transcribe the meeting and highlight action items for the team."
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": "string",
+            "title": "Api Key",
+            "format": "password"
+          }
+        }
       }
     }
   }

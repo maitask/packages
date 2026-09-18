@@ -49,7 +49,7 @@ function execute(input, options = {}, context = {}) {
             ...result,
             metadata: {
                 timestamp: new Date().toISOString(),
-                version: '0.1.0'
+                version: '0.1.1'
             }
         };
     } catch (error) {
@@ -62,7 +62,7 @@ function execute(input, options = {}, context = {}) {
             },
             metadata: {
                 timestamp: new Date().toISOString(),
-                version: '0.1.0'
+                version: '0.1.1'
             }
         };
     }

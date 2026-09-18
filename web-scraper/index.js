@@ -51,7 +51,7 @@ async function execute(input, options = {}, context = {}) {
             metadata: {
                 contract_version: '2026-06-27',
                 package: '@maitask/web-scraper',
-                version: '0.1.0',
+                version: '0.1.1',
                 execution_id: context?.execution_id || null,
                 execution_ms: Date.now() - startedAt,
                 timestamp: new Date().toISOString()
@@ -78,7 +78,7 @@ async function execute(input, options = {}, context = {}) {
             metadata: {
                 contract_version: '2026-06-27',
                 package: '@maitask/web-scraper',
-                version: '0.1.0',
+                version: '0.1.1',
                 execution_id: context?.execution_id || null,
                 execution_ms: Date.now() - startedAt,
                 timestamp: new Date().toISOString()

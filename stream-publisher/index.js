@@ -88,7 +88,7 @@ async function execute(input, options = {}, context = {}) {
             },
             metadata: {
                 package: '@maitask/stream-publisher',
-                version: '0.1.0',
+                version: '0.1.1',
                 endpoint: `${url.origin}${url.pathname}`,
                 mode,
                 publishedAt: new Date().toISOString()
@@ -104,7 +104,7 @@ async function execute(input, options = {}, context = {}) {
             },
             metadata: {
                 publishedAt: new Date().toISOString(),
-                version: '0.1.0'
+                version: '0.1.1'
             }
         };
     }

@@ -1,6 +1,6 @@
 {
   "name": "@maitask/pdf-parser",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Extract Info metadata and uncompressed text operators from PDF bytes",
   "main": "index.js",
   "types": "index.d.ts",
@@ -66,6 +66,28 @@
           "元数据",
           "Adobe"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "base64": {
+            "type": "string",
+            "title": "Base64",
+            "default": "JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAyMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL0xlbmd0aCA1NSA+PgpzdHJlYW0KQlQKNzIgMTIwIFRkCihIZWxsbyBNYWl0YXNrKSBUagpFVAplbmRzdHJlYW0KZW5kb2JqCjUgMCBvYmoKPDwgL1RpdGxlIChTYW1wbGUgRG9jdW1lbnQpIC9BdXRob3IgKE1haXRhc2spID4+CmVuZG9iagp0cmFpbGVyCjw8IC9Sb290IDEgMCBSIC9JbmZvIDUgMCBSIC9TaXplIDYgPj4KJSVFT0YK"
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "maxTextLength": {
+            "type": "integer",
+            "title": "Max Text Length",
+            "default": 20000
+          }
+        }
       }
     }
   }

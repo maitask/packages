@@ -1,6 +1,6 @@
 {
   "name": "@maitask/json-transformer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "JSONPath query and data transformation",
   "main": "index.js",
   "types": "index.d.ts",
@@ -64,6 +64,35 @@
           "映射",
           "数据清洗"
         ]
+      }
+    },
+    "schemas": {
+      "options": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "title": "Operation",
+            "default": "filter"
+          },
+          "condition": {
+            "type": "object",
+            "title": "Condition",
+            "properties": {
+              "age": {
+                "type": "object",
+                "title": "Age",
+                "properties": {
+                  "$gte": {
+                    "type": "integer",
+                    "title": "$gte",
+                    "default": 30
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     }
   }

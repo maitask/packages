@@ -59,7 +59,7 @@ async function execute(input = {}, options = {}, context = {}) {
                     validated_at: new Date().toISOString(),
                     validation_mode: config.validation_mode,
                     schema_source: config.schema_url ? 'url' : 'inline',
-                    version: '0.1.0'
+                    version: '0.1.1'
                 }
             };
         }
@@ -82,7 +82,7 @@ async function execute(input = {}, options = {}, context = {}) {
                 validated_at: new Date().toISOString(),
                 validation_mode: config.validation_mode,
                 schema_source: config.schema_url ? 'url' : 'inline',
-                version: '0.1.0'
+                version: '0.1.1'
             }
         };
 
@@ -98,7 +98,7 @@ async function execute(input = {}, options = {}, context = {}) {
             metadata: {
                 package: '@maitask/data-validator',
                 validated_at: new Date().toISOString(),
-                version: '0.1.0'
+                version: '0.1.1'
             }
         };
     }

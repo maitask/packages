@@ -1,6 +1,6 @@
 {
   "name": "@maitask/cf-proxy",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Validated read-only transport for GitHub resources and container registry content",
   "main": "index.js",
   "types": "index.d.ts",
@@ -69,6 +69,82 @@
           "Registry",
           "安全"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "default": "https://registry-1.docker.io/v2/library/ubuntu/manifests/latest",
+            "format": "uri"
+          },
+          "method": {
+            "type": "string",
+            "title": "Method",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE",
+              "HEAD"
+            ],
+            "default": "GET"
+          },
+          "headers": {
+            "type": "object",
+            "title": "Headers",
+            "properties": {
+              "Accept": {
+                "type": "string",
+                "title": "Accept",
+                "default": "application/vnd.oci.image.manifest.v1+json"
+              }
+            },
+            "x-advanced": true
+          },
+          "config": {
+            "type": "object",
+            "title": "Config",
+            "properties": {
+              "restrictPaths": {
+                "type": "boolean",
+                "title": "Restrict Paths",
+                "default": true
+              },
+              "allowedPaths": {
+                "type": "array",
+                "title": "Allowed Paths",
+                "items": {
+                  "type": "string",
+                  "title": "Allowed Paths",
+                  "default": "/v2/library"
+                }
+              },
+              "maxRedirects": {
+                "type": "integer",
+                "title": "Max Redirects",
+                "default": 4,
+                "x-advanced": true
+              },
+              "timeoutMs": {
+                "type": "integer",
+                "title": "Timeout Ms",
+                "default": 30000,
+                "x-advanced": true
+              },
+              "maxResponseBytes": {
+                "type": "integer",
+                "title": "Max Response Bytes",
+                "default": 8388608,
+                "x-advanced": true
+              }
+            }
+          }
+        }
       }
     }
   }

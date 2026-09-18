@@ -4,7 +4,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/email-sender';
-const PACKAGE_VERSION = '1.0.0';
+const PACKAGE_VERSION = '1.0.1';
 const CONTRACT_VERSION = '2026-07-11';
 const DEFAULT_TIMEOUT_MS = 30_000;
 const DEFAULT_MAX_RESPONSE_BYTES = 64 * 1024;

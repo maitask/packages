@@ -1631,7 +1631,7 @@ test('slack applies formal defaults to string task content through a context sec
     hasAttachments: false
   });
   assert.equal(result.metadata.package, '@maitask/slack-notifier');
-  assert.equal(result.metadata.version, '0.1.0');
+  assert.equal(result.metadata.version, '0.1.1');
   assert.equal(result.metadata.provider, 'slack');
   assert.equal(result.metadata.responseStatus, 200);
   assert.equal(typeof result.metadata.responseTimeMs, 'number');

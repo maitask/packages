@@ -10,7 +10,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/ollama';
-const PACKAGE_VERSION = '0.1.0';
+const PACKAGE_VERSION = '0.1.1';
 const DEFAULT_BASE_URL = 'http://localhost:11434';
 
 async function execute(input = {}, options = {}, context = {}) {

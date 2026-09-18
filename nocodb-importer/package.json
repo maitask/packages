@@ -1,6 +1,6 @@
 {
   "name": "@maitask/nocodb-importer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Import data to NocoDB with authentication",
   "main": "index.js",
   "types": "index.d.ts",
@@ -45,6 +45,54 @@
           "数据同步",
           "低代码"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "title": "Content",
+            "default": "name,email,plan\nAlice,alice@example.com,Pro\nBob,bob@example.com,Free"
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "baseUrl": {
+            "type": "string",
+            "title": "Base Url",
+            "default": "https://nocodb.example.com",
+            "format": "uri"
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "format": "password"
+          },
+          "baseId": {
+            "type": "string",
+            "title": "Base Id",
+            "default": "proj_123456"
+          },
+          "tableName": {
+            "type": "string",
+            "title": "Table Name",
+            "default": "customers"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "title": "Dry Run",
+            "default": true
+          },
+          "delimiter": {
+            "type": "string",
+            "title": "Delimiter",
+            "default": ","
+          }
+        }
       }
     }
   }

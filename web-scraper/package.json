@@ -1,6 +1,6 @@
 {
   "name": "@maitask/web-scraper",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Extract data from web pages with HTML parsing, CSS selectors, and XPath queries",
   "main": "index.js",
   "types": "index.d.ts",
@@ -62,6 +62,62 @@
           "数据提取",
           "爬虫"
         ]
+      }
+    },
+    "schemas": {
+      "options": {
+        "type": "object",
+        "properties": {
+          "selectors": {
+            "type": "object",
+            "title": "Selectors",
+            "properties": {
+              "headline": {
+                "type": "string",
+                "title": "Headline",
+                "default": "article h2"
+              },
+              "summary": {
+                "type": "string",
+                "title": "Summary",
+                "default": "article p"
+              }
+            }
+          },
+          "headingLevels": {
+            "type": "array",
+            "title": "Heading Levels",
+            "items": {
+              "type": "string",
+              "title": "Heading Levels",
+              "default": "h1"
+            }
+          },
+          "linkFilters": {
+            "type": "object",
+            "title": "Link Filters",
+            "properties": {
+              "include": {
+                "type": "array",
+                "title": "Include",
+                "items": {
+                  "type": "string",
+                  "title": "Include",
+                  "default": "/news/"
+                }
+              },
+              "exclude": {
+                "type": "array",
+                "title": "Exclude",
+                "items": {
+                  "type": "string",
+                  "title": "Exclude",
+                  "default": "?utm_"
+                }
+              }
+            }
+          }
+        }
       }
     }
   }

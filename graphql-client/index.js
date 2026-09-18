@@ -57,7 +57,7 @@ async function execute(input, options = {}, context = {}) {
         metadata: {
           url,
           timestamp: new Date().toISOString(),
-          version: '0.1.0'
+          version: '0.1.1'
         }
       };
     }
@@ -72,7 +72,7 @@ async function execute(input, options = {}, context = {}) {
       metadata: {
         url,
         timestamp: new Date().toISOString(),
-        version: '0.1.0'
+        version: '0.1.1'
       }
     };
   } catch (error) {
@@ -202,7 +202,7 @@ function buildError(error, code, type) {
     },
     metadata: {
       timestamp: new Date().toISOString(),
-      version: '0.1.0'
+      version: '0.1.1'
     }
   };
 }

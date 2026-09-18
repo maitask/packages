@@ -1,6 +1,6 @@
 {
   "name": "@maitask/slack-notifier",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Send notifications and messages to Slack channels via incoming webhooks",
   "main": "index.js",
   "types": "index.d.ts",
@@ -66,6 +66,130 @@
           "告警",
           "机器人"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "default": "Deployment succeeded :rocket:"
+          },
+          "blocks": {
+            "type": "array",
+            "title": "Blocks",
+            "items": {
+              "type": "object",
+              "title": "Blocks",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "title": "Type",
+                  "default": "section"
+                },
+                "text": {
+                  "type": "object",
+                  "title": "Text",
+                  "properties": {
+                    "type": {
+                      "type": "string",
+                      "title": "Type",
+                      "default": "mrkdwn"
+                    },
+                    "text": {
+                      "type": "string",
+                      "title": "Text",
+                      "default": "*Service:* api-gateway\n*Version:* 1.4.2"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "attachments": {
+            "type": "array",
+            "title": "Attachments",
+            "items": {
+              "type": "object",
+              "title": "Attachments",
+              "properties": {
+                "color": {
+                  "type": "string",
+                  "title": "Color",
+                  "default": "#36C5F0"
+                },
+                "fields": {
+                  "type": "array",
+                  "title": "Fields",
+                  "items": {
+                    "type": "object",
+                    "title": "Fields",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "title": "Title",
+                        "default": "Environment"
+                      },
+                      "value": {
+                        "type": "string",
+                        "title": "Value",
+                        "default": "production"
+                      },
+                      "short": {
+                        "type": "boolean",
+                        "title": "Short",
+                        "default": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "channel": {
+            "type": "string",
+            "title": "Channel",
+            "default": "#deployments"
+          },
+          "username": {
+            "type": "string",
+            "title": "Username",
+            "default": "Maitask Bot"
+          },
+          "threadTs": {
+            "type": "string",
+            "title": "Thread Ts",
+            "default": "1700000000.000001"
+          },
+          "iconEmoji": {
+            "type": "string",
+            "title": "Icon Emoji",
+            "default": ":rocket:"
+          },
+          "linkNames": {
+            "type": "boolean",
+            "title": "Link Names",
+            "default": true
+          },
+          "mrkdwn": {
+            "type": "boolean",
+            "title": "Mrkdwn",
+            "default": true
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout Ms",
+            "default": 30000,
+            "x-advanced": true
+          }
+        }
       }
     }
   }

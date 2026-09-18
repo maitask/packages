@@ -7,7 +7,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/pdf-parser';
-const PACKAGE_VERSION = '0.1.0';
+const PACKAGE_VERSION = '0.1.1';
 const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
 const INFO_KEYS = ['Title', 'Author', 'Subject', 'Creator', 'Producer', 'CreationDate', 'ModDate'];
 

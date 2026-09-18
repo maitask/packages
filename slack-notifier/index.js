@@ -7,7 +7,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/slack-notifier';
-const PACKAGE_VERSION = '0.1.0';
+const PACKAGE_VERSION = '0.1.1';
 const DEFAULT_TIMEOUT_MS = 30000;
 const MAX_TIMEOUT_MS = 120000;
 const MAX_PROVIDER_NORMALIZATION_PASSES = 4;

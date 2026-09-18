@@ -132,7 +132,7 @@ test('web-search reports upstream request failures as structured failures', asyn
   assert.equal(result.error.code, 'WEB_SEARCH_ERROR');
   assert.equal(result.error.type, 'WebSearchRequestError');
   assert.match(result.error.message, /status 503/);
-  assert.equal(result.metadata.version, '0.1.1');
+  assert.equal(result.metadata.version, '0.1.2');
 });
 
 test('graphql-client executes queries against a fixture endpoint', async t => {

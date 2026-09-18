@@ -45,7 +45,7 @@ function execute(input, options = {}, context = {}) {
                 package: '@maitask/markdown-renderer',
                 length: result.length,
                 timestamp: new Date().toISOString(),
-                version: '0.1.0'
+                version: '0.1.1'
             }
         };
     } catch (error) {
@@ -59,7 +59,7 @@ function execute(input, options = {}, context = {}) {
             metadata: {
                 package: '@maitask/markdown-renderer',
                 timestamp: new Date().toISOString(),
-                version: '0.1.0'
+                version: '0.1.1'
             }
         };
     }

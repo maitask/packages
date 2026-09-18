@@ -1,6 +1,6 @@
 {
   "name": "@maitask/trader",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Deterministic market analysis, simulation, paper execution, and controlled exchange trading",
   "main": "index.js",
   "types": "index.d.ts",
@@ -60,6 +60,54 @@
           "模拟交易",
           "交易所"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "title": "Action",
+            "default": "marketSnapshot"
+          },
+          "symbol": {
+            "type": "string",
+            "title": "Symbol",
+            "default": "BTCUSDT"
+          },
+          "interval": {
+            "type": "string",
+            "title": "Interval",
+            "default": "5m"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "default": 120
+          },
+          "exchange": {
+            "type": "object",
+            "title": "Exchange",
+            "properties": {
+              "provider": {
+                "type": "string",
+                "title": "Provider",
+                "default": "binance"
+              },
+              "market": {
+                "type": "string",
+                "title": "Market",
+                "default": "spot"
+              },
+              "environment": {
+                "type": "string",
+                "title": "Environment",
+                "default": "testnet"
+              }
+            }
+          }
+        }
       }
     }
   }

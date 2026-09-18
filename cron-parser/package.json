@@ -1,6 +1,6 @@
 {
   "name": "@maitask/cron-parser",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Cron expression parser and scheduler",
   "main": "index.js",
   "types": "index.d.ts",
@@ -62,6 +62,38 @@
           "定时",
           "自动化"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "expression": {
+            "type": "string",
+            "title": "Expression",
+            "default": "0 */6 * * 1-5"
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "title": "Operation",
+            "default": "next"
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "default": 3
+          },
+          "from": {
+            "type": "string",
+            "title": "From",
+            "default": "2025-01-01T08:00:00Z"
+          }
+        }
       }
     }
   }

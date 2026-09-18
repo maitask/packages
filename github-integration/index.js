@@ -4,7 +4,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/github-integration';
-const PACKAGE_VERSION = '1.0.0';
+const PACKAGE_VERSION = '1.0.1';
 const DEFAULT_BASE_URL = 'https://api.github.com';
 const DEFAULT_TIMEOUT_MS = 30000;
 const DEFAULT_MAX_RESPONSE_BYTES = 4 * 1024 * 1024;

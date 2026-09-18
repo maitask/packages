@@ -1,6 +1,6 @@
 {
   "name": "@maitask/ollama",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Ollama local AI models integration for Maitask",
   "main": "index.js",
   "types": "index.d.ts",
@@ -47,6 +47,65 @@
           "Llama",
           "私有化"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "default": "llama3.2"
+          },
+          "messages": {
+            "type": "array",
+            "title": "Messages",
+            "items": {
+              "type": "object",
+              "title": "Messages",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "title": "Role",
+                  "default": "system"
+                },
+                "content": {
+                  "type": "string",
+                  "title": "Content",
+                  "default": "You are a concise assistant."
+                }
+              }
+            }
+          },
+          "stream": {
+            "type": "boolean",
+            "title": "Stream",
+            "default": false
+          },
+          "temperature": {
+            "type": "number",
+            "title": "Temperature",
+            "default": 0.7,
+            "x-advanced": true
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "baseUrl": {
+            "type": "string",
+            "title": "Base Url",
+            "default": "http://localhost:11434",
+            "format": "uri"
+          },
+          "openaiCompat": {
+            "type": "boolean",
+            "title": "Openai Compat",
+            "default": false
+          }
+        }
       }
     }
   }

@@ -30,7 +30,7 @@ async function execute(input, options = {}, context = {}) {
       data: resultData,
       metadata: {
         timestamp: new Date().toISOString(),
-        version: '0.1.0'
+        version: '0.1.1'
       }
     };
   } catch (error) {
@@ -900,7 +900,7 @@ function buildError(error, code, type) {
     },
     metadata: {
       timestamp: new Date().toISOString(),
-      version: '0.1.0'
+      version: '0.1.1'
     }
   };
 }

@@ -1,6 +1,6 @@
 {
   "name": "@maitask/gemini",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Google Gemini AI models integration for Maitask",
   "main": "index.js",
   "types": "index.d.ts",
@@ -47,6 +47,45 @@
           "聊天",
           "多模态"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "default": "gemini-2.5-flash"
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "default": "Generate three launch ideas for a developer tooling newsletter."
+          },
+          "temperature": {
+            "type": "number",
+            "title": "Temperature",
+            "default": 0.7,
+            "x-advanced": true
+          },
+          "maxOutputTokens": {
+            "type": "integer",
+            "title": "Max Output Tokens",
+            "default": 512,
+            "x-advanced": true
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": "string",
+            "title": "Api Key",
+            "format": "password"
+          }
+        }
       }
     }
   }

@@ -1,6 +1,6 @@
 {
   "name": "@maitask/image-generator",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "AI image generation using DALL-E or Stable Diffusion",
   "main": "index.js",
   "type": "commonjs",
@@ -46,6 +46,38 @@
           "视觉",
           "图片"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "prompt": {
+            "type": "string",
+            "title": "Prompt",
+            "default": "A minimalistic poster of a robotic crane at sunset"
+          },
+          "provider": {
+            "type": "string",
+            "title": "Provider",
+            "default": "openai"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "default": "dall-e-3"
+          },
+          "size": {
+            "type": "string",
+            "title": "Size",
+            "default": "1024x1024"
+          },
+          "apiKey": {
+            "type": "string",
+            "title": "Api Key",
+            "format": "password"
+          }
+        }
       }
     }
   }

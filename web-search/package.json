@@ -1,6 +1,6 @@
 {
   "name": "@maitask/web-search",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Search the web using multiple search engines",
   "main": "index.js",
   "types": "index.d.ts",
@@ -45,6 +45,49 @@
           "检索",
           "信息收集"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "title": "Query",
+            "default": "Artificial intelligence trends 2025"
+          },
+          "engine": {
+            "type": "string",
+            "title": "Engine",
+            "enum": [
+              "duckduckgo",
+              "bing",
+              "google"
+            ],
+            "default": "duckduckgo"
+          },
+          "limit": {
+            "type": "integer",
+            "title": "Limit",
+            "default": 5
+          },
+          "page": {
+            "type": "integer",
+            "title": "Page",
+            "default": 1,
+            "x-advanced": true
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "default": "en"
+          },
+          "includeSnippets": {
+            "type": "boolean",
+            "title": "Include Snippets",
+            "default": true
+          }
+        }
       }
     }
   }

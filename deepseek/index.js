@@ -10,7 +10,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/deepseek';
-const PACKAGE_VERSION = '0.1.0';
+const PACKAGE_VERSION = '0.1.1';
 const DEFAULT_API_BASE_URL = 'https://api.deepseek.com';
 
 async function execute(input = {}, options = {}, context = {}) {

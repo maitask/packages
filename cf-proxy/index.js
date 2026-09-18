@@ -4,7 +4,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/cf-proxy';
-const PACKAGE_VERSION = '0.1.0';
+const PACKAGE_VERSION = '0.1.1';
 
 const DEFAULT_ALLOWED_HOSTS = Object.freeze([
   'quay.io',

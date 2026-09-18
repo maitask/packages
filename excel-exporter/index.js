@@ -59,7 +59,7 @@ function execute(input, options = {}, context = {}) {
             },
             metadata: {
                 package: '@maitask/excel-exporter',
-                version: '0.1.0',
+                version: '0.1.1',
                 exportedAt: new Date().toISOString()
             }
         };
@@ -73,7 +73,7 @@ function execute(input, options = {}, context = {}) {
             },
             metadata: {
                 exportedAt: new Date().toISOString(),
-                version: '0.1.0'
+                version: '0.1.1'
             }
         };
     }

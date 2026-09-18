@@ -1,6 +1,6 @@
 {
   "name": "@maitask/stream-publisher",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Publish NDJSON or SSE event streams to an HTTPS endpoint",
   "main": "index.js",
   "types": "index.d.ts",
@@ -70,6 +70,34 @@
           "实时",
           "NDJSON"
         ]
+      }
+    },
+    "schemas": {
+      "options": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "default": "https://events.example.com/ingest",
+            "format": "uri"
+          },
+          "mode": {
+            "type": "string",
+            "title": "Mode",
+            "default": "sse"
+          },
+          "event_name": {
+            "type": "string",
+            "title": "Event name",
+            "default": "maitask-event"
+          },
+          "tokenSecret": {
+            "type": "string",
+            "title": "Token Secret",
+            "format": "password"
+          }
+        }
       }
     }
   }

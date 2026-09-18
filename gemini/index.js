@@ -10,7 +10,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/gemini';
-const PACKAGE_VERSION = '0.1.0';
+const PACKAGE_VERSION = '0.1.1';
 const DEFAULT_API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 async function execute(input = {}, options = {}, context = {}) {

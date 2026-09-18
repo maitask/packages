@@ -1,6 +1,6 @@
 {
   "name": "@maitask/markdown-renderer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Markdown to HTML converter with template support",
   "main": "index.js",
   "types": "index.d.ts",
@@ -62,6 +62,33 @@
           "模板",
           "文档"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "default": "# Release Notes\n\n- Added CSV parser support\n- Improved Playground package examples\n\n```bash\nmaitask run @maitask/csv-parser --input data.csv\n```"
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "format": {
+            "type": "string",
+            "title": "Format",
+            "default": "html"
+          },
+          "template": {
+            "type": "string",
+            "title": "Template",
+            "default": "<article class=\"prose\">{{content}}</article>"
+          }
+        }
       }
     }
   }

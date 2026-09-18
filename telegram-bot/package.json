@@ -1,6 +1,6 @@
 {
   "name": "@maitask/telegram-bot",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Send messages to Telegram users and groups via Bot API",
   "main": "index.js",
   "types": "index.d.ts",
@@ -62,6 +62,60 @@
           "Bot API",
           "群组"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "default": "Hello from Maitask! 🚀"
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "chatId": {
+            "type": "string",
+            "title": "Chat Id",
+            "default": "@maitask_updates"
+          },
+          "messageType": {
+            "type": "string",
+            "title": "Message Type",
+            "enum": [
+              "text",
+              "markdown",
+              "html"
+            ],
+            "default": "text"
+          },
+          "parseMode": {
+            "type": "string",
+            "title": "Parse Mode",
+            "enum": [
+              "Markdown",
+              "HTML",
+              "MarkdownV2",
+              "None"
+            ],
+            "default": "Markdown"
+          },
+          "disableNotification": {
+            "type": "boolean",
+            "title": "Disable Notification",
+            "default": false
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout Ms",
+            "default": 30000,
+            "x-advanced": true
+          }
+        }
       }
     }
   }

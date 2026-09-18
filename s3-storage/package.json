@@ -1,6 +1,6 @@
 {
   "name": "@maitask/s3-storage",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Upload, download, or delete objects through presigned S3 URLs",
   "main": "index.js",
   "type": "commonjs",
@@ -46,6 +46,35 @@
           "下载",
           "对象存储"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "title": "Operation",
+            "default": "upload"
+          },
+          "presignedUrl": {
+            "type": "string",
+            "title": "Presigned Url",
+            "default": "https://bucket.s3.amazonaws.com/path/file.txt?...",
+            "format": "uri"
+          },
+          "body": {
+            "type": "string",
+            "title": "Body",
+            "default": "hello world"
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout Ms",
+            "default": 30000,
+            "x-advanced": true
+          }
+        }
       }
     }
   }

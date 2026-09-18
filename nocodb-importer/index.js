@@ -47,7 +47,7 @@ async function execute(input, options, context) {
                 },
                 metadata: {
                     package: '@maitask/nocodb-importer',
-                    version: '0.1.0',
+                    version: '0.1.1',
                     provider: 'nocodb',
                     tableName: config.tableName,
                     timestamp: new Date().toISOString()
@@ -73,7 +73,7 @@ async function execute(input, options, context) {
             },
             metadata: {
                 package: '@maitask/nocodb-importer',
-                version: '0.1.0',
+                version: '0.1.1',
                 provider: 'nocodb',
                 tableName: config.tableName,
                 timestamp: new Date().toISOString()
@@ -89,7 +89,7 @@ async function execute(input, options, context) {
             },
             metadata: {
                 package: '@maitask/nocodb-importer',
-                version: '0.1.0',
+                version: '0.1.1',
                 provider: 'nocodb',
                 timestamp: new Date().toISOString()
             }

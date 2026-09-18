@@ -1,6 +1,6 @@
 {
   "name": "@maitask/email-sender",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Credential-confined SendGrid and Mailgun delivery with safe templates and exact attachments",
   "main": "index.js",
   "types": "index.d.ts",
@@ -66,6 +66,155 @@
           "模板",
           "消息"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider",
+            "default": "sendgrid"
+          },
+          "from": {
+            "type": "object",
+            "title": "From",
+            "properties": {
+              "email": {
+                "type": "string",
+                "title": "Email",
+                "default": "reports@maitask.com"
+              },
+              "name": {
+                "type": "string",
+                "title": "Name",
+                "default": "Maitask Reports"
+              }
+            }
+          },
+          "to": {
+            "type": "array",
+            "title": "To",
+            "items": {
+              "type": "object",
+              "title": "To",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "title": "Email",
+                  "default": "product-team@example.com"
+                },
+                "name": {
+                  "type": "string",
+                  "title": "Name",
+                  "default": "Product Team"
+                }
+              }
+            }
+          },
+          "subject": {
+            "type": "string",
+            "title": "Subject",
+            "default": "Weekly Product Update"
+          },
+          "template": {
+            "type": "object",
+            "title": "Template",
+            "properties": {
+              "text": {
+                "type": "string",
+                "title": "Text",
+                "default": "{{title}}\n\n{{summary}}\nActive users: {{metrics.activeUsers}}\nNew signups: {{metrics.newSignups}}\nChurn: {{metrics.churn}}"
+              },
+              "html": {
+                "type": "string",
+                "title": "Html",
+                "default": "<h1>{{title}}</h1><p>{{summary}}</p><ul><li>Active users: {{metrics.activeUsers}}</li><li>New signups: {{metrics.newSignups}}</li><li>Churn: {{metrics.churn}}</li></ul>"
+              },
+              "variables": {
+                "type": "object",
+                "title": "Variables",
+                "properties": {
+                  "title": {
+                    "type": "string",
+                    "title": "Title",
+                    "default": "Product Metrics - Week 42"
+                  },
+                  "summary": {
+                    "type": "string",
+                    "title": "Summary",
+                    "default": "Active users increased 8% and churn dropped to 1.4%."
+                  },
+                  "metrics": {
+                    "type": "object",
+                    "title": "Metrics",
+                    "properties": {
+                      "activeUsers": {
+                        "type": "string",
+                        "title": "Active Users",
+                        "default": "12,540"
+                      },
+                      "newSignups": {
+                        "type": "string",
+                        "title": "New Signups",
+                        "default": "1,102"
+                      },
+                      "churn": {
+                        "type": "string",
+                        "title": "Churn",
+                        "default": "1.4%"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "tags": {
+            "type": "array",
+            "title": "Tags",
+            "items": {
+              "type": "string",
+              "title": "Tags",
+              "default": "production"
+            }
+          },
+          "metadata": {
+            "type": "object",
+            "title": "Metadata",
+            "properties": {
+              "workflowId": {
+                "type": "string",
+                "title": "Workflow Id",
+                "default": "weekly-product-report"
+              }
+            },
+            "x-advanced": true
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "apiKeySecret": {
+            "type": "string",
+            "title": "Api Key Secret",
+            "format": "password"
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout Ms",
+            "default": 30000,
+            "x-advanced": true
+          },
+          "maxResponseBytes": {
+            "type": "integer",
+            "title": "Max Response Bytes",
+            "default": 65536,
+            "x-advanced": true
+          }
+        }
       }
     }
   }

@@ -1,6 +1,6 @@
 {
   "name": "@maitask/yaml-converter",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "YAML to JSON bidirectional converter",
   "main": "index.js",
   "types": "index.d.ts",
@@ -62,6 +62,23 @@
           "序列化",
           "配置"
         ]
+      }
+    },
+    "schemas": {
+      "options": {
+        "type": "object",
+        "properties": {
+          "direction": {
+            "type": "string",
+            "title": "Direction",
+            "default": "yaml-to-json"
+          },
+          "indent": {
+            "type": "integer",
+            "title": "Indent",
+            "default": 2
+          }
+        }
       }
     }
   }

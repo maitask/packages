@@ -10,7 +10,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/claude';
-const PACKAGE_VERSION = '0.1.0';
+const PACKAGE_VERSION = '0.1.1';
 const DEFAULT_API_BASE_URL = 'https://api.anthropic.com/v1';
 const API_VERSION = '2023-06-01';
 

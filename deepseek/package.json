@@ -1,6 +1,6 @@
 {
   "name": "@maitask/deepseek",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "DeepSeek AI models integration for Maitask",
   "main": "index.js",
   "types": "index.d.ts",
@@ -47,6 +47,60 @@
           "推理",
           "文本生成"
         ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "default": "deepseek-chat"
+          },
+          "messages": {
+            "type": "array",
+            "title": "Messages",
+            "items": {
+              "type": "object",
+              "title": "Messages",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "title": "Role",
+                  "default": "system"
+                },
+                "content": {
+                  "type": "string",
+                  "title": "Content",
+                  "default": "You are a precise financial research assistant."
+                }
+              }
+            }
+          },
+          "temperature": {
+            "type": "number",
+            "title": "Temperature",
+            "default": 0.6,
+            "x-advanced": true
+          },
+          "max_tokens": {
+            "type": "integer",
+            "title": "Max tokens",
+            "default": 800,
+            "x-advanced": true
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": "string",
+            "title": "Api Key",
+            "format": "password"
+          }
+        }
       }
     }
   }

@@ -5,7 +5,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/telegram-bot';
-const PACKAGE_VERSION = '0.1.0';
+const PACKAGE_VERSION = '0.1.1';
 const DEFAULT_BASE_URL = 'https://api.telegram.org';
 const DEFAULT_TIMEOUT_MS = 30000;
 const MAX_TIMEOUT_MS = 120000;
