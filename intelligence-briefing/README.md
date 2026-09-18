@@ -2,7 +2,7 @@
 
 Generate a published Hacker News Daily or a source-backed briefing with filtering, OpenAI-compatible analysis, translation, and channel-neutral output.
 
-When AI writing is enabled, the package fails instead of publishing an extractive stub. Set `output.product` to `hacker_news_daily` for the dated daily digest. The published `message` is reader-facing copy with source URLs and without execution status, generation time, or signal-strength labels.
+When AI writing is enabled, the package fails instead of publishing an extractive stub. Set `output.product` to `hacker_news_daily` for the dated daily digest. The published `message` is the reader-facing article: dated title, short lede, numbered stories, and source URLs. It does not include execution status, generation time, signal-strength labels, or AI-availability notices.
 
 ## Features
 

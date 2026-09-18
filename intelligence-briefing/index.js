@@ -8,7 +8,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/intelligence-briefing';
-const PACKAGE_VERSION = '0.1.7';
+const PACKAGE_VERSION = '0.1.8';
 const CONTRACT_VERSION = '2026-06-27';
 
 async function execute(input = {}, options = {}, context = {}) {
@@ -631,7 +631,7 @@ function buildAnalysisMessages(stories, config) {
     'Forecasts must be framed as scenarios, not guarantees.',
     'Investment, trading, legal, and policy statements must be informational, not advice.',
     isDaily
-      ? 'The message field is the published article. Write formal news prose. Do not mention AI, models, analysis availability, signal strength, status, or generation time. Do not use template labels such as 分析, 影响, 预测, 信号强度, Signal, Analysis, or Watchlist in the message. Each story must include its source URL as 来源：URL or Source: URL. Start with the dated title.'
+      ? 'The message field is the published newspaper article. Write formal news prose in the target language. Do not mention AI, models, analysis availability, signal strength, status, or generation time. Do not use template labels such as 分析, 影响, 预测, 信号强度, Signal, Analysis, or Watchlist. Do not open with 今日的主要信号, 观察, or 要点. Each story must include its source URL as 来源：URL or Source: URL. Start with the dated title, then a short lede, then numbered stories.'
       : 'The message field is the published channel version in the target language.'
   ].join(' ');
 
@@ -779,11 +779,11 @@ function emptyBriefing(config) {
 
 function finalizePublishedMessage(briefing, stories, config) {
   let message = stripPublicationNoise(stringValue(briefing.message));
-  if (!message) {
+  if (!message || looksLikeTemplateCopy(message) || config.output.product === 'hacker_news_daily') {
     message = composeFormalDaily(briefing, stories, config);
   }
   message = ensureSources(message, stories, config);
-  return truncate(message, config.output.maxCharacters);
+  return truncate(stripPublicationNoise(message), config.output.maxCharacters);
 }
 
 function stripPublicationNoise(message) {
@@ -794,7 +794,9 @@ function stripPublicationNoise(message) {
     /^\s*(状态|Status)\s*[:：]/i,
     /^\s*(生成时间|Generated(?: at)?)\s*[:：]/i,
     /^\s*(信号强度|Signal(?: strength)?)\s*[:：]/i,
+    /^\s*(分析|影响|预测|观察|要点|Watchlist|Analysis|Impact|Forecast)\s*[:：]/i,
     /信号强度/,
+    /今日的主要信号/,
     /需要\s*AI\s*分析/,
     /AI 分析暂不可用/,
     /as an AI\b/i
@@ -807,21 +809,60 @@ function stripPublicationNoise(message) {
     .trim();
 }
 
-function composeFormalDaily(briefing, stories, config) {
+function looksLikeTemplateCopy(message) {
+  return [
+    /需要\s*AI\s*分析/,
+    /AI 分析暂不可用/,
+    /as an AI\b/i,
+    /信号强度/,
+    /今日的主要信号/,
+    /^\s*(状态|Status|生成时间|Generated(?: at)?)\s*[:：]/m,
+    /^\s*(分析|影响|预测|观察|要点|Watchlist|Signal|Analysis|Impact|Forecast)\s*[:：]/m
+  ].some(pattern => pattern.test(message));
+}
+
+function publishedProse(text) {
+  return stringValue(text)
+    .replace(/^(分析|影响|预测|观察|要点|Watchlist|Signal(?: strength)?|Analysis|Impact|Forecast)\s*[:：]\s*/i, '')
+    .replace(/信号强度\s*[:：]\s*\S+/g, '')
+    .replace(/今日的主要信号是\s*[:：]?\s*/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function publishedTitle(briefing, config) {
+  const title = publishedProse(briefing.title);
+  if (
+    !title ||
+    /maitask/i.test(title) ||
+    /intelligence briefing/i.test(title) ||
+    /情报简报/.test(title)
+  ) {
+    return defaultTitle(config);
+  }
+  return title;
+}
+
+function sourceMarker(config) {
   const labels = labelsFor(config.analysis.targetLanguage);
-  const lines = [briefing.title || defaultTitle(config)];
-  if (briefing.summary) {
-    lines.push('', briefing.summary);
+  const lang = stringValue(config.analysis.targetLanguage).toLowerCase();
+  return lang === 'zh' || lang.startsWith('zh-') ? `${labels.source}：` : `${labels.source}: `;
+}
+
+function composeFormalDaily(briefing, stories, config) {
+  const lines = [publishedTitle(briefing, config)];
+  const summary = publishedProse(briefing.summary);
+  if (summary) {
+    lines.push('', summary);
   }
 
   const items = briefing.items || [];
   stories.forEach((story, index) => {
     const insight = items.find(item => item.id === story.key) || items[index] || {};
-    const title = stringValue(insight.title || story.title);
-    const body = [insight.analysis, insight.impact]
-      .map(stringValue)
-      .filter(Boolean)
-      .join('');
+    const title = publishedProse(insight.title || story.title);
+    const body = publishedProse(
+      [insight.analysis, insight.impact].map(stringValue).filter(Boolean).join(' ')
+    );
     lines.push('');
     lines.push(`${index + 1}. ${title}`);
     if (body) {
@@ -830,7 +871,7 @@ function composeFormalDaily(briefing, stories, config) {
       lines.push(truncate(story.text, 180));
     }
     if (config.output.includeSources && story.url) {
-      lines.push(`${labels.source}: ${story.url}`);
+      lines.push(`${sourceMarker(config)}${story.url}`);
     }
   });
 
@@ -844,8 +885,9 @@ function ensureSources(message, stories, config) {
   if (withUrl.every(story => message.includes(story.url))) return message;
 
   const labels = labelsFor(config.analysis.targetLanguage);
+  const marker = sourceMarker(config);
   const block = withUrl
-    .map((story, index) => `${index + 1}. ${story.title} ${story.url}`)
+    .map((story, index) => `${index + 1}. ${story.title}\n${marker}${story.url}`)
     .join('\n');
   return `${message.trim()}\n\n${labels.sources}\n${block}`;
 }

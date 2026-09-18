@@ -364,6 +364,118 @@ test('intelligence-briefing generates a fixture-backed AI briefing', async t => 
   assert.equal(result.citations.length, 2);
 });
 
+test('intelligence-briefing publishes formal Daily copy with source URLs', async t => {
+  const server = await createFixtureServer(url => {
+    const routes = {
+      '/v0/topstories.json': [1001, 1002],
+      '/v0/item/1001.json': {
+        id: 1001,
+        type: 'story',
+        title: 'Database engine improves analytical query latency',
+        by: 'maintainer',
+        score: 180,
+        time: 1783555200,
+        descendants: 42,
+        url: 'https://example.com/database-latency'
+      },
+      '/v0/item/1002.json': {
+        id: 1002,
+        type: 'story',
+        title: 'AI infrastructure reporting proposal',
+        by: 'policywatch',
+        score: 95,
+        time: 1783558800,
+        descendants: 25,
+        url: 'https://example.com/ai-policy'
+      },
+      '/v1/chat/completions': {
+        id: 'chatcmpl-daily',
+        object: 'chat.completion',
+        model: 'fixture-intelligence',
+        choices: [
+          {
+            index: 0,
+            finish_reason: 'stop',
+            message: {
+              role: 'assistant',
+              content: JSON.stringify({
+                title: 'Maitask Intelligence Briefing',
+                summary: '今日的主要信号是：数据库引擎与监管披露同时升温。',
+                items: [
+                  {
+                    id: 'hackernews:1001',
+                    title: '数据库延迟改善',
+                    signal: 'high',
+                    analysis: '存储引擎更新降低了分析型负载的写入放大。',
+                    impact: '数据平台的单位查询成本有望下降。'
+                  },
+                  {
+                    id: 'hackernews:1002',
+                    title: 'AI 基础设施报告',
+                    signal: 'medium',
+                    analysis: '披露规则将提高大型模型服务商的合规成本。',
+                    impact: '容量规划和事故通报会进入公开文本。'
+                  }
+                ],
+                message:
+                  'Maitask Intelligence Briefing\n状态: 成功\n生成时间: 2026-09-18T09:52:47Z\n信号强度：高\n需要 AI 分析\n1. 数据库延迟改善'
+              })
+            }
+          }
+        ]
+      }
+    };
+
+    const body = routes[url.pathname];
+    return body === undefined ? null : { body };
+  });
+  t.after(() => server.close());
+
+  const result = await executeIntelligenceBriefing(
+    {
+      sources: [
+        {
+          type: 'hackernews',
+          storyTypes: ['top'],
+          limit: 2,
+          apiBaseUrl: `${server.url}/v0`
+        }
+      ],
+      analysis: {
+        profile: 'forecast',
+        targetLanguage: 'zh-CN'
+      },
+      selection: {
+        maxItems: 2,
+        minScore: 1
+      },
+      output: {
+        product: 'hacker_news_daily',
+        includeSources: true,
+        maxCharacters: 2000
+      }
+    },
+    {
+      apiKey: 'fixture-key',
+      baseUrl: `${server.url}/v1`,
+      model: 'fixture-intelligence'
+    }
+  );
+
+  assert.equal(result.success, true);
+  const published = result.metadata.channel_message;
+  assert.match(published, /^Hacker News 日报 · \d{4}-\d{2}-\d{2}/);
+  assert.match(published, /来源：https:\/\/example.com\/database-latency/);
+  assert.match(published, /来源：https:\/\/example.com\/ai-policy/);
+  assert.match(published, /存储引擎更新降低了分析型负载的写入放大/);
+  assert.doesNotMatch(published, /Maitask Intelligence Briefing/);
+  assert.doesNotMatch(published, /状态/);
+  assert.doesNotMatch(published, /生成时间/);
+  assert.doesNotMatch(published, /信号强度/);
+  assert.doesNotMatch(published, /今日的主要信号/);
+  assert.doesNotMatch(published, /需要\s*AI\s*分析/);
+});
+
 test('intelligence-briefing fails closed when the AI provider is unavailable', async t => {
   const server = await createFixtureServer(url => {
     if (url.pathname === '/v0/topstories.json') {

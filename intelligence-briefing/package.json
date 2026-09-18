@@ -1,6 +1,6 @@
 {
   "name": "@maitask/intelligence-briefing",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "Generate published Hacker News Daily and source-backed briefings with OpenAI-compatible analysis",
   "main": "index.js",
   "types": "index.d.ts",
