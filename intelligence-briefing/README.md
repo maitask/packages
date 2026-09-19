@@ -61,6 +61,7 @@ The package produces the briefing. Plane user adapters deliver it to Telegram, D
     "seen": []
   },
   "output": {
+    "product": "hacker_news_daily",
     "format": "channel_message",
     "maxCharacters": 3500,
     "includeSources": true
@@ -137,14 +138,13 @@ Adapter configuration:
 {
   "bot_token": "telegram-bot-token",
   "chat_id": "-1000000000000",
-  "parse_mode": "none",
+  "parse_mode": "HTML",
   "disable_web_page_preview": true,
-  "include_result": true,
-  "max_chars": 3900
+  "include_result": true
 }
 ```
 
-In a workflow, connect the `@maitask/intelligence-briefing` node to an Adapter node that references the saved Telegram adapter.
+Leave `include_execution_header` unset or `false`. Plane sends `metadata.channel_message` and omits adapter title, status, and generated time. In a workflow, connect the Daily node to an Adapter node that references the saved Telegram adapter.
 
 ## Return Envelope
 
@@ -195,7 +195,9 @@ In a workflow, connect the `@maitask/intelligence-briefing` node to an Adapter n
   "metadata": {
     "contract_version": "2026-06-27",
     "package": "@maitask/intelligence-briefing",
-    "version": "0.1.2"
+    "version": "0.1.8",
+    "product": "hacker_news_daily",
+    "channel_message": "published article"
   },
   "citations": []
 }
@@ -203,7 +205,7 @@ In a workflow, connect the `@maitask/intelligence-briefing` node to an Adapter n
 
 ## Notes
 
+- Item `metadata.signal` is internal ranking metadata. It is not part of the published channel article.
 - The `extractive` provider is available for deterministic smoke tests and no-key previews.
-- Use OpenAI-compatible analysis for production translation, impact assessment, and forecast profiles.
-- Set source `timeoutMs` and `retries` for live network sources that may return transient transport failures.
+- Use OpenAI-compatible analysis for production Daily copy. The package fails closed when that provider is unavailable.
 - The package does not store Telegram, DingTalk, Feishu, Discord, or Slack credentials.
