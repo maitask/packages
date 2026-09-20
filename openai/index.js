@@ -10,7 +10,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/openai';
-const PACKAGE_VERSION = '0.1.2';
+const PACKAGE_VERSION = '0.1.1';
 const DEFAULT_API_BASE_URL = 'https://api.openai.com/v1';
 
 async function execute(input = {}, options = {}, context = {}) {

@@ -32,5 +32,8 @@ Thank you for helping improve the official Maitask package collection. All contr
 - Reference the tracking issue and outline testing performed.
 - Use concise, formal English commit message subjects and bodies that match the code change. Do not use `fix:`, `feat:`, or other Conventional Commit prefixes unless repository tooling requires them.
 - A maintainer will review, run additional checks, and publish through `scripts/publish_to_plane.sh` so registry metadata and tarball storage remain consistent.
+- New or bumped official packages must be published to production Plane before
+  the release gate. The production matrix searches the public catalog and does
+  not upload `@maitask/*` packages.
 
 You can reach the maintainers at `team@maitask.com` for coordination around major releases.

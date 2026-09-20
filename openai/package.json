@@ -1,6 +1,6 @@
 {
   "name": "@maitask/openai",
-  "version": "0.1.2",
+  "version": "0.1.1",
   "description": "OpenAI GPT models integration for Maitask",
   "main": "index.js",
   "types": "index.d.ts",

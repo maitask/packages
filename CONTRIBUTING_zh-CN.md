@@ -31,5 +31,6 @@
 - 关联 issue，并说明测试范围与结果。
 - 提交 message/body 必须使用简洁、正式且符合代码改动内容的英文。除非仓库工具强制要求，不使用 `fix:`、`feat:` 或其它 Conventional Commit 前缀。
 - 维护者会进行复核、补充测试，并通过 `scripts/publish_to_plane.sh` 发布，确保 registry 元数据与 tarball 存储保持一致。
+- 新增或升版的官方包必须先发布到生产 Plane，再跑发布门禁。生产矩阵只检索公开目录，不会自行上传 `@maitask/*` 包。
 
 如需协调重大版本发布，可通过 `team@maitask.com` 联系维护团队。

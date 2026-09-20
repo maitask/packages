@@ -6,7 +6,7 @@
 
 ## AI & Cognitive Services (8)
 
-- [**@maitask/openai**](./openai) `v0.1.2` — OpenAI GPT models integration for Maitask
+- [**@maitask/openai**](./openai) `v0.1.1` — OpenAI GPT models integration for Maitask
 - [**@maitask/claude**](./claude) `v0.1.1` — Anthropic Claude models integration with streaming support
 - [**@maitask/gemini**](./gemini) `v0.1.1` — Google Gemini multimodal models integration
 - [**@maitask/deepseek**](./deepseek) `v0.1.1` — DeepSeek reasoning models integration
