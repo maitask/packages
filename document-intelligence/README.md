@@ -1,5 +1,7 @@
 # @maitask/document-intelligence
 
+[English](README.md) | [中文](README_zh-CN.md)
+
 Summarize, classify, or extract structured fields from documents. The package
 calls an OpenAI-compatible Chat Completions endpoint, fails closed when the
 model or credentials are missing, and returns sourced published copy.

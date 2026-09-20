@@ -1,5 +1,7 @@
 # @maitask/workflow-composer
 
+[English](README.md) | [中文](README_zh-CN.md)
+
 Generate a reviewable Maitask workflow graph from a natural-language
 description and the official package catalog. Plane calls this package from
 `POST /workflows/drafts`. The result is not a live workflow until a person

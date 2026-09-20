@@ -78,6 +78,11 @@ export interface ExecuteResult {
         timestamp: string;
         version: string;
         model?: string;
+        usage?: UsageInfo & {
+            prompt_tokens: number;
+            completion_tokens: number;
+            total_tokens: number;
+        };
     };
 }
 
