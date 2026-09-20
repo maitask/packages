@@ -148,6 +148,9 @@ Failure output:
 - Package-specific statistics belong in `data.summary.metrics`.
 - Package-specific per-item diagnostics belong in `item.metadata`.
 - Execution and delivery metadata belongs in top-level `metadata`.
+- Model token usage belongs in `metadata.usage` and may be mirrored under
+  `data.usage`. Plane credits settlement reads the first matching usage object
+  and does not sum nested copies.
 - Source references belong in top-level `citations`, and items may point to them through `citation_ids`.
 - Public consumers must not depend on package-specific top-level aliases such as `result`, `rows`, `repositories`, `message`, `parser`, or `statistics`.
 - Runtime enforces this contract at the execution boundary. Plane, adapters, and the frontend consume only the standard output.

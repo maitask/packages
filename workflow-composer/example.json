@@ -1,0 +1,28 @@
+{
+  "name": "Research and deliver",
+  "description": "Generate a workflow that searches, writes sourced copy, and waits for an adapter.",
+  "input": {
+    "description": "Search recent web sources, write a sourced briefing, and send it through a saved adapter.",
+    "language": "zh-CN",
+    "catalog": [
+      {
+        "name": "@maitask/web-search",
+        "version": "0.1.2",
+        "description": "Search the web using multiple search engines",
+        "category": "Web & API Integration",
+        "input_fields": ["query", "engine", "limit"]
+      },
+      {
+        "name": "@maitask/document-intelligence",
+        "version": "1.0.0",
+        "description": "Summarize, classify, or extract structured fields",
+        "category": "AI & Cognitive Services",
+        "input_fields": ["text", "documents"]
+      }
+    ]
+  },
+  "options": {
+    "model": "gpt-5.5",
+    "language": "zh-CN"
+  }
+}

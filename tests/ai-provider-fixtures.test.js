@@ -56,6 +56,14 @@ test('openai uses a controlled chat completions endpoint', async t => {
     completionTokens: 4,
     totalTokens: 7
   });
+  assert.deepEqual(result.metadata.usage, {
+    prompt_tokens: 3,
+    completion_tokens: 4,
+    total_tokens: 7,
+    promptTokens: 3,
+    completionTokens: 4,
+    totalTokens: 7
+  });
 });
 
 test('claude uses the Runtime base URL environment fallback', async t => {

@@ -10,7 +10,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/openai';
-const PACKAGE_VERSION = '0.1.1';
+const PACKAGE_VERSION = '0.1.2';
 const DEFAULT_API_BASE_URL = 'https://api.openai.com/v1';
 
 async function execute(input = {}, options = {}, context = {}) {
@@ -345,6 +345,10 @@ async function buildApiError(code, fallbackMessage, response, cfg) {
 }
 
 function buildSuccess(data, cfg) {
+  const usage = normalizeUsage(data?.usage);
+  if (data && typeof data === 'object' && data.usage == null && usage) {
+    data.usage = usage;
+  }
   return {
     success: true,
     data,
@@ -353,8 +357,33 @@ function buildSuccess(data, cfg) {
       version: PACKAGE_VERSION,
       provider: 'openai',
       model: cfg.model,
+      usage,
       timestamp: new Date().toISOString()
     }
+  };
+}
+
+function normalizeUsage(usage) {
+  if (!usage || typeof usage !== 'object') {
+    return {
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0
+    };
+  }
+  const promptTokens = Number(usage.prompt_tokens || usage.promptTokens || 0);
+  const completionTokens = Number(usage.completion_tokens || usage.completionTokens || 0);
+  const totalTokens = Number(usage.total_tokens || usage.totalTokens || promptTokens + completionTokens);
+  return {
+    prompt_tokens: promptTokens,
+    completion_tokens: completionTokens,
+    total_tokens: totalTokens,
+    promptTokens,
+    completionTokens,
+    totalTokens
   };
 }
 

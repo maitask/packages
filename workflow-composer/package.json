@@ -1,0 +1,111 @@
+{
+  "name": "@maitask/workflow-composer",
+  "version": "1.0.0",
+  "description": "Generate a reviewable Maitask workflow graph from a description and the official package catalog",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "commonjs",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "keywords": [
+    "maitask",
+    "workflow",
+    "composer",
+    "draft",
+    "ai"
+  ],
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "example.json"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "Workflow Composer",
+  "category": "AI & Cognitive Services",
+  "maitask": {
+    "locales": {
+      "en": {
+        "display_name": "Workflow Composer",
+        "description": "Generate a reviewable Maitask workflow graph from a description and the official package catalog.",
+        "category": "AI & Cognitive Services",
+        "keywords": [
+          "maitask",
+          "workflow",
+          "composer",
+          "draft",
+          "ai"
+        ]
+      },
+      "zh": {
+        "display_name": "工作流草稿",
+        "description": "根据自然语言描述和官方包目录生成可审阅的工作流图，需人工确认后创建。",
+        "category": "AI 与认知服务",
+        "keywords": [
+          "工作流",
+          "草稿",
+          "生成",
+          "AI",
+          "编排"
+        ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "description": {
+            "type": "string",
+            "title": "Description"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "enum": ["zh-CN", "en"],
+            "default": "zh-CN"
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "apiKey": {
+            "type": "string",
+            "title": "API key",
+            "format": "password"
+          },
+          "baseUrl": {
+            "type": "string",
+            "title": "API base URL",
+            "format": "uri"
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "default": "gpt-5.5"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "enum": ["zh-CN", "en"],
+            "default": "zh-CN"
+          },
+          "temperature": {
+            "type": "number",
+            "title": "Temperature",
+            "minimum": 0,
+            "maximum": 2,
+            "x-advanced": true
+          },
+          "maxTokens": {
+            "type": "integer",
+            "title": "Max tokens",
+            "x-advanced": true
+          }
+        }
+      }
+    }
+  }
+}

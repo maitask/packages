@@ -1,0 +1,40 @@
+{
+  "examples": [
+    {
+      "name": "Summarize sourced documents",
+      "description": "Produce a publishable summary with source links.",
+      "input": {
+        "documents": [
+          {
+            "title": "Runtime isolation",
+            "text": "Managed Runtime workers execute packages as native processes. Network access is limited to destinations declared by the package.",
+            "url": "https://maitask.com/docs/runtime"
+          }
+        ]
+      },
+      "options": {
+        "task": "summarize",
+        "language": "zh-CN",
+        "ai": {
+          "model": "gpt-5.5"
+        },
+        "output": {
+          "includeSources": true,
+          "maxCharacters": 2000
+        }
+      }
+    },
+    {
+      "name": "Classify a document",
+      "input": {
+        "title": "Incident report",
+        "text": "The worker failed to reach the configured API endpoint and retried until the node timeout."
+      },
+      "options": {
+        "task": "classify",
+        "language": "en",
+        "labels": ["operations", "billing", "product"]
+      }
+    }
+  ]
+}

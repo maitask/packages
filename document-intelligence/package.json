@@ -1,0 +1,163 @@
+{
+  "name": "@maitask/document-intelligence",
+  "version": "1.0.0",
+  "description": "Summarize, classify, or extract structured fields from documents with sourced, fail-closed model output",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "type": "commonjs",
+  "author": "Maitask Team <team@maitask.com>",
+  "license": "MIT",
+  "keywords": [
+    "maitask",
+    "ai",
+    "summarize",
+    "classify",
+    "extract",
+    "documents"
+  ],
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "example.json"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "display_name": "Document Intelligence",
+  "category": "AI & Cognitive Services",
+  "maitask": {
+    "locales": {
+      "en": {
+        "display_name": "Document Intelligence",
+        "description": "Summarize, classify, or extract structured fields from documents with sourced, fail-closed model output.",
+        "category": "AI & Cognitive Services",
+        "keywords": [
+          "maitask",
+          "ai",
+          "summarize",
+          "classify",
+          "extract",
+          "documents"
+        ]
+      },
+      "zh": {
+        "display_name": "文档智能",
+        "description": "对文档进行摘要、分类或结构化抽取，输出带来源引用，模型失败即终止。",
+        "category": "AI 与认知服务",
+        "keywords": [
+          "文档",
+          "摘要",
+          "分类",
+          "抽取",
+          "AI",
+          "来源"
+        ]
+      }
+    },
+    "schemas": {
+      "input": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text"
+          },
+          "title": {
+            "type": "string",
+            "title": "Title"
+          },
+          "documents": {
+            "type": "array",
+            "title": "Documents",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": { "type": "string", "title": "Title" },
+                "text": { "type": "string", "title": "Text" },
+                "url": { "type": "string", "title": "URL" }
+              }
+            }
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "task": {
+            "type": "string",
+            "title": "Task",
+            "enum": ["summarize", "classify", "extract"],
+            "default": "summarize"
+          },
+          "language": {
+            "type": "string",
+            "title": "Language",
+            "enum": ["zh-CN", "en"],
+            "default": "zh-CN"
+          },
+          "labels": {
+            "type": "array",
+            "title": "Labels",
+            "items": { "type": "string" },
+            "x-advanced": true
+          },
+          "schema": {
+            "type": "object",
+            "title": "Extraction schema",
+            "x-advanced": true
+          },
+          "ai": {
+            "type": "object",
+            "title": "AI",
+            "properties": {
+              "apiKey": {
+                "type": "string",
+                "title": "API key",
+                "format": "password"
+              },
+              "baseUrl": {
+                "type": "string",
+                "title": "API base URL",
+                "format": "uri"
+              },
+              "model": {
+                "type": "string",
+                "title": "Model",
+                "default": "gpt-5.5"
+              },
+              "temperature": {
+                "type": "number",
+                "title": "Temperature",
+                "minimum": 0,
+                "maximum": 2,
+                "x-advanced": true
+              },
+              "maxTokens": {
+                "type": "integer",
+                "title": "Max tokens",
+                "x-advanced": true
+              }
+            }
+          },
+          "output": {
+            "type": "object",
+            "title": "Output",
+            "properties": {
+              "includeSources": {
+                "type": "boolean",
+                "title": "Include source links",
+                "default": true
+              },
+              "maxCharacters": {
+                "type": "integer",
+                "title": "Maximum length",
+                "x-advanced": true
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
