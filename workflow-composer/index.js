@@ -423,7 +423,7 @@ async function requestWithRetry(url, init, timeoutMs, retries) {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await fetch(url, { ...init, signal: controller.signal });
+      const response = await fetch(url, { ...init, signal: controller.signal, timeoutMs });
       if (response.ok || attempt >= retries || (response.status < 500 && ![408, 409, 425, 429].includes(response.status))) {
         return response;
       }

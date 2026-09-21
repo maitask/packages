@@ -79,7 +79,9 @@ For OpenAI-compatible providers:
   "baseUrl": "https://provider.example.com/v1",
   "model": "provider-model",
   "temperature": 0.2,
-  "maxTokens": 1800
+  "maxTokens": 1800,
+  "timeoutMs": 60000,
+  "retries": 2
 }
 ```
 

@@ -336,7 +336,7 @@ async function requestWithRetry(url, init, timeoutMs, retries) {
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
-      const response = await fetch(url, { ...init, signal: controller.signal });
+      const response = await fetch(url, { ...init, signal: controller.signal, timeoutMs });
       if (response.ok || !shouldRetryStatus(response.status) || attempt >= retries) {
         return response;
       }

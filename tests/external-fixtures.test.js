@@ -520,7 +520,8 @@ test('intelligence-briefing fails closed when the AI provider is unavailable', a
     {
       apiKey: 'fixture-key',
       baseUrl: `${server.url}/v1`,
-      model: 'fixture-intelligence'
+      model: 'fixture-intelligence',
+      retries: 0
     }
   );
 
@@ -550,8 +551,8 @@ test('intelligence-briefing uses Runtime fetch without abort timers', async t =>
     throw new Error('Runtime fetch path must not create timeout timers');
   };
   globalThis.clearTimeout = () => {};
-  globalThis.fetch = async url => {
-    requested.push(String(url));
+  globalThis.fetch = async (url, init = {}) => {
+    requested.push({ url: String(url), timeoutMs: init.timeoutMs });
     const path = new URL(String(url)).pathname;
     const routes = {
       '/v0/topstories.json': [1001, 1002],
@@ -611,6 +612,7 @@ test('intelligence-briefing uses Runtime fetch without abort timers', async t =>
   assert.equal(result.success, true);
   assert.equal(result.data.summary.total, 2);
   assert.equal(requested.length, 3);
+  assert.ok(requested.every(entry => Number(entry.timeoutMs) > 0));
 });
 
 test('intelligence-briefing consumes upstream Hacker News output and filters seen items', async () => {

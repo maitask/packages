@@ -1,6 +1,6 @@
 {
   "name": "@maitask/intelligence-briefing",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "description": "Generate published Hacker News Daily and source-backed briefings with OpenAI-compatible analysis",
   "main": "index.js",
   "types": "index.d.ts",
@@ -124,6 +124,22 @@
                 "type": "string",
                 "title": "Model",
                 "default": "gpt-5.5"
+              },
+              "timeoutMs": {
+                "type": "integer",
+                "title": "Request timeout (ms)",
+                "minimum": 1000,
+                "maximum": 300000,
+                "default": 60000,
+                "x-advanced": true
+              },
+              "retries": {
+                "type": "integer",
+                "title": "Retries",
+                "minimum": 0,
+                "maximum": 5,
+                "default": 2,
+                "x-advanced": true
               },
               "temperature": {
                 "type": "number",

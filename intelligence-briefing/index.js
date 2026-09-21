@@ -8,7 +8,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/intelligence-briefing';
-const PACKAGE_VERSION = '0.1.8';
+const PACKAGE_VERSION = '0.1.9';
 const CONTRACT_VERSION = '2026-06-27';
 
 async function execute(input = {}, options = {}, context = {}) {
@@ -90,11 +90,13 @@ function buildConfig(input, options, context) {
   const dedupeInput = mergeObjects(opts.dedupe || {}, root.dedupe || {});
   const aiInput = mergeObjects(
     mergeObjects(opts.ai || {}, root.ai || {}),
-    mergeObjects(analysisInput.ai || {}, {
+    mergeObjects(analysisInput.ai || {}, compactDefined({
       apiKey: opts.apiKey || opts.api_key || root.apiKey || root.api_key,
       baseUrl: opts.baseUrl || opts.base_url || root.baseUrl || root.base_url,
-      model: opts.model || root.model
-    })
+      model: opts.model || root.model,
+      timeoutMs: firstDefined(opts.timeoutMs, opts.timeout_ms, root.timeoutMs, root.timeout_ms),
+      retries: firstDefined(opts.retries, root.retries)
+    }))
   );
 
   const targetLanguage = stringValue(
@@ -211,8 +213,13 @@ function buildConfig(input, options, context) {
       model: stringValue(aiInput.model || 'gpt-4o-mini'),
       temperature: readNumber(aiInput.temperature, 0.2),
       maxTokens: boundedInt(aiInput.maxTokens ?? aiInput.max_tokens, 1800, 200, 12000),
-      timeoutMs: boundedInt(aiInput.timeoutMs ?? aiInput.timeout_ms, 60000, 1000, 300000),
-      retries: boundedInt(aiInput.retries, 1, 0, 5),
+      timeoutMs: boundedInt(
+        firstDefined(aiInput.timeoutMs, aiInput.timeout_ms),
+        60000,
+        1000,
+        300000
+      ),
+      retries: boundedInt(firstDefined(aiInput.retries, aiInput.retry_count), 2, 0, 5),
       jsonMode: aiInput.jsonMode === true || aiInput.json_mode === true
     }
   };
@@ -590,8 +597,14 @@ async function postChatCompletion(endpoint, body, config) {
   }
 
   if (!response.ok) {
-    const message = parsed?.error?.message || parsed?.message || text || response.statusText;
-    throw new Error(`AI provider request failed with status ${response.status}: ${message}`);
+    const host = requestHost(endpoint);
+    const message =
+      parsed?.error?.message ||
+      parsed?.message ||
+      (typeof parsed?.error === 'string' ? parsed.error : '') ||
+      truncate(text, 180) ||
+      response.statusText;
+    throw new Error(`AI provider ${host} returned HTTP ${response.status}: ${message}`);
   }
 
   const content = parsed?.choices?.[0]?.message?.content;
@@ -1055,30 +1068,87 @@ async function requestWithRetry(url, init, timeoutMs, retries) {
       }
       retryAfterMs = readRetryAfter(response.headers);
     } catch (error) {
-      if (attempt >= maxRetries) throw error;
+      const classified = classifyFetchError(url, timeoutMs, error);
+      if (!classified.retryable || attempt >= maxRetries) {
+        throw decorateAttemptError(classified, attempt, maxRetries);
+      }
+    }
+    if (attempt >= maxRetries) {
+      break;
     }
     await sleep(retryDelayMs(attempt, retryAfterMs));
     attempt += 1;
   }
+  throw new Error(`Request to ${requestHost(url)} failed after ${maxRetries + 1} attempts`);
 }
 
 async function fetchWithTimeout(url, init, timeoutMs) {
   if (usesMaitaskRuntimeFetch()) {
-    return await fetch(url, init);
+    return await fetch(url, { ...init, timeoutMs });
   }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...init, signal: controller.signal });
+    return await fetch(url, { ...init, signal: controller.signal, timeoutMs });
   } catch (error) {
-    if (error?.name === 'AbortError') {
-      throw new Error(`Request timed out after ${timeoutMs}ms`);
-    }
-    throw error;
+    throw classifyFetchError(url, timeoutMs, error);
   } finally {
     clearTimeout(timer);
   }
+}
+
+function classifyFetchError(url, timeoutMs, error) {
+  const message = error instanceof Error ? error.message : String(error);
+  const host = requestHost(url);
+  const timedOut = error?.name === 'AbortError' || /timed out/i.test(message);
+  const wrapped = new Error(
+    timedOut
+      ? `Request to ${host} timed out after ${timeoutMs}ms`
+      : `Request to ${host} failed: ${message}`
+  );
+  wrapped.name = timedOut ? 'AbortError' : error?.name || 'Error';
+  wrapped.retryable = timedOut || isRetryableNetworkMessage(message);
+  wrapped.cause = error;
+  return wrapped;
+}
+
+function decorateAttemptError(error, attempt, maxRetries) {
+  const tries = attempt + 1;
+  if (tries <= 1) {
+    return error;
+  }
+  error.message = `${error.message} after ${tries} of ${maxRetries + 1} attempts`;
+  return error;
+}
+
+function requestHost(url) {
+  try {
+    return new URL(String(url)).host || String(url);
+  } catch {
+    return String(url);
+  }
+}
+
+function isRetryableNetworkMessage(message) {
+  return /timed out|error sending request|could not connect|failed to fetch|network|econnreset|enotfound|temporarily unavailable/i.test(
+    String(message)
+  );
+}
+
+function firstDefined(...values) {
+  for (const value of values) {
+    if (value !== undefined && value !== null && value !== '') {
+      return value;
+    }
+  }
+  return undefined;
+}
+
+function compactDefined(value) {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entry]) => entry !== undefined && entry !== null && entry !== '')
+  );
 }
 
 function profileInstruction(profile) {
