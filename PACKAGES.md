@@ -11,7 +11,7 @@
 - [**@maitask/gemini**](./gemini) `v0.1.1` — Google Gemini multimodal models integration
 - [**@maitask/deepseek**](./deepseek) `v0.1.1` — DeepSeek reasoning models integration
 - [**@maitask/ollama**](./ollama) `v0.1.1` — Local Ollama models execution bridge
-- [**@maitask/intelligence-briefing**](./intelligence-briefing) `v0.1.9` — Generate a published Hacker News Daily or source-backed briefing with OpenAI-compatible analysis
+- [**@maitask/intelligence-briefing**](./intelligence-briefing) `v0.1.10` — Generate a published Hacker News Daily or source-backed briefing with OpenAI-compatible analysis
 - [**@maitask/document-intelligence**](./document-intelligence) `v1.0.0` — Summarize, classify, or extract structured fields from documents with sourced, fail-closed model output
 - [**@maitask/workflow-composer**](./workflow-composer) `v1.0.0` — Generate a reviewable workflow graph from a description and the official package catalog
 

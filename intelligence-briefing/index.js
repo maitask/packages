@@ -8,7 +8,7 @@
  */
 
 const PACKAGE_NAME = '@maitask/intelligence-briefing';
-const PACKAGE_VERSION = '0.1.9';
+const PACKAGE_VERSION = '0.1.10';
 const CONTRACT_VERSION = '2026-06-27';
 
 async function execute(input = {}, options = {}, context = {}) {
@@ -220,7 +220,7 @@ function buildConfig(input, options, context) {
         300000
       ),
       retries: boundedInt(firstDefined(aiInput.retries, aiInput.retry_count), 2, 0, 5),
-      jsonMode: aiInput.jsonMode === true || aiInput.json_mode === true
+      jsonMode: aiInput.jsonMode !== false && aiInput.json_mode !== false
     }
   };
 }
@@ -541,8 +541,10 @@ async function generateBriefing(stories, config) {
 
   const aiResult = await requestOpenAiCompatible(stories, config);
   const briefing = normalizeAiBriefing(aiResult, stories, config);
-  if (!briefing.provider.parsed || !stringValue(briefing.message)) {
-    throw new Error('AI provider returned a briefing that could not be published');
+  if (!stringValue(briefing.message) && !briefing.items.length && !stringValue(briefing.summary)) {
+    throw new Error(
+      `AI model ${config.ai.model} returned copy that could not be published`
+    );
   }
   return briefing;
 }
@@ -690,13 +692,14 @@ function buildAnalysisMessages(stories, config) {
 function normalizeAiBriefing(aiResult, stories, config) {
   const parsed = parseJsonObject(aiResult.content);
   if (!parsed) {
+    const raw = stringValue(aiResult.content).trim();
     return {
       title: defaultTitle(config),
       profile: config.analysis.profile,
       language: config.analysis.targetLanguage,
       summary: '',
       items: [],
-      message: '',
+      message: raw,
       provider: {
         model: aiResult.model,
         usage: aiResult.usage,
@@ -1455,22 +1458,27 @@ function decodeEntities(value) {
 }
 
 function parseJsonObject(text) {
-  try {
-    const parsed = JSON.parse(text);
-    return isPlainObject(parsed) ? parsed : null;
-  } catch {
-    const start = text.indexOf('{');
-    const end = text.lastIndexOf('}');
-    if (start >= 0 && end > start) {
-      try {
-        const parsed = JSON.parse(text.slice(start, end + 1));
-        return isPlainObject(parsed) ? parsed : null;
-      } catch {
-        return null;
-      }
+  const trimmed = String(text || '').trim();
+  if (!trimmed) return null;
+  const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced ? fenced[1].trim() : trimmed;
+  for (const value of [candidate, extractJsonObject(candidate)]) {
+    if (!value) continue;
+    try {
+      const parsed = JSON.parse(value);
+      if (isPlainObject(parsed)) return parsed;
+    } catch {
+      // Try the next candidate.
     }
-    return null;
   }
+  return null;
+}
+
+function extractJsonObject(text) {
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  return text.slice(start, end + 1);
 }
 
 function truncate(value, max) {
