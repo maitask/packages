@@ -127,7 +127,7 @@ JSON values must be finite, acyclic JSON data with standard or null prototypes a
 await execute({
   url: 'https://api.example.com/v1/text',
   method: 'PUT',
-  text: 'Maitask production payload 🚀',
+  text: 'Maitask production payload',
   responseType: 'text',
   retry: { maxAttempts: 1 }
 });
@@ -324,21 +324,10 @@ Failure results intentionally omit provider response bodies. To inspect a known 
 
 For exact binary and multipart request bodies, the package calls the Maitask Runtime HTTP operation with canonical `bodyBase64`. Runtime must decode those bytes without UTF-8 conversion and must reject requests that supply both `body` and `bodyBase64`. Responses must contain canonical `bodyBase64` and a matching `bodyBytes` count. Node-compatible execution sends the same bytes through fetch.
 
-## Version 2 migration
+## Input Exclusions
 
-Version 2 deliberately removes the permissive version 1 surface:
+The package accepts only the documented camelCase contract above and intentionally rejects legacy or non-serializable forms (`params`, `data`, raw `body`, `timeout`, `response_type`, `validate_status`, `retries`, executable functions, literal auth strings, `$SECRET` placeholders, `Blob`, `ArrayBuffer`, `FormData`, `URLSearchParams`, and binary/retry ambiguity).
 
-- String input becomes `{ url }`.
-- `params` becomes `query`; `data` and raw `body` become one explicit body representation.
-- `timeout`, `response_type`, `validate_status`, `retries`, and every snake_case alias are removed.
-- Executable `validateStatus` functions are replaced by serializable `acceptedStatuses` or `acceptedStatusRange`.
-- Literal auth strings and `$SECRET` substitution are replaced by named secret references.
-- `Blob`, `ArrayBuffer`, `FormData`, and `URLSearchParams` inputs are replaced by serializable text, Base64, form, and multipart contracts.
-- `blob` and `arraybuffer` response modes are replaced by canonical Base64 plus an exact byte count.
-- Retry count becomes total `maxAttempts`, and write-method replay is prohibited.
+## Verification Scope
 
-The package provides no compatibility aliases because accepting ambiguous legacy fields would reintroduce unverified behavior and credential leakage paths.
-
-## Deterministic verification
-
-The mandatory package suite uses loopback fixtures for request bodies, authentication, redirects, retries, timeouts, response limits, strict parsing, exact bytes, and adversarial object/header inputs. It does not require a live third-party service. Live endpoint checks may be used only as optional diagnostics.
+`npm test` covers request bodies, authentication, redirects, retries, timeouts, response limits, strict parsing, exact bytes, and adversarial inputs against controlled loopback fixtures. Live endpoint checks are optional diagnostics.

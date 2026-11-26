@@ -233,22 +233,26 @@ const result = execute(rawData, {
 
 ## Output Format
 
-```javascript
+```json
 {
-  success: true,
-  operation: "transform",
-  result: [...],  // Processed data
-  metadata: {
-    operation: "transform",
-    inputCount: 10,
-    outputCount: 8,
-    steps: [...],   // Processing steps applied
-    fields: [...],  // Available fields in result
-    executedAt: "2023-01-15T10:30:00.000Z",
-    version: "0.1.1"
+  "success": true,
+  "data": {
+    "operation": "transform",
+    "result": [...]
+  },
+  "metadata": {
+    "package": "@maitask/file-processor",
+    "operation": "transform",
+    "inputCount": 10,
+    "outputCount": 8,
+    "steps": [],
+    "executedAt": "2026-01-15T10:30:00.000Z",
+    "version": "0.1.1"
   }
 }
 ```
+
+Failure responses return `{ "success": false, "error": { "message": "...", "code": "...", "type": "..." }, "metadata": { ... } }`.
 
 ## Advanced Examples
 
@@ -382,34 +386,3 @@ try {
 ## Requirements
 
 - Node.js >= 18.0.0
-- Maitask Engine >= 1.0.0
-
-## License
-
-MIT © Maitask Team
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Add comprehensive tests
-4. Submit a pull request
-
-## Changelog
-
-### 0.1.0
-
-- Initial release
-- Data transformation engine
-- Advanced filtering capabilities
-- Aggregation operations
-- Multi-step processing pipelines
-- Preprocessing utilities
-- Comprehensive type system
-
-## Response Contract
-
-The package now returns a unified envelope:
-
-- Success: `{ success: true, data: { operation, result }, metadata: {...} }`
-- Failure: `{ success: false, error: { message, code, type }, metadata: {...} }`

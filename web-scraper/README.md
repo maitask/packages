@@ -141,78 +141,59 @@ Supported XPath patterns:
 ## Return Value
 
 Success response:
-```javascript
+
+```json
 {
   "success": true,
   "data": {
-    "total": 1,
-    "success_count": 1,
-    "failure_count": 0,
-    "results": [
+    "items": [
       {
-        "url": "https://example.com",
-        "label": null,
-        "status": 200,
-        "success": true,
-        "title": "Page Title",
-        "meta": {
-          "description": "Page description",
-          "keywords": "keyword1, keyword2",
-          "author": "Author Name"
+        "index": 0,
+        "id": "https://example.com",
+        "data": {
+          "url": "https://example.com",
+          "label": null,
+          "status": 200,
+          "success": true,
+          "title": "Page Title",
+          "meta": {
+            "description": "Page description",
+            "keywords": "keyword1, keyword2",
+            "author": "Author Name"
+          },
+          "headings": [
+            { "level": "h1", "text": "Main Heading" }
+          ],
+          "links": [
+            { "href": "https://example.com/page", "text": "Link text" }
+          ],
+          "patterns": [],
+          "customData": {},
+          "fetchedAt": "2026-01-01T00:00:00.000Z"
         },
-        "headings": [
-          { "level": "h1", "text": "Main Heading" },
-          { "level": "h2", "text": "Subheading" }
-        ],
-        "links": [
-          { "href": "https://example.com/page", "text": "Link text" }
-        ],
-        "patterns": [
-          {
-            "name": "email",
-            "matches": ["contact@example.com", "info@example.com"]
-          }
-        ],
-        "customData": {
-          "mainTitle": ["Welcome to Example"],
-          "prices": ["$19.99", "$29.99"],
-          "ratings": ["4.5", "4.8"]
-        },
-        "fetchedAt": "2025-10-05T10:30:00.000Z"
+        "metadata": { "status": 200, "success": true }
       }
-    ]
+    ],
+    "summary": {
+      "total": 1,
+      "success_count": 1,
+      "failure_count": 0
+    }
   },
+  "error": null,
   "metadata": {
+    "contract_version": "2026-06-27",
     "package": "@maitask/web-scraper",
     "version": "0.1.1",
-    "timestamp": "2025-10-05T10:30:00.000Z"
-  }
+    "execution_id": null,
+    "execution_ms": 42,
+    "timestamp": "2026-01-01T00:00:00.000Z"
+  },
+  "citations": []
 }
 ```
 
-Error response (for individual URL):
-```javascript
-{
-  "success": true,
-  "data": {
-    "total": 1,
-    "success_count": 0,
-    "failure_count": 1,
-    "results": [
-      {
-        "url": "https://example.com",
-        "success": false,
-        "error": "Request failed"
-      }
-    ]
-  },
-  "metadata": {
-    "package": "@maitask/web-scraper",
-    "version": "0.1.1",
-    "timestamp": "2025-10-05T10:30:00.000Z"
-  }
-}
-```
+Failure responses set `success: false` with `error: { message, code, type, details }` and per-target failures recorded inside `data.items`.
 
 ## XPath Examples
 
@@ -253,13 +234,3 @@ Error response (for individual URL):
   }
 }
 ```
-
-## License
-
-MIT
-## Response Contract (Current)
-
-The package uses a standardized envelope:
-
-- Success: `{ success: true, data: { total, success_count, failure_count, results }, metadata: {...} }`
-- Failure: `{ success: false, error: { message, code, type }, metadata: {...} }`

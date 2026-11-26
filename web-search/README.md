@@ -130,13 +130,13 @@ Search the web using multiple search engines.
 ## Return Value
 
 Success response:
-```javascript
+
+```json
 {
   "success": true,
-  "message": "Found X results for 'query'",
   "data": {
     "query": "search query",
-    "engine": "search engine used",
+    "engine": "duckduckgo",
     "page": 1,
     "offset": 0,
     "limit": 10,
@@ -148,13 +148,16 @@ Success response:
         "url": "https://example.com",
         "domain": "example.com",
         "snippet": "Description text...",
-        "searchEngine": "google"
+        "searchEngine": "duckduckgo"
       }
     ],
-    "fetchedAt": "2025-01-27T10:30:00.000Z"
+    "fetchedAt": "2026-01-01T00:00:00.000Z"
   },
   "metadata": {
-    "sourceUrl": "original search URL"
+    "package": "@maitask/web-search",
+    "version": "0.1.2",
+    "sourceUrl": "original search URL",
+    "timestamp": "2026-01-01T00:00:00.000Z"
   },
   "pagination": {
     "currentPage": 1,
@@ -165,12 +168,13 @@ Success response:
 }
 ```
 
-Error response:
-```javascript
+Search request failures return a structured failure response:
+
+```json
 {
   "success": false,
   "error": {
-    "message": "DuckDuckGo search request failed: Request to ... failed with status 503",
+    "message": "DuckDuckGo search request failed: status 503",
     "code": "WEB_SEARCH_ERROR",
     "type": "WebSearchRequestError"
   },
@@ -181,12 +185,5 @@ Error response:
   }
 }
 ```
-## Response Contract (Current)
 
-The package uses a standardized envelope:
-
-- Success: `{ success: true, data: {...}, metadata: {...}, pagination }`
-- Failure: `{ success: false, error: { message, code, type }, metadata: {...} }`
-
-Search request failures return a structured failure response. A valid search
-response that contains no organic results remains a successful empty result.
+A valid HTTP search response containing zero organic results remains a successful empty result.

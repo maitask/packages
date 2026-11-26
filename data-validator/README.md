@@ -406,44 +406,6 @@ const validationResult = execute(csvResult.rows, {
 });
 ```
 
-### With File Processor
-
-```javascript
-// Transform then validate
-const processed = fileProcessor.execute(rawData, {
-  operation: "transform",
-  transformRules: { ... }
-});
-
-const validated = execute(processed.result, {
-  schema: outputSchema
-});
-```
-
 ## Requirements
 
 - Node.js >= 18.0.0
-- Maitask Engine >= 1.0.0
-
-## License
-
-MIT © Maitask Team
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Add comprehensive tests
-4. Submit a pull request
-
-## Changelog
-
-### 0.1.0
-
-- Initial release
-- JSON Schema validation support
-- Custom validation rules engine
-- Data quality analysis
-- Multiple validation modes
-- Comprehensive error reporting
-- Batch processing capabilities

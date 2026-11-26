@@ -75,10 +75,9 @@ Crawl and extract stories from Hacker News using official API v0.
 
 Success response:
 
-```javascript
+```json
 {
   "success": true,
-  "message": "Successfully fetched stories from Hacker News",
   "data": {
     "storyType": "top",
     "totalStories": 2,
@@ -93,13 +92,14 @@ Success response:
         "commentCount": 45,
         "type": "story",
         "text": "Story text if applicable",
-        "tags": ["tag1", "tag2"],
-        "original": { /* Raw hacker news API response */ },
-        "comments": [ /* Array of comment objects, if includeComments is true */ ]
+        "comments": []
       }
     ]
   },
   "metadata": {
+    "package": "@maitask/hackernews-crawler",
+    "version": "0.1.1",
+    "provider": "hackernews",
     "storyType": "top",
     "fetchedAt": "2025-01-27T10:30:00.000Z",
     "requested": 2,
@@ -108,33 +108,23 @@ Success response:
 }
 ```
 
-Each comment object:
+Each comment object includes `id`, `author`, `time`, `text`, `parent`, `deleted`, and nested `children` when `commentDepth > 1`.
 
-```javascript
-{
-  "id": 1234567,
-  "author": "author_name",
-  "time": "2025-01-27T10:30:00.000Z",
-  "text": "Comment text",
-  "parent": 123456, // Parent comment ID or story ID
-  "deleted": false,
-  "original": { /* Raw hacker news API response */ },
-  "children": [ /* Nested comment replies, if commentDepth > 1 */ ]
-}
-```
+Failure response:
 
-Error response:
-
-```javascript
+```json
 {
   "success": false,
-  "message": "Error message"
+  "error": {
+    "message": "Error details",
+    "code": "HACKERNEWS_CRAWLER_ERROR",
+    "type": "HackerNewsCrawlerError"
+  },
+  "metadata": {
+    "package": "@maitask/hackernews-crawler",
+    "version": "0.1.1",
+    "provider": "hackernews",
+    "fetchedAt": "2025-01-27T10:30:00.000Z"
+  }
 }
 ```
-
-## Response Contract (Current)
-
-The package uses a standardized envelope:
-
-- Success: `{ success: true, data: {...}, metadata: {...} }`
-- Failure: `{ success: false, error: { message, code, type }, metadata: {...} }`

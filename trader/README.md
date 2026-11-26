@@ -243,15 +243,10 @@ Before OKX placement, the package loads the formal instrument and enforces live 
 
 Errors are stable, controlled, and secret-safe. Raw provider messages are intentionally omitted.
 
-## Migration from 0.1
+## Contract Boundaries
 
-- Replace `execute`, `status`, `cancel`, and `stream` with the seven formal actions.
-- Replace kebab-case strategy names with `smaCrossover`, `rsiMeanReversion`, `momentum`, or `manual`.
-- Move all credentials and endpoint controls out of input and into trusted options or context secrets.
-- Replace `testnet: boolean` with explicit `exchange.environment`.
-- Replace merged risk/execution objects with explicit `simulation`, `paperState`, and `order` contracts.
-- Do not convert analysis recommendations into live orders. Construct a separate `placeOrder` request under explicit authority.
-- Remove leverage, stop-loss, take-profit, precision, and WebSocket fields; they did not represent complete provider operations.
-- Persist versioned paper state with position side and reserved notional fields.
+- Only the seven formal actions, formal strategy names (`smaCrossover`, `rsiMeanReversion`, `momentum`, `manual`), and explicit `exchange.environment`, `simulation`, `paperState`, and `order` objects are accepted.
+- Credentials and endpoint overrides belong strictly in `options` and `context.secrets`.
+- Analysis output never implicitly triggers live orders; live order placement requires explicit authority through `placeOrder`. Unsupported exchange/futures/streaming fields (`leverage`, `stopLoss`, `takeProfit`, WebSockets) are rejected.
 
 See `index.d.ts` for readonly action-specific contracts.

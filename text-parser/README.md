@@ -157,25 +157,3 @@ This package is designed and includes:
 ## Requirements
 
 - Node.js >= 18.0.0
-- Maitask Engine >= 1.0.0
-
-## License
-
-MIT © Maitask Team
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Add tests for new functionality
-4. Submit a pull request
-
-## Changelog
-
-### 0.1.0
-
-- Initial release
-- Plain text and Markdown parsing
-- Base64 decoding support
-- Comprehensive text statistics
-- Markdown structure extraction

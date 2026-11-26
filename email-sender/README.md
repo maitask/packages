@@ -247,19 +247,12 @@ SendGrid message IDs come only from `X-Message-Id`. Mailgun message IDs come onl
 | `EMAIL_PROVIDER` | The provider returned a non-2xx status. Only numeric status and retriable classification are exposed. |
 | `EMAIL_UPSTREAM` | Transport or successful-response validation failed without exposing arbitrary details. |
 
-## Version 1 migration
+## Contract Boundaries
 
-- `api_key`, `domain`, and `smtp_config` are removed from input. Provider policy and credentials belong in trusted options and secrets.
-- `smtp` is removed because it is not executable in managed Runtime.
-- `template_data` and built-in template names are replaced by formal `template` or `providerTemplate` objects.
-- Snake_case output and option aliases are removed.
-- Empty content no longer generates an implicit Maitask message.
-- Recipient strings become explicit address objects.
-- Provider responses and error bodies are no longer returned.
-- Retry examples are removed; the package intentionally sends each delivery once.
+- Credentials and provider policy (`apiKeySecret`, `domain`, `allowInsecureHttp`, etc.) belong strictly in `options` and `context.secrets`; `smtp` is unsupported in managed Runtime.
+- Messages require explicit `template` or `providerTemplate` contracts (or explicit text/HTML content) and structured recipient objects rather than plain strings, `template_data`, or snake_case aliases.
+- Deliveries execute once without implicit retries, and raw provider response/error bodies are discarded.
 
-No compatibility aliases remain because they would preserve ambiguous credential precedence and unverified delivery behavior.
+## Verification Scope
 
-## Deterministic verification
-
-Mandatory tests use controlled loopback fixtures and Runtime operation mocks. They do not call live SendGrid or Mailgun services. Live provider smoke checks are optional diagnostics and require separately managed test accounts and cleanup policy.
+`npm test` exercises SendGrid and Mailgun flows against controlled loopback fixtures and Runtime operation mocks; live provider smoke checks are optional diagnostics.
