@@ -13,7 +13,7 @@
 - 展示元数据统一写在 `maitask.locales.en` 与 `maitask.locales.zh` 下。如果只有一组中性展示文案，则使用扁平的 `maitask.locales.display_name`、`description`、`category`、`keywords` 作为默认兜底。
 
 ## 3. 验证清单
-- 执行 `npm install` 并确保 lint/测试通过（如项目提供脚本）。
+- 运行 `npm test` 验证完整包目录、安全加固与发布产物测试套件，以及按需运行 `npm run test:*-types` TypeScript 契约检查。
 - 运行 `npm pack` 确认最终发布产物无误。
 - 当修改包元数据或发布产物时，可使用 `scripts/publish_to_plane.sh <package-dir>` 向开发环境 Plane 做 registry 发布验证。
 - 使用 Maitask Runtime 本地测试：

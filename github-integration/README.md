@@ -150,7 +150,7 @@ Successful actions return platform-standard items and summary data:
   "error": null,
   "metadata": {
     "package": "@maitask/github-integration",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "provider": "github",
     "action": "listRepositories",
     "status": 200,

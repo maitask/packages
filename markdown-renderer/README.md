@@ -22,13 +22,13 @@ echo '# Hello\n\nThis is **bold** text.' | maitask run @maitask/markdown-rendere
 ### Plain Text Output
 
 ```bash
-echo '# Hello\n\nThis is **bold** text.' | maitask run @maitask/markdown-renderer --options '{"format":"plain"}'
+echo '# Hello\n\nThis is **bold** text.' | maitask run @maitask/markdown-renderer -c '{"format":"plain"}'
 ```
 
 ### With Template
 
 ```bash
-echo '# Title' | maitask run @maitask/markdown-renderer --options '{
+echo '# Title' | maitask run @maitask/markdown-renderer -c '{
   "template": "<!DOCTYPE html><html><head><title>{{title}}</title></head><body>{{content}}</body></html>",
   "templateVars": {"title": "My Page"}
 }'
@@ -65,7 +65,7 @@ echo '# Title' | maitask run @maitask/markdown-renderer --options '{
   "metadata": {
     "package": "@maitask/markdown-renderer",
     "length": 31,
-    "version": "0.1.0",
+    "version": "0.1.1",
     "timestamp": "2026-02-24T00:00:00.000Z"
   }
 }

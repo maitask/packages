@@ -25,7 +25,7 @@ echo '0 9 * * 1-5' | maitask run @maitask/cron-parser
 Calculate next N execution times:
 
 ```bash
-echo '0 9 * * 1-5' | maitask run @maitask/cron-parser --options '{"operation":"next","count":10}'
+echo '0 9 * * 1-5' | maitask run @maitask/cron-parser -c '{"operation":"next","count":10}'
 ```
 
 ### Validate
@@ -33,7 +33,7 @@ echo '0 9 * * 1-5' | maitask run @maitask/cron-parser --options '{"operation":"n
 Validate cron expression:
 
 ```bash
-echo '0 9 * * 1-5' | maitask run @maitask/cron-parser --options '{"operation":"validate"}'
+echo '0 9 * * 1-5' | maitask run @maitask/cron-parser -c '{"operation":"validate"}'
 ```
 
 ### Describe
@@ -41,7 +41,7 @@ echo '0 9 * * 1-5' | maitask run @maitask/cron-parser --options '{"operation":"v
 Get human-readable description:
 
 ```bash
-echo '0 9 * * 1-5' | maitask run @maitask/cron-parser --options '{"operation":"describe"}'
+echo '0 9 * * 1-5' | maitask run @maitask/cron-parser -c '{"operation":"describe"}'
 ```
 
 ## Cron Format

@@ -21,100 +21,123 @@ Import data to NocoDB with authentication.
 
 ### Optional Options
 
-- `delimiter`: CSV delimiter character (default: ,)
-- `previewRows`: Number of rows for preview (default: 5)
-- `dryRun`: Only show preview, no actual import (default: false)
-- `inferTypes`: Infer data types for columns (default: true)
-- `fallbackColumnType`: Default column type for new tables (default: SingleLineText)
+- `delimiter`: CSV delimiter character (default: `,`)
+- `previewRows`: Number of rows for preview (`1`–`100`, default: `5`)
+- `dryRun`: Only show preview, no actual import (default: `false`)
+- `inferTypes`: Infer data types for columns (default: `true`)
+- `fallbackColumnType` / `defaultColumnType`: Default column type for new tables (default: `SingleLineText`)
+- `allowPrivateHosts`: Allow private/internal `baseUrl` targets (default: `false`)
+- `timeoutMs`: Request timeout in milliseconds (default: `30000`)
 
 ## Usage Examples
 
 ### Basic Import
 
+Pass CSV content in `input` and connection/table configuration in `options` (or `context.secrets.NOCODB_API_TOKEN` / `context.defaults`):
+
 ```javascript
-{
-  "baseUrl": "https://your-nocodb-project.nocodb.com",
-  "token": "your_xc_token",
-  "baseId": "your_base_id",
-  "tableName": "users",
-  "content": "name,age\nJohn,30\nJane,25"
-}
+const input = {
+  content: 'name,age\nJohn,30\nJane,25'
+};
+
+const options = {
+  baseUrl: 'https://your-nocodb-project.nocodb.com',
+  token: 'your_xc_token',
+  baseId: 'your_base_id',
+  tableName: 'users'
+};
 ```
 
 ### With Custom Delimiter
 
 ```javascript
-{
-  "baseUrl": "https://your-nocodb-project.nocodb.com",
-  "token": "your_xc_token",
-  "baseId": "your_base_id",
-  "tableName": "inventory",
-  "delimiter": ";",
-  "inferTypes": true,
-  "content": "id;name;price\n1;Product A;9.99\n2;Product B;14.99"
-}
+const input = {
+  content: 'id;name;price\n1;Product A;9.99\n2;Product B;14.99'
+};
+
+const options = {
+  baseUrl: 'https://your-nocodb-project.nocodb.com',
+  token: 'your_xc_token',
+  baseId: 'your_base_id',
+  tableName: 'inventory',
+  delimiter: ';',
+  inferTypes: true
+};
 ```
 
 ### Dry Run Preview
 
 ```javascript
-{
-  "baseUrl": "https://your-nocodb-project.nocodb.com",
-  "token": "your_xc_token",
-  "baseId": "your_base_id",
-  "tableName": "exports",
-  "dryRun": true,
-  "content": "date,value\n2023-01-01,100\n2023-01-02,120"
-}
-```
+const input = {
+  content: 'date,value\n2023-01-01,100\n2023-01-02,120'
+};
 
-### Advanced Configuration
-
-```javascript
-{
-  "baseUrl": "https://your-nocodb-project.nocodb.com",
-  "token": "your_xc_token",
-  "baseId": "your_base_id",
-  "tableName": "products",
-  "delimiter": ",",
-  "previewRows": 10,
-  "inferTypes": true,
-  "fallbackColumnType": "LongText"
-}
+const options = {
+  baseUrl: 'https://your-nocodb-project.nocodb.com',
+  token: 'your_xc_token',
+  baseId: 'your_base_id',
+  tableName: 'exports',
+  dryRun: true
+};
 ```
 
 ## Return Value
 
 Success response:
-```javascript
+```json
 {
   "success": true,
-  "message": "Successfully imported X rows",
-  "result": {
+  "data": {
     "importedRows": 10,
     "createdTable": true,
-    "table": { /* NocoDB table info */ },
-    "response": { /* NocoDB API response */ }
+    "table": {},
+    "response": {}
+  },
+  "metadata": {
+    "package": "@maitask/nocodb-importer",
+    "version": "0.1.1",
+    "provider": "nocodb",
+    "tableName": "users",
+    "timestamp": "2026-02-24T00:00:00.000Z"
   }
 }
 ```
 
 Dry run response:
-```javascript
+```json
 {
   "success": true,
-  "message": "Dry run completed. No data sent to NocoDB.",
-  "preview": [ /* First previewRows of data */ ],
-  "totalRows": 10,
-  "columns": [ /* Column names from CSV */ ]
+  "data": {
+    "dryRun": true,
+    "preview": [],
+    "totalRows": 10,
+    "columns": ["date", "value"]
+  },
+  "metadata": {
+    "package": "@maitask/nocodb-importer",
+    "version": "0.1.1",
+    "provider": "nocodb",
+    "tableName": "exports",
+    "timestamp": "2026-02-24T00:00:00.000Z"
+  }
 }
 ```
 
 Error response:
-```javascript
+```json
 {
   "success": false,
-  "message": "Error details"
+  "error": {
+    "message": "Error details",
+    "code": "NOCODB_IMPORT_ERROR",
+    "type": "NocoDBImportError"
+  },
+  "metadata": {
+    "package": "@maitask/nocodb-importer",
+    "version": "0.1.1",
+    "provider": "nocodb",
+    "timestamp": "2026-02-24T00:00:00.000Z"
+  }
 }
 ```
 ## Response Contract (Current)

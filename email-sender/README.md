@@ -220,7 +220,7 @@ The package never retries a delivery POST. A timeout or lost connection can occu
   "metadata": {
     "contractVersion": "2026-07-11",
     "package": "@maitask/email-sender",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "provider": "sendgrid",
     "executionId": "execution-1",
     "status": 202,

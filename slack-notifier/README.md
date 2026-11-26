@@ -75,7 +75,7 @@ Each execution performs one JSON `POST`. The package does not retry automaticall
   },
   "metadata": {
     "package": "@maitask/slack-notifier",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "provider": "slack",
     "webhook": "https://hooks.slack.com/services/T***/B***/***",
     "responseStatus": 200,

@@ -85,12 +85,11 @@ For OpenAI-compatible providers:
 }
 ```
 
-The same values can be supplied under `input.ai` or `input.analysis.ai`. Runtime secrets are also supported:
+Non-credential preferences (`model`, `temperature`, `maxTokens`) may be supplied under `input.ai` or `input.analysis.ai`. Credentials and endpoints (`apiKey`, `baseUrl`, `endpoint`) must come from trusted `options`, `options.ai`, `context.secrets`, or `context.env`:
 
 - `context.secrets.INTELLIGENCE_API_KEY`
-- `context.secrets.DEXPS_API_KEY`
 - `context.secrets.OPENAI_API_KEY`
-- `context.env.DEXPS_BASE_URL`
+- `context.env.INTELLIGENCE_BASE_URL`
 - `context.env.OPENAI_BASE_URL`
 
 ## Upstream Package Input
@@ -197,7 +196,7 @@ Leave `include_execution_header` unset or `false`. Plane sends `metadata.channel
   "metadata": {
     "contract_version": "2026-06-27",
     "package": "@maitask/intelligence-briefing",
-    "version": "0.1.8",
+    "version": "0.1.10",
     "product": "hacker_news_daily",
     "channel_message": "published article"
   },

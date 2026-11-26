@@ -12,10 +12,12 @@ High-performance CSV parser with advanced features and RFC 4180 compliance.
 - **Encoding support**: UTF-8 and Base64 decoding
 - **Statistics**: Row counts, column analysis, data type detection
 
-## Installation
+## Execution
 
-```bash
-npm install @maitask/csv-parser
+Run through Maitask Runtime or invoke the CommonJS entry point locally:
+
+```javascript
+const { execute } = require('./index');
 ```
 
 ## Usage
@@ -120,7 +122,7 @@ const result = execute({ base64: base64Csv });
     escape: string,
     hasHeaders: boolean,
     parsedAt: string,          // ISO timestamp
-    version: "1.0.0"
+    version: "0.1.1"
   }
 }
 ```
@@ -188,7 +190,7 @@ console.log(result.statistics.dataTypes);
   },
   metadata: {
     parsedAt: string,
-    version: "1.0.0"
+    version: "0.1.1"
   }
 }
 ```
@@ -218,7 +220,7 @@ console.log(result.statistics.dataTypes);
 
 ## Requirements
 
-- Node.js >= 14.0.0
+- Node.js >= 18.0.0
 - Maitask Engine >= 1.0.0
 
 ## License

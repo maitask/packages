@@ -98,13 +98,13 @@ Restore nested structure:
 
 ```bash
 # Query
-echo '{"data":{"user":{"name":"Alice"}}}' | maitask run @maitask/json-transformer --options '{"operation":"query","path":"$.user.name"}'
+echo '{"data":{"user":{"name":"Alice"}}}' | maitask run @maitask/json-transformer -c '{"operation":"query","path":"$.user.name"}'
 
 # Map
-echo '{"user":{"name":"Alice","age":30}}' | maitask run @maitask/json-transformer --options '{"operation":"map","mapping":{"name":"user.name"}}'
+echo '{"user":{"name":"Alice","age":30}}' | maitask run @maitask/json-transformer -c '{"operation":"map","mapping":{"name":"user.name"}}'
 
 # Filter
-echo '[{"age":25},{"age":35}]' | maitask run @maitask/json-transformer --options '{"operation":"filter","condition":{"age":{"$gte":30}}}'
+echo '[{"age":25},{"age":35}]' | maitask run @maitask/json-transformer -c '{"operation":"filter","condition":{"age":{"$gte":30}}}'
 ```
 
 ## License

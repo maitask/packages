@@ -80,7 +80,7 @@ Successful transport returns the upstream HTTP status and byte-safe content. A r
   },
   "metadata": {
     "package": "@maitask/cf-proxy",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "redirects": 0,
     "registryAuthenticated": true,
     "timestamp": "2026-07-11T00:00:00.000Z"

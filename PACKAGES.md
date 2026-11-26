@@ -7,46 +7,46 @@
 ## AI & Cognitive Services (8)
 
 - [**@maitask/openai**](./openai) `v0.1.1` — OpenAI GPT models integration for Maitask
-- [**@maitask/claude**](./claude) `v0.1.1` — Anthropic Claude models integration with streaming support
-- [**@maitask/gemini**](./gemini) `v0.1.1` — Google Gemini multimodal models integration
-- [**@maitask/deepseek**](./deepseek) `v0.1.1` — DeepSeek reasoning models integration
-- [**@maitask/ollama**](./ollama) `v0.1.1` — Local Ollama models execution bridge
-- [**@maitask/intelligence-briefing**](./intelligence-briefing) `v0.1.10` — Generate a published Hacker News Daily or source-backed briefing with OpenAI-compatible analysis
+- [**@maitask/claude**](./claude) `v0.1.1` — Anthropic Claude AI models integration for Maitask
+- [**@maitask/gemini**](./gemini) `v0.1.1` — Google Gemini AI models integration for Maitask
+- [**@maitask/deepseek**](./deepseek) `v0.1.1` — DeepSeek AI models integration for Maitask
+- [**@maitask/ollama**](./ollama) `v0.1.1` — Ollama local AI models integration for Maitask
+- [**@maitask/intelligence-briefing**](./intelligence-briefing) `v0.1.10` — Generate published Hacker News Daily and source-backed briefings with OpenAI-compatible analysis
 - [**@maitask/document-intelligence**](./document-intelligence) `v1.0.0` — Summarize, classify, or extract structured fields from documents with sourced, fail-closed model output
-- [**@maitask/workflow-composer**](./workflow-composer) `v1.0.0` — Generate a reviewable workflow graph from a description and the official package catalog
+- [**@maitask/workflow-composer**](./workflow-composer) `v1.0.0` — Generate a reviewable Maitask workflow graph from a description and the official package catalog
 
 ## Media & Multimodal Processing (3)
 
 - [**@maitask/audio-processor**](./audio-processor) `v0.1.2` — Audio transcription and speech synthesis through Whisper and OpenAI audio APIs
 - [**@maitask/image-metadata**](./image-metadata) `v0.1.1` — Image metadata extraction from headers
-- [**@maitask/image-generator**](./image-generator) `v0.1.1` — AI image generation via OpenAI/Stability APIs
+- [**@maitask/image-generator**](./image-generator) `v0.1.1` — AI image generation using DALL-E or Stable Diffusion
 
 ## Data Processing & Transformation (10)
 
 - [**@maitask/text-parser**](./text-parser) `v0.1.1` — High-performance text and markdown parser
 - [**@maitask/csv-parser**](./csv-parser) `v0.1.1` — High-performance CSV parser with advanced features
-- [**@maitask/pdf-parser**](./pdf-parser) `v0.1.1` — Extract Info metadata and uncompressed PDF text operators
+- [**@maitask/pdf-parser**](./pdf-parser) `v0.1.1` — Extract Info metadata and text from uncompressed or FlateDecode PDF streams
 - [**@maitask/file-processor**](./file-processor) `v0.1.1` — Powerful data processing and transformation engine
 - [**@maitask/data-validator**](./data-validator) `v0.1.1` — Comprehensive data validation and quality assurance
 - [**@maitask/json-transformer**](./json-transformer) `v0.1.1` — JSONPath query and data transformation
 - [**@maitask/diff-generator**](./diff-generator) `v0.1.1` — Data difference comparison and patch generation
 - [**@maitask/yaml-converter**](./yaml-converter) `v0.1.1` — YAML to JSON bidirectional converter
 - [**@maitask/xml-parser**](./xml-parser) `v0.1.1` — XML to JSON parser with XPath support
-- [**@maitask/file-transformer**](./file-transformer) `v0.1.1` — Transform between JSON/CSV/XML/YAML/TOML formats
+- [**@maitask/file-transformer**](./file-transformer) `v0.1.1` — Convert between file formats: JSON, CSV, XML, YAML, TOML
 
 ## Communications & Automation (5)
 
-- [**@maitask/email-sender**](./email-sender) `v1.0.1` — Credential-confined SendGrid and Mailgun delivery with recipient privacy, safe templates, and exact attachments
+- [**@maitask/email-sender**](./email-sender) `v1.0.1` — Credential-confined SendGrid and Mailgun delivery with safe templates and exact attachments
 - [**@maitask/slack-notifier**](./slack-notifier) `v0.1.1` — Send notifications and messages to Slack channels via incoming webhooks
 - [**@maitask/telegram-bot**](./telegram-bot) `v0.1.1` — Send messages to Telegram users and groups via Bot API
 - [**@maitask/stream-publisher**](./stream-publisher) `v0.1.1` — Publish NDJSON or SSE event streams to an HTTPS endpoint
-- [**@maitask/kafka-publisher**](./kafka-publisher) `v0.1.1` — Publish records to Kafka through REST proxy endpoints
+- [**@maitask/kafka-publisher**](./kafka-publisher) `v0.1.1` — Publish messages to Kafka topics via REST proxy
 
 ## Web & API Integration (8)
 
-- [**@maitask/web-scraper**](./web-scraper) `v0.1.1` — Extract data from web pages with HTML parsing and CSS selectors
+- [**@maitask/web-scraper**](./web-scraper) `v0.1.1` — Extract data from web pages with HTML parsing, CSS selectors, and XPath queries
 - [**@maitask/web-search**](./web-search) `v0.1.2` — Search the web using multiple search engines
-- [**@maitask/http-request**](./http-request) `v2.0.1` — Strict credential-confined HTTP client with bounded redirects, safe retries, multipart and exact binary bodies, and byte-accurate responses
+- [**@maitask/http-request**](./http-request) `v2.0.1` — Strict credential-confined HTTP client with bounded redirects, safe retries, and exact response bytes
 - [**@maitask/hackernews-crawler**](./hackernews-crawler) `v0.1.1` — Crawl and extract stories from Hacker News using official API
 - [**@maitask/github-integration**](./github-integration) `v1.0.1` — Credential-confined GitHub REST client for repositories, issues, pull requests, users, and controlled custom requests
 - [**@maitask/url-analyzer**](./url-analyzer) `v0.1.1` — URL parsing, validation, and analysis
@@ -55,7 +55,7 @@
 
 ## Export & Storage (3)
 
-- [**@maitask/excel-exporter**](./excel-exporter) `v0.1.1` — Convert tabular data to CSV for download or downstream adapters
+- [**@maitask/excel-exporter**](./excel-exporter) `v0.1.1` — Convert tabular data to CSV for Excel and downstream adapters
 - [**@maitask/nocodb-importer**](./nocodb-importer) `v0.1.1` — Import data to NocoDB with authentication
 - [**@maitask/s3-storage**](./s3-storage) `v0.1.1` — Upload, download, or delete objects through presigned S3 URLs
 
@@ -66,4 +66,4 @@
 
 ## Finance & Trading (1)
 
-- [**@maitask/trader**](./trader) `v1.0.1` — Deterministic analysis, backtesting, paper execution, and controlled Binance, Aster, and OKX trading
+- [**@maitask/trader**](./trader) `v1.0.1` — Deterministic market analysis, simulation, paper execution, and controlled exchange trading

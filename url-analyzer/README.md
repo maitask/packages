@@ -26,7 +26,7 @@ echo 'https://user:pass@example.com:8080/path?key=value#section' | maitask run @
 Validate URL format and components:
 
 ```bash
-echo 'https://example.com' | maitask run @maitask/url-analyzer --options '{"operation":"validate"}'
+echo 'https://example.com' | maitask run @maitask/url-analyzer -c '{"operation":"validate"}'
 ```
 
 ### Normalize
@@ -34,7 +34,7 @@ echo 'https://example.com' | maitask run @maitask/url-analyzer --options '{"oper
 Normalize URL to canonical form:
 
 ```bash
-echo 'HTTPS://EXAMPLE.COM:443/PATH//' | maitask run @maitask/url-analyzer --options '{"operation":"normalize"}'
+echo 'HTTPS://EXAMPLE.COM:443/PATH//' | maitask run @maitask/url-analyzer -c '{"operation":"normalize"}'
 ```
 
 ### Query
@@ -42,7 +42,7 @@ echo 'HTTPS://EXAMPLE.COM:443/PATH//' | maitask run @maitask/url-analyzer --opti
 Parse query string parameters:
 
 ```bash
-echo 'https://example.com?foo=bar&baz=qux' | maitask run @maitask/url-analyzer --options '{"operation":"query"}'
+echo 'https://example.com?foo=bar&baz=qux' | maitask run @maitask/url-analyzer -c '{"operation":"query"}'
 ```
 
 ### Analyze
@@ -50,7 +50,7 @@ echo 'https://example.com?foo=bar&baz=qux' | maitask run @maitask/url-analyzer -
 Complete URL analysis:
 
 ```bash
-echo 'https://api.example.com/v1/users?active=true' | maitask run @maitask/url-analyzer --options '{"operation":"analyze"}'
+echo 'https://api.example.com/v1/users?active=true' | maitask run @maitask/url-analyzer -c '{"operation":"analyze"}'
 ```
 
 ## Parse Output

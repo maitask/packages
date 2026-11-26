@@ -289,7 +289,7 @@ retry: {
   "metadata": {
     "contractVersion": "2026-07-11",
     "package": "@maitask/http-request",
-    "version": "2.0.0",
+    "version": "2.0.1",
     "executionId": null,
     "method": "GET",
     "status": 200,

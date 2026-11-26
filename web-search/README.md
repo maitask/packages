@@ -4,65 +4,80 @@ Search the web using multiple search engines.
 
 ## Features
 
-- Multi-engine search (Google, Bing, DuckDuckGo with fallbacks)
+- Multi-engine search (`google`, `bing`, `duckduckgo`, with `duckduckgo` fallback for `bing`/`google` when an upstream search page fails)
 - HTML content parsing with safe URL extraction
 - Pagination support for all search engines
 - Configurable result limits (up to 100 results per page)
-- Integrated caching and rate limiting
+- Bounded streaming response reads and SSRF validation
 
 ## Configuration
 
-### Required Options
+### Required Input
 
 - `query`: Search query string
 
-### Optional Options
+### Optional Input
 
-- `engine`: Search engine to use ('google', 'bing', 'duckduckgo') - defaults to duckduckgo with fallbacks
-- `limit`: Maximum number of results per page (1-100) - defaults to 10
-- `page`: Page number for pagination (1-based) - defaults to 1
+- `engine`: Search engine to use (`'google'`, `'bing'`, `'duckduckgo'`) - defaults to `'duckduckgo'`
+- `limit`: Maximum number of results per page (`1`–`100`) - defaults to `10`
+- `page`: Page number for pagination (1-based) - defaults to `1`
 - `offset`: Result offset for manual pagination control - defaults to calculated from page
-- `language`: Language code (e.g., 'en', 'zh') - defaults to 'en'
-- `region`: Region code (e.g., 'us', 'cn') - defaults to 'us'
-- `includeSnippets`: Whether to include result snippets - defaults to true
-- `safeSearch`: Safe search level ('strict', 'moderate', 'off') - defaults to 'moderate'
-- `baseUrl`: Override the selected engine base URL for controlled upstreams or private search gateways
-- `engineBaseUrls`: Per-engine base URL overrides for `duckduckgo`, `bing`, and `google`
+- `language`: Language code (e.g., `'en'`, `'zh'`) - defaults to `'en'`
+- `region`: Region code (e.g., `'us'`, `'cn'`) - defaults to `'us'`
+- `includeSnippets`: Whether to include result snippets - defaults to `true`
+- `safeSearch`: Safe search level (`'strict'`, `'moderate'`, `'off'`) - defaults to `'moderate'`
+
+### Trusted Options (`options` / `context.env` only)
+
+- `baseUrl`: Override the selected engine base URL (also via `context.env.WEB_SEARCH_BASE_URL`; ignored in `input`)
+- `engineBaseUrls`: Per-engine base URL overrides for `duckduckgo`, `bing`, and `google` (ignored in `input`)
+- `headers`: Custom HTTP request headers (ignored in `input`)
+- `timeoutMs`: Request timeout in milliseconds (`1000`–`120000`, default: `30000`)
+- `maxResponseBytes`: Maximum HTML response size in bytes (default: `5242880`)
+- `allowPrivateHosts`: Allow private/internal `baseUrl` targets (default: `false`)
 
 ## Usage Examples
 
 ### Basic Web Search
 
-```javascript
+```json
 {
-  "query": "Artificial intelligence trends 2025",
-  "limit": 5,
-  "engine": "duckduckgo"
+  "input": {
+    "query": "Artificial intelligence trends 2025",
+    "limit": 5,
+    "engine": "duckduckgo"
+  }
 }
 ```
 
 ### Advanced Search Options
 
-```javascript
+```json
 {
-  "query": "Maitask engine documentation",
-  "engine": "google",
-  "limit": 10,
-  "language": "en",
-  "region": "us",
-  "includeSnippets": true,
-  "safeSearch": "moderate"
+  "input": {
+    "query": "Maitask engine documentation",
+    "engine": "google",
+    "limit": 10,
+    "language": "en",
+    "region": "us",
+    "includeSnippets": true,
+    "safeSearch": "moderate"
+  }
 }
 ```
 
 ### Using with HTTP Headers
 
-```javascript
+```json
 {
-  "query": "JavaScript framework comparison",
-  "limit": 8,
-  "headers": {
-    "User-Agent": "Custom Bot 1.0"
+  "input": {
+    "query": "JavaScript framework comparison",
+    "limit": 8
+  },
+  "options": {
+    "headers": {
+      "User-Agent": "Custom Bot 1.0"
+    }
   }
 }
 ```
@@ -161,7 +176,7 @@ Error response:
   },
   "metadata": {
     "package": "@maitask/web-search",
-    "version": "0.1.1",
+    "version": "0.1.2",
     "timestamp": "2026-07-09T00:00:00.000Z"
   }
 }

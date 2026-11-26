@@ -64,7 +64,7 @@ Successful output contains only validated delivery fields rather than the comple
   },
   "metadata": {
     "package": "@maitask/telegram-bot",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "provider": "telegram",
     "method": "sendPhoto",
     "timestamp": "2026-07-10T00:00:00.000Z"

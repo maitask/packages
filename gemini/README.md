@@ -11,16 +11,12 @@ Google Gemini AI models integration for Maitask.
 - Streaming generation
 - Safety settings
 
-## Installation
+## Execution
 
-```bash
-npm install @maitask/gemini
-```
-
-## Usage
+Run through Maitask Runtime or invoke the CommonJS entry point locally:
 
 ```javascript
-import { execute } from '@maitask/gemini';
+const { execute } = require('./index');
 
 const result = await execute(
   {
@@ -43,14 +39,16 @@ console.log(result.data.content);
 - `contents` - Advanced content array with parts
 - `messages` - Chat messages (converted to Gemini format)
 - `model` - Model name (default: `gemini-2.5-pro`)
-- `temperature` - Controls randomness (0-1)
+- `temperature` - Controls randomness (`0`–`2`)
 - `maxOutputTokens` - Maximum tokens to generate
 - `responseMimeType` - Output MIME type for structured output
 
 ### Options
 
-- `apiKey` - Google AI API key (required)
-- `baseUrl` - Gemini-compatible models API base URL (default: `https://generativelanguage.googleapis.com/v1beta/models`)
+- `apiKey` - Google AI API key (required via `options.apiKey`, `context.secrets.GEMINI_API_KEY`, or `context.secrets.GOOGLE_API_KEY`; ignored if supplied in `input`)
+- `baseUrl` - Gemini-compatible models API base URL (default: `https://generativelanguage.googleapis.com/v1beta/models`; ignored if supplied in `input`)
+- `allowPrivateHosts` - Allow private/internal `baseUrl` targets (default: `false`)
+- `allowInsecureHttp` - Allow plain `http:` for custom `baseUrl` (default: `false`)
 - `timeoutMs` - Request timeout in milliseconds (default: `60000`)
 - `retries` - Retry count for transient failures (default: `2`)
 
@@ -60,8 +58,6 @@ controlled upstream. The official Google Generative Language URL remains the
 production default. Repository regression uses a loopback fixture and never
 requires live Gemini availability; credentialed live smoke checks are optional
 diagnostics.
-- `timeoutMs` - Request timeout in milliseconds (default: `60000`)
-- `retries` - Retry count for transient failures (default: `2`)
 
 ## Return Envelope
 
@@ -80,7 +76,7 @@ diagnostics.
   },
   "metadata": {
     "package": "@maitask/gemini",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "provider": "google",
     "model": "gemini-2.5-pro",
     "timestamp": "2026-02-24T00:00:00.000Z"

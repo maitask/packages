@@ -28,19 +28,19 @@ echo '{"name":"John","age":30}' | maitask run @maitask/yaml-converter
 ### Custom Indentation
 
 ```bash
-echo '{"data":{"nested":"value"}}' | maitask run @maitask/yaml-converter --options '{"indent":4}'
+maitask run @maitask/yaml-converter -i input.json -c '{"indent":4}'
 ```
 
 ### Explicit Direction
 
 ```bash
-echo 'data' | maitask run @maitask/yaml-converter --options '{"direction":"yaml-to-json"}'
+maitask run @maitask/yaml-converter -i input.yaml -c '{"direction":"yaml-to-json"}'
 ```
 
 ## Options
 
 - `direction`: `auto`, `yaml-to-json`, or `json-to-yaml` (default: `auto`)
-- `indent`: Number of spaces for YAML indentation (default: `2`)
+- `indent`: Number of spaces for YAML indentation (`1`–`16`, default: `2`)
 
 ## Supported YAML Features
 

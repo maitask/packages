@@ -13,10 +13,12 @@ Powerful data processing and transformation engine.
 - **Type Conversion**: Automatic and explicit data type handling
 - **Template System**: Dynamic value generation with templates
 
-## Installation
+## Execution
 
-```bash
-npm install @maitask/file-processor
+Run through Maitask Runtime or invoke the CommonJS entry point locally:
+
+```javascript
+const { execute } = require('./index');
 ```
 
 ## Usage
@@ -243,7 +245,7 @@ const result = execute(rawData, {
     steps: [...],   // Processing steps applied
     fields: [...],  // Available fields in result
     executedAt: "2023-01-15T10:30:00.000Z",
-    version: "0.1.0"
+    version: "0.1.1"
   }
 }
 ```
@@ -379,7 +381,7 @@ try {
 
 ## Requirements
 
-- Node.js >= 14.0.0
+- Node.js >= 18.0.0
 - Maitask Engine >= 1.0.0
 
 ## License

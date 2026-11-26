@@ -1,6 +1,6 @@
 # Maitask Package IO Contract
 
-Contract version: `2026-06-27`
+Contract version: `2026-06-27` (newer strict packages emit camelCase `contractVersion`: `2026-07-11`)
 
 Every package exposes one async-compatible entry point:
 
@@ -16,7 +16,7 @@ frontend.
 
 `input` is the task payload. It may be any JSON value, but each package must validate the shape it supports and return a structured error when invalid.
 
-`options` is execution configuration. Packages should keep operational settings here, such as `timeout_ms`, `retries`, `format`, `headers`, or provider-specific flags.
+`options` is execution configuration. Packages should keep operational settings here, such as `timeoutMs`, `retries`, `format`, `headers`, or provider-specific security flags (`allowPrivateHosts`, `allowInsecureHttp`).
 
 `context` is runtime-provided execution context. Packages may read secrets and environment values from:
 
@@ -154,6 +154,14 @@ Failure output:
 - Source references belong in top-level `citations`, and items may point to them through `citation_ids`.
 - Public consumers must not depend on package-specific top-level aliases such as `result`, `rows`, `repositories`, `message`, `parser`, or `statistics`.
 - Runtime enforces this contract at the execution boundary. Plane, adapters, and the frontend consume only the standard output.
+
+## Package Manifest Metadata & Schemas
+
+Each package `package.json` defines `maitask.locales` (`en` and `zh`) and `maitask.schemas`:
+
+- `maitask.schemas.input`: JSON Schema describing accepted `input` payloads (using `properties` for object forms and standard multi-type schemas such as `["array", "object"]` when arrays or strings are also valid).
+- `maitask.schemas.options`: JSON Schema describing trusted `options` configuration. Packages that accept no configuration options (such as `@maitask/cf-proxy`, `@maitask/image-metadata`, and `@maitask/text-parser`) omit `maitask.schemas.options`.
+- Schema `"default"` values reflect real runtime defaults only, never placeholder literals copied from `example.json`.
 
 ## Runtime HTTP Execute Response
 

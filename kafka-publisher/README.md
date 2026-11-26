@@ -72,7 +72,7 @@ The package performs no automatic retry. Redirect following is disabled for ever
   "metadata": {
     "proxyUrl": "https://kafka-proxy.internal",
     "timestamp": "2026-07-10T00:00:00.000Z",
-    "version": "0.1.0"
+    "version": "0.1.1"
   }
 }
 ```
@@ -95,7 +95,7 @@ Failures use the current fixed code `KAFKA_PUBLISHER_ERROR` and type `KafkaPubli
   },
   "metadata": {
     "timestamp": "2026-07-10T00:00:00.000Z",
-    "version": "0.1.0"
+    "version": "0.1.1"
   }
 }
 ```

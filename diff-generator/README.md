@@ -26,7 +26,7 @@ echo '{"old":{"a":1,"b":2},"new":{"a":1,"b":3,"c":4}}' | maitask run @maitask/di
 Line-by-line text comparison:
 
 ```bash
-echo '{"old":"line1\nline2","new":"line1\nline3"}' | maitask run @maitask/diff-generator --options '{"mode":"text"}'
+echo '{"old":"line1\nline2","new":"line1\nline3"}' | maitask run @maitask/diff-generator -c '{"mode":"text"}'
 ```
 
 ### Array Mode
@@ -34,7 +34,7 @@ echo '{"old":"line1\nline2","new":"line1\nline3"}' | maitask run @maitask/diff-g
 Detect added and removed array elements:
 
 ```bash
-echo '{"old":[1,2,3],"new":[2,3,4]}' | maitask run @maitask/diff-generator --options '{"mode":"array"}'
+echo '{"old":[1,2,3],"new":[2,3,4]}' | maitask run @maitask/diff-generator -c '{"mode":"array"}'
 ```
 
 ## Input Format

@@ -11,10 +11,12 @@ High-performance text and markdown parser.
 - **File type detection**: Automatic detection based on extension/content
 - **Error handling**: Comprehensive error reporting
 
-## Installation
+## Execution
 
-```bash
-npm install @maitask/text-parser
+Run through Maitask Runtime or invoke the CommonJS entry point locally:
+
+```javascript
+const { execute } = require('./index');
 ```
 
 ## Usage
@@ -113,7 +115,7 @@ console.log(result.text); // "Hello World!"
     encoding: "utf-8",
     mimeType: string,
     parsedAt: string,      // ISO timestamp
-    version: "1.0.0"
+    version: "0.1.1"
   }
 }
 ```
@@ -130,7 +132,7 @@ console.log(result.text); // "Hello World!"
   },
   metadata: {
     parsedAt: string,
-    version: "1.0.0"
+    version: "0.1.1"
   }
 }
 ```
@@ -154,7 +156,7 @@ This package is designed and includes:
 
 ## Requirements
 
-- Node.js >= 14.0.0
+- Node.js >= 18.0.0
 - Maitask Engine >= 1.0.0
 
 ## License

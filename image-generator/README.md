@@ -13,7 +13,6 @@ Generate images through OpenAI or Stability APIs.
 
 Required:
 - `prompt`
-- `apiKey`
 
 Optional:
 - `provider`
@@ -24,15 +23,28 @@ Optional:
 - `height`
 - `timeoutMs`
 
+## Options
+
+Required (via `options.apiKey` or `context.secrets.OPENAI_API_KEY` / `context.secrets.STABILITY_API_KEY`; ignored if passed in `input`):
+- `apiKey`
+
+Optional:
+- `provider` (`openai` or `stability`, default: `openai`)
+- `timeoutMs`
+
 ## Example
 
 ```json
 {
-  "prompt": "A minimalistic poster of a robotic crane at sunset",
-  "provider": "openai",
-  "model": "dall-e-3",
-  "size": "1024x1024",
-  "apiKey": "sk-xxx"
+  "input": {
+    "prompt": "A minimalistic poster of a robotic crane at sunset",
+    "provider": "openai",
+    "model": "dall-e-3",
+    "size": "1024x1024"
+  },
+  "options": {
+    "apiKey": "sk-xxx"
+  }
 }
 ```
 
@@ -45,7 +57,7 @@ Success:
   "data": {},
   "metadata": {
     "timestamp": "2026-02-24T00:00:00.000Z",
-    "version": "0.1.0"
+    "version": "0.1.1"
   }
 }
 ```
@@ -61,7 +73,7 @@ Failure:
   },
   "metadata": {
     "timestamp": "2026-02-24T00:00:00.000Z",
-    "version": "0.1.0"
+    "version": "0.1.1"
   }
 }
 ```

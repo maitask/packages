@@ -184,7 +184,7 @@ Success response:
   },
   "metadata": {
     "package": "@maitask/web-scraper",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "timestamp": "2025-10-05T10:30:00.000Z"
   }
 }
@@ -208,7 +208,7 @@ Error response (for individual URL):
   },
   "metadata": {
     "package": "@maitask/web-scraper",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "timestamp": "2025-10-05T10:30:00.000Z"
   }
 }

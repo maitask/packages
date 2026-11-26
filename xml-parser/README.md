@@ -23,7 +23,7 @@ echo '<root><item id="1">Value</item></root>' | maitask run @maitask/xml-parser
 ### XPath Query
 
 ```bash
-echo '<root><item id="1">A</item><item id="2">B</item></root>' | maitask run @maitask/xml-parser --options '{"operation":"query","xpath":"//item[@id=\"2\"]/text()"}'
+echo '<root><item id="1">A</item><item id="2">B</item></root>' | maitask run @maitask/xml-parser -c '{"operation":"query","xpath":"//item[@id=\"2\"]/text()"}'
 ```
 
 ## Operations

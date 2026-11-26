@@ -12,16 +12,12 @@ DeepSeek V3.2 AI models integration for Maitask.
 - Cost-effective inference
 - Fill-in-the-middle (FIM) support
 
-## Installation
+## Execution
 
-```bash
-npm install @maitask/deepseek
-```
-
-## Usage
+Run through Maitask Runtime or invoke the CommonJS entry point locally:
 
 ```javascript
-import { execute } from '@maitask/deepseek';
+const { execute } = require('./index');
 
 const result = await execute(
   {
@@ -42,18 +38,20 @@ console.log(result.data.content);
 
 ### Input Parameters
 
-- `messages` - Array of message objects with `role` and `content`
+- `messages` - Array of message objects with `role` and `content` (or supply `text` / `prompt`)
 - `model` - Model name (default: `deepseek-chat`)
   - `deepseek-chat` - General-purpose chat model
   - `deepseek-reasoner` - Advanced reasoning model
-- `temperature` - Controls randomness (0-1, default: 0.7)
-- `maxTokens` - Maximum tokens to generate (default: 1000)
-- `stream` - Enable streaming responses
+- `temperature` - Controls randomness (`0`–`2`, omitted unless specified)
+- `maxTokens` / `max_tokens` - Maximum tokens to generate
+- `stream` - Enable streaming responses (default: `false`)
 
 ### Options
 
-- `apiKey` - DeepSeek API key (required)
-- `baseUrl` - DeepSeek-compatible API base URL (default: `https://api.deepseek.com`)
+- `apiKey` - DeepSeek API key (required via `options.apiKey` or `context.secrets.DEEPSEEK_API_KEY`; ignored if supplied in `input`)
+- `baseUrl` - DeepSeek-compatible API base URL (default: `https://api.deepseek.com`; ignored if supplied in `input`)
+- `allowPrivateHosts` - Allow private/internal `baseUrl` targets (default: `false`)
+- `allowInsecureHttp` - Allow plain `http:` for custom `baseUrl` (default: `false`)
 - `timeoutMs` - Request timeout in milliseconds (default: `60000`)
 - `retries` - Retry count for transient failures (default: `2`)
 
@@ -62,8 +60,6 @@ console.log(result.data.content);
 a controlled upstream. The official DeepSeek URL remains the production
 default. Repository regression uses a loopback fixture and never requires live
 DeepSeek availability; credentialed live smoke checks are optional diagnostics.
-- `timeoutMs` - Request timeout in milliseconds (default: `60000`)
-- `retries` - Retry count for transient failures (default: `2`)
 
 ## Return Envelope
 
@@ -83,7 +79,7 @@ DeepSeek availability; credentialed live smoke checks are optional diagnostics.
   },
   "metadata": {
     "package": "@maitask/deepseek",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "provider": "deepseek",
     "model": "deepseek-chat",
     "timestamp": "2026-02-24T00:00:00.000Z"

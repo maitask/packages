@@ -11,16 +11,12 @@ Anthropic Claude AI models integration for Maitask.
 - Streaming responses
 - Temperature and token control
 
-## Installation
+## Execution
 
-```bash
-npm install @maitask/claude
-```
-
-## Usage
+Run through Maitask Runtime or invoke the CommonJS entry point locally:
 
 ```javascript
-import { execute } from '@maitask/claude';
+const { execute } = require('./index');
 
 const result = await execute(
   {
@@ -43,17 +39,19 @@ console.log(result.data.content);
 
 ### Input Parameters
 
-- `messages` - Array of message objects with `role` ('user' or 'assistant') and `content`
+- `messages` - Array of message objects with `role` (`'system'`, `'user'`, or `'assistant'`) and `content` (or supply `text` / `prompt`)
 - `model` - Model name (default: `claude-sonnet-4-5`)
-- `maxTokens` - Maximum tokens to generate (required)
+- `maxTokens` - Maximum tokens to generate (default: `1024`)
 - `system` - System prompt (separate from messages)
-- `temperature` - Controls randomness (0-1)
-- `stream` - Enable streaming responses
+- `temperature` - Controls randomness (`0`–`1`)
+- `stream` - Enable streaming responses (default: `false`)
 
 ### Options
 
-- `apiKey` - Anthropic API key (required)
-- `baseUrl` - Anthropic-compatible API base URL (default: `https://api.anthropic.com/v1`)
+- `apiKey` - Anthropic API key (required via `options.apiKey` or `context.secrets.ANTHROPIC_API_KEY`; ignored if supplied in `input`)
+- `baseUrl` - Anthropic-compatible API base URL (default: `https://api.anthropic.com/v1`; ignored if supplied in `input`)
+- `allowPrivateHosts` - Allow private/internal `baseUrl` targets (default: `false`)
+- `allowInsecureHttp` - Allow plain `http:` for custom `baseUrl` (default: `false`)
 - `timeoutMs` - Request timeout in milliseconds (default: `60000`)
 - `retries` - Retry count for transient failures (default: `2`)
 
@@ -62,8 +60,6 @@ console.log(result.data.content);
 or controlled upstream. The official Anthropic URL remains the production
 default. Repository regression uses a loopback fixture and never requires live
 Anthropic availability; credentialed live smoke checks are optional diagnostics.
-- `timeoutMs` - Request timeout in milliseconds (default: `60000`)
-- `retries` - Retry count for transient failures (default: `2`)
 
 ## Return Envelope
 
@@ -82,7 +78,7 @@ Anthropic availability; credentialed live smoke checks are optional diagnostics.
   },
   "metadata": {
     "package": "@maitask/claude",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "provider": "anthropic",
     "model": "claude-sonnet-4-5",
     "timestamp": "2026-02-24T00:00:00.000Z"
@@ -127,7 +123,7 @@ const result = await execute(
   { apiKey: 'sk-ant-...' }
 );
 
-// Or with URL (will be fetched and converted to base64)
+// Or with URL (passed through to the Anthropic Messages API)
 const result2 = await execute(
   {
     messages: [{

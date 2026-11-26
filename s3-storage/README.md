@@ -42,7 +42,7 @@ Success:
   "data": {},
   "metadata": {
     "timestamp": "2026-02-24T00:00:00.000Z",
-    "version": "0.1.0"
+    "version": "0.1.1"
   }
 }
 ```
@@ -59,7 +59,7 @@ Failure:
   },
   "metadata": {
     "timestamp": "2026-02-24T00:00:00.000Z",
-    "version": "0.1.0"
+    "version": "0.1.1"
   }
 }
 ```

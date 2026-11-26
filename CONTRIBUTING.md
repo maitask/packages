@@ -13,8 +13,8 @@ Thank you for helping improve the official Maitask package collection. All contr
 - Define display metadata under `maitask.locales.en` and `maitask.locales.zh`. If a package only has one neutral label set, use flat `maitask.locales.display_name`, `description`, `category`, and `keywords` as the default fallback.
 
 ## 3. Validation Checklist
-- `npm install` and `npm run lint` (if available).
-- `npm test` or relevant script (if applicable).
+- `npm test` (runs the full package catalog, security hardening, and tarball verification suites).
+- Run `npm run test:cf-proxy-types`, `npm run test:github-integration-types`, `npm run test:http-request-types`, `npm run test:email-sender-types`, and `npm run test:trader-types` when modifying TypeScript definitions.
 - `npm pack` to confirm the publish artifact.
 - `scripts/publish_to_plane.sh <package-dir>` for registry publish dry-runs against a development Plane instance when changing package metadata or artifacts.
 - Manual smoke test via Maitask Runtime:

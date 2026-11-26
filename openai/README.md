@@ -11,16 +11,12 @@ OpenAI GPT models integration for Maitask.
 - Function calling and tools
 - Temperature and token control
 
-## Installation
+## Execution
 
-```bash
-npm install @maitask/openai
-```
-
-## Usage
+Run through Maitask Runtime or invoke the CommonJS entry point locally:
 
 ```javascript
-import { execute } from '@maitask/openai';
+const { execute } = require('./index');
 
 const result = await execute(
   {
@@ -43,19 +39,21 @@ console.log(result.data.content);
 
 ### Input Parameters
 
-- `messages` - Array of message objects with `role` and `content`
+- `messages` - Array of message objects with `role` and `content` (or supply `text` / `prompt`)
 - `model` - Model name (default: `gpt-5`)
-- `temperature` - Controls randomness (0-1, default: 0.7)
-- `maxTokens` - Maximum tokens to generate (default: 1000)
+- `temperature` - Controls randomness (`0`–`2`, default: `0.7`)
+- `maxTokens` - Maximum tokens to generate (default: `1000`)
 - `jsonMode` - Enable JSON output mode
-- `stream` - Enable streaming responses
+- `stream` - Enable streaming responses (default: `false`)
 - `functions` - Function calling definitions
 - `tools` - Tools definitions
 
 ### Options
 
-- `apiKey` - OpenAI API key (required)
-- `baseUrl` - OpenAI-compatible API base URL (default: `https://api.openai.com/v1`)
+- `apiKey` - OpenAI API key (required via `options.apiKey` or `context.secrets.OPENAI_API_KEY`; ignored if supplied in `input`)
+- `baseUrl` - OpenAI-compatible API base URL (default: `https://api.openai.com/v1`; ignored if supplied in `input`)
+- `allowPrivateHosts` - Allow private/internal `baseUrl` targets (default: `false`)
+- `allowInsecureHttp` - Allow plain `http:` for custom `baseUrl` (default: `false`)
 - `timeoutMs` - Request timeout in milliseconds (default: `60000`)
 - `retries` - Retry count for transient failures (default: `2`)
 
@@ -64,8 +62,6 @@ console.log(result.data.content);
 controlled upstream. The official OpenAI URL remains the production default.
 Repository regression uses a loopback fixture and never requires live OpenAI
 availability; credentialed live smoke checks are optional diagnostics.
-- `timeoutMs` - Request timeout in milliseconds (default: `60000`)
-- `retries` - Retry count for transient failures (default: `2`)
 
 ## Return Envelope
 
@@ -84,7 +80,7 @@ availability; credentialed live smoke checks are optional diagnostics.
   },
   "metadata": {
     "package": "@maitask/openai",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "provider": "openai",
     "model": "gpt-5",
     "timestamp": "2026-02-24T00:00:00.000Z"

@@ -13,10 +13,12 @@ Comprehensive data validation and quality assurance.
 - **Batch Processing**: Validate arrays of data efficiently
 - **Extensible Rules**: Add custom validation patterns and rules
 
-## Installation
+## Execution
 
-```bash
-npm install @maitask/data-validator
+Run through Maitask Runtime or invoke the CommonJS entry point locally:
+
+```javascript
+const { execute } = require('./index');
 ```
 
 ## Usage
@@ -140,7 +142,8 @@ const result = execute(data, {
     type: "object",               // JSON Schema object
     properties: { ... }
   },
-  schema_url: "https://...",      // URL to fetch schema from
+  schema_url: "https://...",      // HTTPS/HTTP URL to fetch schema from (SSRF-guarded unless allowPrivateHosts: true)
+  allowPrivateHosts: false,       // Allow private/internal schema_url hosts (default: false)
   validation_mode: "strict",      // "strict" | "loose" | "report-only"
   required_fields: ["id", "name"], // Array of required field names
   data_types: {                   // Expected data types
@@ -192,7 +195,7 @@ const result = execute(data, {
     validated_at: "2023-01-15T10:30:00.000Z",
     validation_mode: "strict",
     schema_source: "inline",
-    version: "0.1.0"
+    version: "0.1.1"
   }
 }
 ```
@@ -211,7 +214,7 @@ const result = execute(data, {
   metadata: {
     package: "@maitask/data-validator",
     validated_at: "2023-01-15T10:30:00.000Z",
-    version: "0.1.0"
+    version: "0.1.1"
   }
 }
 ```
@@ -373,7 +376,7 @@ try {
   const result = execute(data, options);
 
   if (!result.success) {
-    console.log('Validation failed:', result.message);
+    console.log('Validation failed:', result.error?.message);
     // Handle validation errors
     result.data.results.forEach(item => {
       if (!item.valid) {
@@ -419,7 +422,7 @@ const validated = execute(processed.result, {
 
 ## Requirements
 
-- Node.js >= 14.0.0
+- Node.js >= 18.0.0
 - Maitask Engine >= 1.0.0
 
 ## License

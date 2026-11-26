@@ -1,4 +1,6 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
 const test = require('node:test');
 const zlib = require('node:zlib');
 
@@ -9,6 +11,7 @@ const { execute: executeCsv } = require('../csv-parser');
 const { execute: executeValidator } = require('../data-validator');
 const { execute: executeDeepSeek } = require('../deepseek');
 const { execute: executeDiff } = require('../diff-generator');
+const { execute: executeDocIntel } = require('../document-intelligence');
 const { execute: executeExcel } = require('../excel-exporter');
 const { execute: executeFileProc } = require('../file-processor');
 const { execute: executeFileTx } = require('../file-transformer');
@@ -30,8 +33,11 @@ const { execute: executeSlack } = require('../slack-notifier');
 const { execute: executeStreamPub } = require('../stream-publisher');
 const { execute: executeTelegram } = require('../telegram-bot');
 const { execute: executeText } = require('../text-parser');
+const { execute: executeTrader } = require('../trader');
 const { execute: executeUrl } = require('../url-analyzer');
+const { execute: executeWebScraper } = require('../web-scraper');
 const { execute: executeWebSearch } = require('../web-search');
+const { execute: executeComposer } = require('../workflow-composer');
 const { execute: executeXml } = require('../xml-parser');
 const { execute: executeYaml } = require('../yaml-converter');
 
@@ -798,4 +804,464 @@ test('stream-publisher and graphql-client read error bodies boundedly and redact
   assert.equal(gqlErr.error.message.includes('gql-tok-888'), false);
   assert.equal(gqlErr.error.message.includes('secret.internal'), false);
   assert.ok(gqlErr.error.message.length <= 16500);
+});
+
+test('SSRF guards block private/internal targets unless allowPrivateHosts is opted in', async t => {
+  const origFetch = global.fetch;
+  let fetchCalled = 0;
+  t.after(() => { global.fetch = origFetch; });
+  global.fetch = async () => {
+    fetchCalled += 1;
+    throw new Error('fetch must not be reached for blocked private hosts');
+  };
+
+  const blockedHosts = [
+    'https://100.64.0.1/path',
+    'https://[fe80::1]/path',
+    'https://[::ffff:127.0.0.1]/path',
+    'https://localhost./path',
+    'https://service.localdomain/path'
+  ];
+
+  for (const blockedUrl of blockedHosts) {
+    const wsRes = await executeWebScraper(blockedUrl);
+    assert.equal(wsRes.success, false);
+
+    const gqlRes = await executeGraphQL({ url: blockedUrl, query: '{ ok }' });
+    assert.equal(gqlRes.success, false);
+
+    const spRes = await executeStreamPub([{ ok: true }], { url: blockedUrl });
+    assert.equal(spRes.success, false);
+
+    const hnRes = await executeHackerNews({ storyType: 'top', limit: 1 }, { apiBaseUrl: blockedUrl });
+    assert.equal(hnRes.success, false);
+
+    const nocoRes = await executeNocoDb(
+      { content: 'a,b\n1,2' },
+      { baseUrl: blockedUrl, token: 'tok', baseId: 'b1', tableName: 't1', dryRun: true }
+    );
+    assert.equal(nocoRes.success, false);
+
+    const searchRes = await executeWebSearch({ query: 'hello' }, { baseUrl: blockedUrl });
+    assert.equal(searchRes.success, false);
+
+    const docRes = await executeDocIntel({ text: 'hello' }, { apiKey: 'k', baseUrl: blockedUrl });
+    assert.equal(docRes.success, false);
+
+    const compRes = await executeComposer(
+      { description: 'hello', catalog: [{ name: '@maitask/text-parser' }] },
+      { apiKey: 'k', baseUrl: blockedUrl }
+    );
+    assert.equal(compRes.success, false);
+
+    const briefRes = await executeBriefing(
+      { sourceData: [{ id: '1', title: 'Test', url: 'https://example.com/1' }] },
+      { ai: { apiKey: 'k', baseUrl: blockedUrl } }
+    );
+    assert.equal(briefRes.success, false);
+
+    const aiProviders = [
+      executeClaude({ text: 'hi' }, { apiKey: 'k', baseUrl: blockedUrl }),
+      executeDeepSeek({ text: 'hi' }, { apiKey: 'k', baseUrl: blockedUrl }),
+      executeGemini({ text: 'hi' }, { apiKey: 'k', baseUrl: blockedUrl }),
+      executeOpenAI({ text: 'hi' }, { apiKey: 'k', baseUrl: blockedUrl }),
+      executeOllama({ text: 'hi' }, { baseUrl: blockedUrl })
+    ];
+    for (const promise of aiProviders) {
+      const res = await promise;
+      assert.equal(res.success, false);
+    }
+
+    const tgRes = await executeTelegram(
+      { fileUrl: blockedUrl },
+      { botToken: 'tok', chatId: '1', messageType: 'document' }
+    );
+    assert.equal(tgRes.success, false);
+
+    const trRes = await executeTrader(
+      { action: 'marketSnapshot', symbol: 'BTCUSDT', interval: '1m', exchange: { provider: 'binance', market: 'spot', environment: 'testnet' } },
+      { baseUrl: blockedUrl }
+    );
+    assert.equal(trRes.success, false);
+  }
+  assert.equal(fetchCalled, 0);
+
+  // Opt-in allowPrivateHosts permits loopback fixtures across updated packages
+  global.fetch = async url => ({
+    ok: true,
+    status: 200,
+    type: 'basic',
+    headers: { get: () => 'application/json' },
+    text: async () => JSON.stringify({ data: { ok: true }, klines: [], price: '100' }),
+    json: async () => ({ data: { ok: true } })
+  });
+  const allowedGql = await executeGraphQL(
+    { url: 'http://127.0.0.1:8080/graphql', query: '{ ok }' },
+    { allowInsecureHttp: true, allowPrivateHosts: true }
+  );
+  assert.equal(allowedGql.success, true);
+
+  // Trader allowPrivateHosts permits https private overrides too
+  const mockKlines = Array.from({ length: 20 }, (_, i) => [
+    1700000000000 + i * 60000,
+    '100',
+    '105',
+    '99',
+    '104',
+    '10'
+  ]);
+  global.fetch = async url => {
+    if (String(url).includes('/klines')) {
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: () => 'application/json' },
+        arrayBuffer: async () => Buffer.from(JSON.stringify(mockKlines))
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: () => 'application/json' },
+      arrayBuffer: async () => Buffer.from(JSON.stringify({ price: '104' }))
+    };
+  };
+  const allowedTrader = await executeTrader(
+    { action: 'marketSnapshot', symbol: 'BTCUSDT', interval: '1m', exchange: { provider: 'binance', market: 'spot', environment: 'testnet' } },
+    { baseUrl: 'https://127.0.0.1:8443', allowPrivateHosts: true }
+  );
+  assert.equal(allowedTrader.success, true);
+});
+
+test('untrusted input overrides are ignored across search, graphql, hn, briefing, ai, and transformers', async t => {
+  const origFetch = global.fetch;
+  const seenUrls = [];
+  const seenHeaders = [];
+  t.after(() => { global.fetch = origFetch; });
+
+  global.fetch = async (url, init = {}) => {
+    seenUrls.push(String(url));
+    seenHeaders.push(init.headers || {});
+    return {
+      ok: true,
+      status: 200,
+      type: 'basic',
+      headers: { get: () => 'application/json' },
+      text: async () => JSON.stringify({
+        choices: [{ message: { content: 'ok' }, finish_reason: 'stop' }],
+        content: [{ type: 'text', text: 'ok' }],
+        candidates: [{ content: { parts: [{ text: 'ok' }] }, finishReason: 'STOP' }],
+        message: { content: 'ok' },
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2, input_tokens: 1, output_tokens: 1 },
+        data: [{ url: 'https://img.example/1.png' }]
+      })
+    };
+  };
+
+  // web-search ignores untrusted input baseUrl/engineBaseUrls/headers and falls back from Bing error cleanly
+  const searchRes = await executeWebSearch({
+    query: 'test',
+    engine: 'duckduckgo',
+    baseUrl: 'https://evil.example',
+    engineBaseUrls: { duckduckgo: 'https://evil.example' },
+    headers: { 'X-Evil': '1' }
+  });
+  assert.equal(seenUrls[0].startsWith('https://duckduckgo.com/'), true);
+  assert.equal(seenHeaders[0]['X-Evil'], undefined);
+  assert.equal(searchRes.success, true);
+
+  // graphql-client binds tokenSecret to options, not input, and ignores inherited prototype keys
+  const gqlToString = await executeGraphQL(
+    { url: 'https://api.example.com/graphql', query: '{ ok }', tokenSecret: 'SECRET' },
+    { tokenSecret: 'toString' },
+    { secrets: { SECRET: 'hidden' } }
+  );
+  assert.equal(gqlToString.success, false);
+  assert.match(gqlToString.error.message, /toString is required/);
+
+  // hackernews-crawler rejects input.apiBaseUrl override
+  const hnBad = await executeHackerNews({ storyType: 'top', apiBaseUrl: 'https://evil.example' });
+  assert.equal(hnBad.success, false);
+
+  // intelligence-briefing ignores input.ai.baseUrl/apiKey override
+  seenUrls.length = 0;
+  const briefRes = await executeBriefing(
+    {
+      sourceData: [{ id: '1', title: 'Story', url: 'https://news.example/1' }],
+      ai: { enabled: true, apiKey: 'evil-key', baseUrl: 'https://evil.example/v1' }
+    },
+    { ai: { apiKey: 'trusted-key', baseUrl: 'https://api.openai.com/v1' } }
+  );
+  assert.equal(seenUrls.some(u => u.includes('evil.example')), false);
+  assert.equal(briefRes.metadata.package, '@maitask/intelligence-briefing');
+
+  // AI providers + image-generator ignore input.apiKey / input.baseUrl
+  seenUrls.length = 0;
+  seenHeaders.length = 0;
+  await executeOpenAI(
+    { text: 'hi', apiKey: 'evil', baseUrl: 'https://evil.example/v1' },
+    { apiKey: 'trusted-openai' }
+  );
+  await executeClaude(
+    { text: 'hi', api_key: 'evil', baseUrl: 'https://evil.example/v1' },
+    { apiKey: 'trusted-claude' }
+  );
+  await executeDeepSeek(
+    { text: 'hi', apiKey: 'evil', base_url: 'https://evil.example/v1' },
+    { apiKey: 'trusted-ds' }
+  );
+  await executeGemini(
+    { text: 'hi', model: 'gemini/pro:custom', apiKey: 'evil', baseUrl: 'https://evil.example/v1' },
+    { apiKey: 'trusted-gem' }
+  );
+  await executeOllama(
+    { text: 'hi', baseUrl: 'https://evil.example' },
+    { baseUrl: 'http://127.0.0.1:11434' }
+  );
+  await executeImageGen(
+    { prompt: 'tree', apiKey: 'evil' },
+    { apiKey: 'trusted-img' }
+  );
+  assert.equal(seenUrls.some(u => u.includes('evil.example')), false);
+  assert.ok(seenUrls.some(u => u.includes('gemini%2Fpro%3Acustom%3AgenerateContent') || u.includes('gemini%2Fpro%3Acustom:generateContent')));
+
+  // file-transformer & nocodb-importer ignore input.options overrides
+  const ftRes = await executeFileTx({ data: '{"a":1}', from: 'json', to: 'yaml', options: { includeParsed: true } });
+  assert.equal(ftRes.success, true);
+  assert.equal(ftRes.data.parsed, undefined);
+});
+
+test('P0/P1 parser, validation, streaming, and logic fixes hold under adversarial inputs', async t => {
+  const origFetch = global.fetch;
+  t.after(() => { global.fetch = origFetch; });
+
+  // web-scraper zero-width regex & oversize pattern
+  global.fetch = async () => ({
+    ok: true,
+    status: 200,
+    type: 'basic',
+    headers: { get: () => 'text/html' },
+    body: new ReadableStream({
+      start(c) {
+        c.enqueue(new TextEncoder().encode('<html><title>Hi</title><body>abc</body></html>'));
+        c.close();
+      }
+    })
+  });
+  const wsZeroWidth = await executeWebScraper('https://example.com', {
+    patterns: [
+      { name: 'zw', pattern: '(?:)' },
+      { name: 'long', pattern: 'a'.repeat(513) }
+    ]
+  });
+  assert.equal(wsZeroWidth.success, true);
+  assert.ok(wsZeroWidth.data.items[0].data.patterns[0].matches.length > 0);
+  assert.match(wsZeroWidth.data.items[0].data.patterns[1].error, /512/);
+
+  // ollama NDJSON flush + stream cancel
+  let cancelled = false;
+  global.fetch = async () => ({
+    ok: true,
+    status: 200,
+    type: 'basic',
+    body: {
+      getReader() {
+        const chunks = [new TextEncoder().encode('{"model":"llama3.2","message":{"content":"ok"},"done":true}')];
+        return {
+          async read() {
+            if (chunks.length) return { done: false, value: chunks.shift() };
+            return { done: true, value: undefined };
+          },
+          async cancel() {
+            cancelled = true;
+          }
+        };
+      }
+    }
+  });
+  const olRes = await executeOllama({ text: 'hi', stream: true });
+  assert.equal(olRes.success, true);
+  assert.equal(olRes.data.content, 'ok');
+  assert.equal(cancelled, true);
+
+  // data-validator $ref cycle guard + loose validation_mode + schema_url error redaction
+  const cyclicVal = await executeValidator([{ id: '1' }], {
+    schema: {
+      $defs: { node: { type: 'object', properties: { next: { $ref: '#/$defs/node' } } } },
+      $ref: '#/$defs/node'
+    }
+  });
+  assert.equal(cyclicVal.success, true);
+
+  const looseVal = await executeValidator([{ name: 'Alice', code: 'bad' }], {
+    validation_mode: 'loose',
+    schema: { type: 'object', properties: { code: { type: 'string', minLength: 10 } } }
+  });
+  assert.equal(looseVal.success, true);
+  assert.equal(looseVal.data.results[0].warnings.length, 1);
+
+  const looseCrit = await executeValidator([{ code: 'ok' }], {
+    validation_mode: 'loose',
+    required_fields: ['missing']
+  });
+  assert.equal(looseCrit.success, false);
+
+  global.fetch = async () => ({ ok: false, status: 500, type: 'basic' });
+  const schemaFetchErr = await executeValidator([{ a: 1 }], { schema_url: 'https://secret.example.com/private.json' });
+  assert.equal(schemaFetchErr.success, false);
+  assert.equal(schemaFetchErr.error.message.includes('secret.example.com'), false);
+
+  // json-transformer callable sourcePath guard & regex-special separator unflatten
+  const jtxCallable = executeJsonTx({ a: 1 }, { operation: 'map', mapping: { s: 'toString', fn: () => 'ran' } });
+  assert.equal(jtxCallable.success, true);
+  assert.equal(jtxCallable.data.s, undefined);
+  assert.equal(jtxCallable.data.fn, undefined);
+
+  const jtxUnflat = executeJsonTx({ 'a[0]*b': 42 }, { operation: 'unflatten', separator: '[0]*' });
+  assert.equal(jtxUnflat.success, true);
+  assert.equal(jtxUnflat.data.a.b, 42);
+
+  // file-processor callable field guard & null-proto distinct count
+  const fpRes = executeFileProc([{ a: 'constructor' }], {
+    operation: 'transform',
+    transformRules: { out: { from: 'toString' } }
+  });
+  assert.equal(fpRes.success, true);
+  assert.equal(fpRes.data.result[0].out, undefined);
+
+  // url-analyzer IPv6, equal sign in query, malformed percent, null options
+  const urlRes = executeUrl('https://[2001:db8::1]:8443/p?sig=abc==&bad=%ZZ', null);
+  assert.equal(urlRes.success, true);
+  assert.equal(urlRes.result.hostname, '[2001:db8::1]');
+  assert.equal(urlRes.result.queryParams.sig, 'abc==');
+
+  // excel-exporter newline + formula neutralization
+  const exRes = executeExcel([{ cell: '\n=1+1' }]);
+  assert.equal(exRes.success, true);
+  assert.equal(exRes.data.csv.includes("'\n=1+1"), true);
+
+  // csv-parser & text-parser 4-byte UTF-8 + base64 padding
+  const rocketB64 = Buffer.from('a,b\n🚀,ok', 'utf8').toString('base64');
+  const csvUtf8 = executeCsv({ base64: rocketB64 }, null);
+  assert.equal(csvUtf8.success, true);
+  assert.equal(csvUtf8.rows[0].a, '🚀');
+
+  const txtBadB64 = executeText({ base64: 'ab=c' });
+  assert.equal(txtBadB64.success, false);
+
+  // diff-generator falsey primitives & object key order
+  const diffZero = executeDiff({ old: 0, new: '' });
+  assert.equal(diffZero.success, true);
+  const diffArrOrder = executeDiff({ old: [{ a: 1, b: 2 }], new: [{ b: 2, a: 1 }] }, { mode: 'array' });
+  assert.equal(diffArrOrder.success, true);
+  assert.equal(diffArrOrder.hasChanges, false);
+  assert.equal(diffArrOrder.added.length, 0);
+  assert.equal(diffArrOrder.removed.length, 0);
+
+  // cron-parser step description, impossible date, null options
+  const cronDesc = executeCron('*/5 * * * *', { operation: 'describe' });
+  assert.equal(cronDesc.success, true);
+  assert.equal(cronDesc.data.result.includes('undefined'), false);
+  const cronFeb30 = executeCron('0 0 30 2 *', { operation: 'next', from: '2026-01-01T00:00:00Z' });
+  assert.equal(cronFeb30.success, false);
+  assert.equal(executeCron('* * * * *', null).success, true);
+
+  // markdown-renderer underscores inside link href
+  const mdRes = executeMarkdown('[my_doc](https://example.com/path_with_underscores)');
+  assert.equal(mdRes.success, true);
+  assert.match(mdRes.data.content, /href="https:\/\/example\.com\/path_with_underscores"/);
+
+  // pdf-parser FlateDecode with small maxTextLength
+  const compressed = zlib.deflateSync(Buffer.from('BT (Hello Compressed World) Tj ET', 'latin1'));
+  const pdfLatin1 = `%PDF-1.4\n1 0 obj\n<< /Length ${compressed.length} /Filter /FlateDecode >>\nstream\n${compressed.toString('latin1')}\nendstream\nendobj\n%%EOF`;
+  const pdfRes = executePdf({ base64: Buffer.from(pdfLatin1, 'latin1').toString('base64') }, { maxTextLength: 5 });
+  assert.equal(pdfRes.success, true);
+  assert.equal(pdfRes.data.decompressedStreams, 1);
+  assert.equal(pdfRes.data.text.startsWith('Hello'), true);
+
+  // image-metadata truncated PNG/GIF headers return null dimensions instead of NaN/garbage
+  const metaTrunc = executeImageMeta(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).toString('base64'));
+  assert.equal(metaTrunc.success, true);
+  assert.equal(metaTrunc.data.format, 'PNG');
+  assert.equal(metaTrunc.data.dimensions, null);
+  assert.equal(metaTrunc.data.colorInfo, null);
+  const gifTrunc = executeImageMeta(Buffer.from('GIF89a\x01\x00', 'latin1').toString('base64'));
+  assert.equal(gifTrunc.success, true);
+  assert.equal(gifTrunc.data.format, 'GIF');
+  assert.equal(gifTrunc.data.dimensions, null);
+
+  // yaml-converter cycle guard, indent validation, single-key array newline
+  const cyc = {};
+  cyc.self = cyc;
+  assert.equal(executeYaml({ data: cyc }, { direction: 'json-to-yaml' }).success, false);
+  assert.equal(executeYaml('a: 1', { indent: 0 }).success, false);
+  const yamlArr = executeYaml({ data: [{ a: 1 }, { b: 2 }] }, { direction: 'json-to-yaml' });
+  assert.equal(yamlArr.success, true);
+  assert.match(yamlArr.result, /a: 1\n-.*b: 2/);
+
+  // audio-processor srt format & streaming audioUrl limit
+  global.fetch = async url => {
+    if (String(url).includes('audio.mp3')) {
+      return {
+        ok: true,
+        status: 200,
+        body: new ReadableStream({
+          start(c) {
+            c.enqueue(new Uint8Array(100));
+            c.close();
+          }
+        })
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      text: async () => '1\n00:00:00,000 --> 00:00:01,000\nHello',
+      json: async () => { throw new Error('json() must not run for srt'); }
+    };
+  };
+  const audioSrt = await executeAudio(
+    { audioUrl: 'https://cdn.example.com/audio.mp3', response_format: 'srt' },
+    { apiKey: 'sk-test' }
+  );
+  assert.equal(audioSrt.success, true);
+  assert.match(audioSrt.data.text, /Hello/);
+});
+
+test('package schemas, TypeScript headers, and docs stay aligned without legacy artifacts', () => {
+  const pkgRoot = path.resolve(__dirname, '..');
+  const dirs = fs.readdirSync(pkgRoot)
+    .filter(d => fs.existsSync(path.join(pkgRoot, d, 'package.json')))
+    .sort();
+  assert.equal(dirs.length, 40);
+
+  for (const d of dirs) {
+    const manifest = JSON.parse(fs.readFileSync(path.join(pkgRoot, d, 'package.json'), 'utf8'));
+    assert.ok(manifest.maitask?.schemas?.input, `${d} must define maitask.schemas.input`);
+    if (['cf-proxy', 'image-metadata', 'text-parser'].includes(d)) {
+      assert.equal(manifest.maitask.schemas.options, undefined, `${d} omits schemas.options`);
+    } else {
+      assert.ok(manifest.maitask.schemas.options, `${d} must define maitask.schemas.options`);
+    }
+
+    const dtsPath = path.join(pkgRoot, d, 'index.d.ts');
+    if (fs.existsSync(dtsPath)) {
+      const dts = fs.readFileSync(dtsPath, 'utf8');
+      for (const m of dts.matchAll(/version:\s*['"]([0-9]+\.[0-9]+\.[0-9]+)['"]/g)) {
+        assert.equal(m[1], manifest.version, `${d}/index.d.ts literal version must match ${manifest.version}`);
+      }
+    }
+
+    const readme = fs.readFileSync(path.join(pkgRoot, d, 'README.md'), 'utf8');
+    assert.equal(/--options\b/.test(readme), false, `${d}/README.md must not use --options`);
+    assert.equal(/npm install @maitask\//.test(readme), false, `${d}/README.md must not suggest npm install @maitask/...`);
+    assert.equal(/Node\.js\s*>=\s*14/.test(readme), false, `${d}/README.md must not require Node 14`);
+    assert.equal(/DEXPS_/.test(readme), false, `${d}/README.md must not reference DEXPS_`);
+  }
+
+  const traderPkg = JSON.parse(fs.readFileSync(path.join(pkgRoot, 'trader/package.json'), 'utf8'));
+  assert.equal(traderPkg.maitask.schemas.input.properties.interval.default, undefined);
+
+  const imgGenPkg = JSON.parse(fs.readFileSync(path.join(pkgRoot, 'image-generator/package.json'), 'utf8'));
+  assert.equal(imgGenPkg.maitask.schemas.input.properties.apiKey, undefined);
 });
