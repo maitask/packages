@@ -70,10 +70,19 @@ export interface ExecuteResult {
         type: string;
     };
     metadata: {
+        package?: string;
         provider: string;
         timestamp: string;
         version: string;
         model?: string;
+        usage?: {
+            promptTokens: number;
+            completionTokens: number;
+            totalTokens: number;
+            prompt_tokens: number;
+            completion_tokens: number;
+            total_tokens: number;
+        };
     };
 }
 

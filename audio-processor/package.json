@@ -61,9 +61,21 @@
             "default": "https://storage.googleapis.com/maitask/examples/meeting-snippet.mp3",
             "format": "uri"
           },
+          "audioData": {
+            "type": "string",
+            "title": "Audio Data",
+            "x-advanced": true
+          },
           "task": {
             "type": "string",
             "title": "Task",
+            "enum": [
+              "transcribe",
+              "translate",
+              "analyze",
+              "summarize",
+              "generate"
+            ],
             "default": "transcribe"
           },
           "language": {
@@ -74,6 +86,11 @@
           "provider": {
             "type": "string",
             "title": "Provider",
+            "enum": [
+              "whisper",
+              "gemini",
+              "openai"
+            ],
             "default": "whisper"
           },
           "model": {
@@ -85,6 +102,31 @@
             "type": "string",
             "title": "Prompt",
             "default": "Transcribe the meeting and highlight action items for the team."
+          },
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "x-advanced": true
+          },
+          "voice": {
+            "type": "string",
+            "title": "Voice",
+            "default": "alloy",
+            "x-advanced": true
+          },
+          "response_format": {
+            "type": "string",
+            "title": "Response Format",
+            "default": "mp3",
+            "x-advanced": true
+          },
+          "speed": {
+            "type": "number",
+            "title": "Speed",
+            "minimum": 0.25,
+            "maximum": 4,
+            "default": 1,
+            "x-advanced": true
           }
         }
       },
@@ -95,9 +137,23 @@
             "type": "string",
             "title": "Api Key",
             "format": "password"
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout Ms",
+            "minimum": 1000,
+            "maximum": 120000,
+            "default": 30000,
+            "x-advanced": true
           }
         }
       }
     }
-  }
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "example.json"
+  ]
 }

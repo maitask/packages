@@ -71,47 +71,107 @@
             "title": "Method",
             "enum": [
               "GET",
+              "HEAD",
               "POST",
               "PUT",
               "PATCH",
               "DELETE",
-              "HEAD"
+              "OPTIONS"
             ],
             "default": "GET"
           },
           "headers": {
             "type": "object",
             "title": "Headers",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "x-advanced": true
+          },
+          "query": {
+            "type": "object",
+            "title": "Query Parameters",
+            "additionalProperties": true
+          },
+          "auth": {
+            "type": "object",
+            "title": "Auth",
             "properties": {
-              "Accept": {
+              "type": {
                 "type": "string",
-                "title": "Accept",
-                "default": "application/json"
+                "title": "Type",
+                "enum": [
+                  "bearer",
+                  "basic",
+                  "apiKey"
+                ]
               },
-              "X-Trace-Id": {
+              "tokenSecret": {
                 "type": "string",
-                "title": "X Trace Id",
-                "default": "maitask-http-request-example"
+                "title": "Token Secret Name"
+              },
+              "usernameSecret": {
+                "type": "string",
+                "title": "Username Secret Name"
+              },
+              "passwordSecret": {
+                "type": "string",
+                "title": "Password Secret Name"
+              },
+              "header": {
+                "type": "string",
+                "title": "Header"
+              },
+              "valueSecret": {
+                "type": "string",
+                "title": "Value Secret Name"
               }
             },
+            "x-advanced": true
+          },
+          "json": {
+            "type": "object",
+            "title": "JSON Body",
+            "additionalProperties": true
+          },
+          "text": {
+            "type": "string",
+            "title": "Text Body",
+            "x-advanced": true
+          },
+          "bodyBase64": {
+            "type": "string",
+            "title": "Base64 Body",
+            "x-advanced": true
+          },
+          "form": {
+            "type": "object",
+            "title": "Form Body",
+            "additionalProperties": true,
+            "x-advanced": true
+          },
+          "multipart": {
+            "type": "object",
+            "title": "Multipart Body",
+            "additionalProperties": true,
             "x-advanced": true
           },
           "timeoutMs": {
             "type": "integer",
             "title": "Timeout Ms",
-            "default": 15000,
+            "default": 30000,
             "x-advanced": true
           },
           "maxResponseBytes": {
             "type": "integer",
             "title": "Max Response Bytes",
-            "default": 1048576,
+            "default": 8388608,
             "x-advanced": true
           },
           "maxRedirects": {
             "type": "integer",
             "title": "Max Redirects",
-            "default": 2,
+            "default": 5,
             "x-advanced": true
           },
           "responseType": {
@@ -120,7 +180,7 @@
             "enum": [
               "json",
               "text",
-              "bytes"
+              "base64"
             ],
             "default": "json"
           },
@@ -134,15 +194,32 @@
             },
             "x-advanced": true
           },
+          "acceptedStatusRange": {
+            "type": "object",
+            "title": "Accepted Status Range",
+            "properties": {
+              "min": {
+                "type": "integer",
+                "title": "Min",
+                "default": 200
+              },
+              "max": {
+                "type": "integer",
+                "title": "Max",
+                "default": 299
+              }
+            },
+            "x-advanced": true
+          },
           "redirect": {
             "type": "string",
             "title": "Redirect",
             "enum": [
-              "error",
               "follow",
-              "manual"
+              "manual",
+              "error"
             ],
-            "default": "error"
+            "default": "follow"
           },
           "retry": {
             "type": "object",
@@ -188,6 +265,51 @@
                 "title": "Respect Retry After",
                 "default": true
               }
+            },
+            "x-advanced": true
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout Ms",
+            "default": 30000,
+            "x-advanced": true
+          },
+          "maxResponseBytes": {
+            "type": "integer",
+            "title": "Max Response Bytes",
+            "default": 8388608,
+            "x-advanced": true
+          },
+          "maxRedirects": {
+            "type": "integer",
+            "title": "Max Redirects",
+            "default": 5,
+            "x-advanced": true
+          },
+          "allowInsecureHttp": {
+            "type": "boolean",
+            "title": "Allow Insecure Http",
+            "default": false,
+            "x-advanced": true
+          },
+          "allowedHosts": {
+            "type": "array",
+            "title": "Allowed Hosts",
+            "items": {
+              "type": "string"
+            },
+            "x-advanced": true
+          },
+          "secrets": {
+            "type": "object",
+            "title": "Secrets",
+            "additionalProperties": {
+              "type": "string"
             },
             "x-advanced": true
           }

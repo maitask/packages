@@ -18,7 +18,8 @@
     "index.js",
     "index.d.ts",
     "README.md",
-    "example.json"
+    "example.json",
+    "README_zh-CN.md"
   ],
   "engines": {
     "node": ">=18.0.0"
@@ -60,10 +61,55 @@
             "type": "string",
             "title": "Description"
           },
+          "catalog": {
+            "type": "array",
+            "title": "Catalog",
+            "items": {
+              "type": "object",
+              "title": "Package",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "title": "Name"
+                },
+                "version": {
+                  "type": "string",
+                  "title": "Version"
+                },
+                "description": {
+                  "type": "string",
+                  "title": "Description"
+                },
+                "category": {
+                  "type": "string",
+                  "title": "Category"
+                },
+                "input_fields": {
+                  "type": "array",
+                  "title": "Input Fields",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "option_fields": {
+                  "type": "array",
+                  "title": "Option Fields",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "additionalProperties": true
+            },
+            "x-advanced": true
+          },
           "language": {
             "type": "string",
             "title": "Language",
-            "enum": ["zh-CN", "en"],
+            "enum": [
+              "zh-CN",
+              "en"
+            ],
             "default": "zh-CN"
           }
         }
@@ -89,7 +135,10 @@
           "language": {
             "type": "string",
             "title": "Language",
-            "enum": ["zh-CN", "en"],
+            "enum": [
+              "zh-CN",
+              "en"
+            ],
             "default": "zh-CN"
           },
           "temperature": {

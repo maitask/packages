@@ -86,10 +86,6 @@
             "title": "Method",
             "enum": [
               "GET",
-              "POST",
-              "PUT",
-              "PATCH",
-              "DELETE",
               "HEAD"
             ],
             "default": "GET"

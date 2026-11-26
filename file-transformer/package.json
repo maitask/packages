@@ -67,7 +67,46 @@
             "default": "yaml"
           }
         }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "csvDelimiter": {
+            "type": "string",
+            "title": "CSV Delimiter",
+            "default": ","
+          },
+          "csvHeader": {
+            "type": "boolean",
+            "title": "Include CSV Header",
+            "default": true
+          },
+          "inferTypes": {
+            "type": "boolean",
+            "title": "Infer Types",
+            "default": true
+          },
+          "includeParsed": {
+            "type": "boolean",
+            "title": "Include Parsed Object",
+            "default": false,
+            "x-advanced": true
+          },
+          "yamlIndent": {
+            "type": "integer",
+            "title": "YAML Indent",
+            "default": 2,
+            "x-advanced": true
+          }
+        }
       }
     }
-  }
+  },
+  "types": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "example.json"
+  ]
 }

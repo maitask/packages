@@ -88,7 +88,30 @@
             "default": true
           }
         }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "baseUrl": {
+            "type": "string",
+            "title": "Base Url",
+            "format": "uri",
+            "x-advanced": true
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout Ms",
+            "default": 15000,
+            "x-advanced": true
+          }
+        }
       }
     }
-  }
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "example.json"
+  ]
 }

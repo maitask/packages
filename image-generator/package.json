@@ -78,7 +78,39 @@
             "format": "password"
           }
         }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "provider": {
+            "type": "string",
+            "title": "Provider",
+            "enum": [
+              "openai",
+              "stability"
+            ],
+            "default": "openai"
+          },
+          "apiKey": {
+            "type": "string",
+            "title": "API Key",
+            "format": "password"
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout Ms",
+            "default": 30000,
+            "x-advanced": true
+          }
+        }
       }
     }
-  }
+  },
+  "types": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "example.json"
+  ]
 }

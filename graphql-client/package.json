@@ -79,7 +79,36 @@
             "x-advanced": true
           }
         }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "tokenSecret": {
+            "type": "string",
+            "title": "Bearer Token Secret Name",
+            "x-advanced": true
+          },
+          "allowInsecureHttp": {
+            "type": "boolean",
+            "title": "Allow Insecure HTTP",
+            "default": false,
+            "x-advanced": true
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout Ms",
+            "default": 30000,
+            "x-advanced": true
+          }
+        }
       }
     }
-  }
+  },
+  "types": "index.d.ts",
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "example.json"
+  ]
 }

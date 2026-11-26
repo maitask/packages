@@ -69,6 +69,15 @@
           "action": {
             "type": "string",
             "title": "Action",
+            "enum": [
+              "marketSnapshot",
+              "analyze",
+              "backtest",
+              "paperOrder",
+              "accountSnapshot",
+              "cancelOrder",
+              "placeOrder"
+            ],
             "default": "marketSnapshot"
           },
           "symbol": {
@@ -79,6 +88,22 @@
           "interval": {
             "type": "string",
             "title": "Interval",
+            "enum": [
+              "1m",
+              "3m",
+              "5m",
+              "15m",
+              "30m",
+              "1h",
+              "2h",
+              "4h",
+              "6h",
+              "8h",
+              "12h",
+              "1d",
+              "3d",
+              "1w"
+            ],
             "default": "5m"
           },
           "limit": {
@@ -93,19 +118,350 @@
               "provider": {
                 "type": "string",
                 "title": "Provider",
+                "enum": [
+                  "binance",
+                  "aster",
+                  "okx"
+                ],
                 "default": "binance"
               },
               "market": {
                 "type": "string",
                 "title": "Market",
+                "enum": [
+                  "spot",
+                  "futures",
+                  "swap"
+                ],
                 "default": "spot"
               },
               "environment": {
                 "type": "string",
                 "title": "Environment",
+                "enum": [
+                  "testnet",
+                  "mainnet"
+                ],
                 "default": "testnet"
               }
             }
+          },
+          "candles": {
+            "type": "array",
+            "title": "Candles",
+            "items": {
+              "type": "object",
+              "properties": {
+                "openTime": {
+                  "type": "number",
+                  "title": "Open Time"
+                },
+                "open": {
+                  "type": "number",
+                  "title": "Open"
+                },
+                "high": {
+                  "type": "number",
+                  "title": "High"
+                },
+                "low": {
+                  "type": "number",
+                  "title": "Low"
+                },
+                "close": {
+                  "type": "number",
+                  "title": "Close"
+                },
+                "volume": {
+                  "type": "number",
+                  "title": "Volume"
+                }
+              }
+            },
+            "x-advanced": true
+          },
+          "strategy": {
+            "type": "object",
+            "title": "Strategy",
+            "properties": {
+              "type": {
+                "type": "string",
+                "title": "Type",
+                "enum": [
+                  "smaCrossover",
+                  "rsiMeanReversion",
+                  "momentum",
+                  "manual"
+                ],
+                "default": "smaCrossover"
+              },
+              "manualSignal": {
+                "type": "string",
+                "title": "Manual Signal",
+                "enum": [
+                  "long",
+                  "short",
+                  "flat"
+                ]
+              },
+              "fastLength": {
+                "type": "integer",
+                "title": "Fast Length"
+              },
+              "slowLength": {
+                "type": "integer",
+                "title": "Slow Length"
+              },
+              "emaLength": {
+                "type": "integer",
+                "title": "EMA Length"
+              },
+              "rsiLength": {
+                "type": "integer",
+                "title": "RSI Length"
+              },
+              "lowerBand": {
+                "type": "number",
+                "title": "Lower Band"
+              },
+              "upperBand": {
+                "type": "number",
+                "title": "Upper Band"
+              },
+              "volatilityLength": {
+                "type": "integer",
+                "title": "Volatility Length"
+              },
+              "momentumLookback": {
+                "type": "integer",
+                "title": "Momentum Lookback"
+              },
+              "confidence": {
+                "type": "number",
+                "title": "Confidence"
+              },
+              "reason": {
+                "type": "string",
+                "title": "Reason"
+              }
+            },
+            "x-advanced": true
+          },
+          "simulation": {
+            "type": "object",
+            "title": "Simulation",
+            "properties": {
+              "initialCapital": {
+                "type": "number",
+                "title": "Initial Capital"
+              },
+              "positionFraction": {
+                "type": "number",
+                "title": "Position Fraction"
+              },
+              "feeBps": {
+                "type": "number",
+                "title": "Fee (bps)"
+              },
+              "slippageBps": {
+                "type": "number",
+                "title": "Slippage (bps)"
+              },
+              "allowLong": {
+                "type": "boolean",
+                "title": "Allow Long"
+              },
+              "allowShort": {
+                "type": "boolean",
+                "title": "Allow Short"
+              }
+            },
+            "x-advanced": true
+          },
+          "paperState": {
+            "type": "object",
+            "title": "Paper State",
+            "properties": {
+              "version": {
+                "type": "integer",
+                "title": "Version"
+              },
+              "quoteBalance": {
+                "type": "string",
+                "title": "Quote Balance"
+              },
+              "positions": {
+                "type": "array",
+                "title": "Positions",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "orders": {
+                "type": "array",
+                "title": "Orders",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "realizedPnl": {
+                "type": "string",
+                "title": "Realized PnL"
+              },
+              "feesPaid": {
+                "type": "string",
+                "title": "Fees Paid"
+              },
+              "equityHistory": {
+                "type": "array",
+                "title": "Equity History",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              }
+            },
+            "x-advanced": true
+          },
+          "referencePrice": {
+            "type": "string",
+            "title": "Reference Price",
+            "x-advanced": true
+          },
+          "eventTime": {
+            "type": "number",
+            "title": "Event Time",
+            "x-advanced": true
+          },
+          "order": {
+            "type": "object",
+            "title": "Order",
+            "properties": {
+              "orderId": {
+                "type": "string",
+                "title": "Order ID"
+              },
+              "clientOrderId": {
+                "type": "string",
+                "title": "Client Order ID"
+              },
+              "side": {
+                "type": "string",
+                "title": "Side",
+                "enum": [
+                  "buy",
+                  "sell"
+                ]
+              },
+              "type": {
+                "type": "string",
+                "title": "Type",
+                "enum": [
+                  "market",
+                  "limit"
+                ]
+              },
+              "quantity": {
+                "type": "string",
+                "title": "Quantity"
+              },
+              "quoteQuantity": {
+                "type": "string",
+                "title": "Quote Quantity"
+              },
+              "price": {
+                "type": "string",
+                "title": "Price"
+              },
+              "timeInForce": {
+                "type": "string",
+                "title": "Time In Force",
+                "enum": [
+                  "GTC",
+                  "IOC",
+                  "FOK"
+                ]
+              },
+              "reduceOnly": {
+                "type": "boolean",
+                "title": "Reduce Only"
+              },
+              "positionSide": {
+                "type": "string",
+                "title": "Position Side",
+                "enum": [
+                  "long",
+                  "short"
+                ]
+              }
+            },
+            "x-advanced": true
+          }
+        }
+      },
+      "options": {
+        "type": "object",
+        "properties": {
+          "baseUrl": {
+            "type": "string",
+            "title": "Base Url",
+            "format": "uri",
+            "x-advanced": true
+          },
+          "allowInsecureHttp": {
+            "type": "boolean",
+            "title": "Allow Insecure Http",
+            "default": false,
+            "x-advanced": true
+          },
+          "allowLiveTrading": {
+            "type": "boolean",
+            "title": "Allow Live Trading",
+            "default": false,
+            "x-advanced": true
+          },
+          "allowMainnetTrading": {
+            "type": "boolean",
+            "title": "Allow Mainnet Trading",
+            "default": false,
+            "x-advanced": true
+          },
+          "apiKeySecret": {
+            "type": "string",
+            "title": "API Key Secret Name",
+            "x-advanced": true
+          },
+          "apiSecretSecret": {
+            "type": "string",
+            "title": "API Secret Name",
+            "x-advanced": true
+          },
+          "passphraseSecret": {
+            "type": "string",
+            "title": "Passphrase Secret Name",
+            "x-advanced": true
+          },
+          "secrets": {
+            "type": "object",
+            "title": "Secrets",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "x-advanced": true
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout Ms",
+            "default": 30000,
+            "x-advanced": true
+          },
+          "maxResponseBytes": {
+            "type": "integer",
+            "title": "Max Response Bytes",
+            "default": 4194304,
+            "x-advanced": true
           }
         }
       }

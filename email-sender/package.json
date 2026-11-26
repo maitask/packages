@@ -75,6 +75,10 @@
           "provider": {
             "type": "string",
             "title": "Provider",
+            "enum": [
+              "sendgrid",
+              "mailgun"
+            ],
             "default": "sendgrid"
           },
           "from": {
@@ -83,13 +87,11 @@
             "properties": {
               "email": {
                 "type": "string",
-                "title": "Email",
-                "default": "reports@maitask.com"
+                "title": "Email"
               },
               "name": {
                 "type": "string",
-                "title": "Name",
-                "default": "Maitask Reports"
+                "title": "Name"
               }
             }
           },
@@ -98,25 +100,89 @@
             "title": "To",
             "items": {
               "type": "object",
-              "title": "To",
+              "title": "Recipient",
               "properties": {
                 "email": {
                   "type": "string",
-                  "title": "Email",
-                  "default": "product-team@example.com"
+                  "title": "Email"
                 },
                 "name": {
                   "type": "string",
-                  "title": "Name",
-                  "default": "Product Team"
+                  "title": "Name"
                 }
               }
             }
           },
+          "cc": {
+            "type": "array",
+            "title": "CC",
+            "items": {
+              "type": "object",
+              "title": "Recipient",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "title": "Email"
+                },
+                "name": {
+                  "type": "string",
+                  "title": "Name"
+                }
+              }
+            },
+            "x-advanced": true
+          },
+          "bcc": {
+            "type": "array",
+            "title": "BCC",
+            "items": {
+              "type": "object",
+              "title": "Recipient",
+              "properties": {
+                "email": {
+                  "type": "string",
+                  "title": "Email"
+                },
+                "name": {
+                  "type": "string",
+                  "title": "Name"
+                }
+              }
+            },
+            "x-advanced": true
+          },
+          "replyTo": {
+            "type": "object",
+            "title": "Reply To",
+            "properties": {
+              "email": {
+                "type": "string",
+                "title": "Email"
+              },
+              "name": {
+                "type": "string",
+                "title": "Name"
+              }
+            },
+            "x-advanced": true
+          },
           "subject": {
             "type": "string",
-            "title": "Subject",
-            "default": "Weekly Product Update"
+            "title": "Subject"
+          },
+          "content": {
+            "type": "object",
+            "title": "Content",
+            "properties": {
+              "text": {
+                "type": "string",
+                "title": "Text"
+              },
+              "html": {
+                "type": "string",
+                "title": "Html"
+              }
+            }
           },
           "template": {
             "type": "object",
@@ -124,71 +190,90 @@
             "properties": {
               "text": {
                 "type": "string",
-                "title": "Text",
-                "default": "{{title}}\n\n{{summary}}\nActive users: {{metrics.activeUsers}}\nNew signups: {{metrics.newSignups}}\nChurn: {{metrics.churn}}"
+                "title": "Text"
               },
               "html": {
                 "type": "string",
-                "title": "Html",
-                "default": "<h1>{{title}}</h1><p>{{summary}}</p><ul><li>Active users: {{metrics.activeUsers}}</li><li>New signups: {{metrics.newSignups}}</li><li>Churn: {{metrics.churn}}</li></ul>"
+                "title": "Html"
               },
               "variables": {
                 "type": "object",
                 "title": "Variables",
-                "properties": {
-                  "title": {
-                    "type": "string",
-                    "title": "Title",
-                    "default": "Product Metrics - Week 42"
-                  },
-                  "summary": {
-                    "type": "string",
-                    "title": "Summary",
-                    "default": "Active users increased 8% and churn dropped to 1.4%."
-                  },
-                  "metrics": {
-                    "type": "object",
-                    "title": "Metrics",
-                    "properties": {
-                      "activeUsers": {
-                        "type": "string",
-                        "title": "Active Users",
-                        "default": "12,540"
-                      },
-                      "newSignups": {
-                        "type": "string",
-                        "title": "New Signups",
-                        "default": "1,102"
-                      },
-                      "churn": {
-                        "type": "string",
-                        "title": "Churn",
-                        "default": "1.4%"
-                      }
-                    }
-                  }
-                }
+                "additionalProperties": true
               }
             }
+          },
+          "providerTemplate": {
+            "type": "object",
+            "title": "Provider Template",
+            "properties": {
+              "id": {
+                "type": "string",
+                "title": "Template ID"
+              },
+              "variables": {
+                "type": "object",
+                "title": "Variables",
+                "additionalProperties": true
+              }
+            },
+            "x-advanced": true
+          },
+          "attachments": {
+            "type": "array",
+            "title": "Attachments",
+            "items": {
+              "type": "object",
+              "properties": {
+                "filename": {
+                  "type": "string",
+                  "title": "Filename"
+                },
+                "contentType": {
+                  "type": "string",
+                  "title": "Content Type"
+                },
+                "bodyBase64": {
+                  "type": "string",
+                  "title": "Body Base64"
+                },
+                "disposition": {
+                  "type": "string",
+                  "title": "Disposition",
+                  "enum": [
+                    "attachment",
+                    "inline"
+                  ]
+                },
+                "contentId": {
+                  "type": "string",
+                  "title": "Content ID"
+                }
+              }
+            },
+            "x-advanced": true
+          },
+          "headers": {
+            "type": "object",
+            "title": "Headers",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "x-advanced": true
           },
           "tags": {
             "type": "array",
             "title": "Tags",
             "items": {
               "type": "string",
-              "title": "Tags",
-              "default": "production"
+              "title": "Tag"
             }
           },
           "metadata": {
             "type": "object",
             "title": "Metadata",
-            "properties": {
-              "workflowId": {
-                "type": "string",
-                "title": "Workflow Id",
-                "default": "weekly-product-report"
-              }
+            "additionalProperties": {
+              "type": "string"
             },
             "x-advanced": true
           }
@@ -197,10 +282,19 @@
       "options": {
         "type": "object",
         "properties": {
+          "domain": {
+            "type": "string",
+            "title": "Domain"
+          },
+          "baseUrl": {
+            "type": "string",
+            "title": "Base Url",
+            "format": "uri",
+            "x-advanced": true
+          },
           "apiKeySecret": {
             "type": "string",
-            "title": "Api Key Secret",
-            "format": "password"
+            "title": "Api Key Secret"
           },
           "timeoutMs": {
             "type": "integer",
@@ -212,6 +306,20 @@
             "type": "integer",
             "title": "Max Response Bytes",
             "default": 65536,
+            "x-advanced": true
+          },
+          "allowInsecureHttp": {
+            "type": "boolean",
+            "title": "Allow Insecure Http",
+            "default": false,
+            "x-advanced": true
+          },
+          "secrets": {
+            "type": "object",
+            "title": "Secrets",
+            "additionalProperties": {
+              "type": "string"
+            },
             "x-advanced": true
           }
         }

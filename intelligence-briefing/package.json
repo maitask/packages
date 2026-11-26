@@ -39,7 +39,10 @@
               "targetLanguage": {
                 "type": "string",
                 "title": "Language",
-                "enum": ["zh-CN", "en"],
+                "enum": [
+                  "zh-CN",
+                  "en"
+                ],
                 "default": "zh-CN"
               },
               "profile": {
@@ -60,14 +63,20 @@
               "depth": {
                 "type": "string",
                 "title": "Depth",
-                "enum": ["brief", "standard", "deep"],
+                "enum": [
+                  "brief",
+                  "standard",
+                  "deep"
+                ],
                 "default": "standard",
                 "x-advanced": true
               },
               "focus": {
                 "type": "array",
                 "title": "Focus topics",
-                "items": { "type": "string" },
+                "items": {
+                  "type": "string"
+                },
                 "x-advanced": true
               }
             }
@@ -107,7 +116,10 @@
               "provider": {
                 "type": "string",
                 "title": "Provider",
-                "enum": ["openai_compatible", "extractive"],
+                "enum": [
+                  "openai_compatible",
+                  "extractive"
+                ],
                 "default": "openai_compatible"
               },
               "apiKey": {
@@ -123,7 +135,7 @@
               "model": {
                 "type": "string",
                 "title": "Model",
-                "default": "gpt-5.5"
+                "default": "gpt-4o-mini"
               },
               "timeoutMs": {
                 "type": "integer",
@@ -162,7 +174,10 @@
               "product": {
                 "type": "string",
                 "title": "Format",
-                "enum": ["hacker_news_daily", "intelligence_briefing"],
+                "enum": [
+                  "hacker_news_daily",
+                  "intelligence_briefing"
+                ],
                 "default": "hacker_news_daily"
               },
               "includeSources": {
@@ -176,6 +191,375 @@
                 "x-advanced": true
               }
             }
+          }
+        }
+      },
+      "input": {
+        "type": "object",
+        "properties": {
+          "sourceData": {
+            "type": "array",
+            "title": "Pre-collected Items",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "title": "ID"
+                },
+                "title": {
+                  "type": "string",
+                  "title": "Title"
+                },
+                "url": {
+                  "type": "string",
+                  "title": "URL",
+                  "format": "uri"
+                },
+                "text": {
+                  "type": "string",
+                  "title": "Text"
+                },
+                "summary": {
+                  "type": "string",
+                  "title": "Summary"
+                },
+                "score": {
+                  "type": "number",
+                  "title": "Score"
+                },
+                "commentCount": {
+                  "type": "integer",
+                  "title": "Comment Count"
+                },
+                "time": {
+                  "type": "string",
+                  "title": "Time"
+                },
+                "author": {
+                  "type": "string",
+                  "title": "Author"
+                },
+                "source": {
+                  "type": "string",
+                  "title": "Source"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "sources": {
+            "type": "array",
+            "title": "Source Feeds",
+            "items": {
+              "type": "object",
+              "properties": {
+                "type": {
+                  "type": "string",
+                  "title": "Type",
+                  "enum": [
+                    "hackernews",
+                    "items",
+                    "inline"
+                  ],
+                  "default": "hackernews"
+                },
+                "storyType": {
+                  "type": "string",
+                  "title": "Story Type"
+                },
+                "storyTypes": {
+                  "type": "array",
+                  "title": "Story Types",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "limit": {
+                  "type": "integer",
+                  "title": "Limit",
+                  "minimum": 1,
+                  "maximum": 100
+                },
+                "includeComments": {
+                  "type": "boolean",
+                  "title": "Include Comments"
+                },
+                "commentLimit": {
+                  "type": "integer",
+                  "title": "Comment Limit",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "commentDepth": {
+                  "type": "integer",
+                  "title": "Comment Depth",
+                  "minimum": 0,
+                  "maximum": 10
+                },
+                "apiBaseUrl": {
+                  "type": "string",
+                  "title": "API Base URL",
+                  "format": "uri"
+                }
+              },
+              "additionalProperties": true
+            }
+          },
+          "selection": {
+            "type": "object",
+            "title": "Selection Policy",
+            "properties": {
+              "maxItems": {
+                "type": "integer",
+                "title": "Stories",
+                "minimum": 1,
+                "maximum": 30,
+                "default": 8
+              },
+              "minScore": {
+                "type": "number",
+                "title": "Minimum Score"
+              },
+              "minComments": {
+                "type": "number",
+                "title": "Minimum Comments"
+              },
+              "newerThanHours": {
+                "type": "number",
+                "title": "Newer Than Hours"
+              },
+              "keywords": {
+                "type": "array",
+                "title": "Keywords",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "excludeKeywords": {
+                "type": "array",
+                "title": "Exclude Keywords",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "domains": {
+                "type": "array",
+                "title": "Domains",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "excludeDomains": {
+                "type": "array",
+                "title": "Exclude Domains",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "sortBy": {
+                "type": "string",
+                "title": "Sort By",
+                "default": "signal"
+              }
+            },
+            "additionalProperties": true
+          },
+          "analysis": {
+            "type": "object",
+            "title": "Analysis Configuration",
+            "properties": {
+              "targetLanguage": {
+                "type": "string",
+                "title": "Language",
+                "enum": [
+                  "zh-CN",
+                  "en"
+                ],
+                "default": "en"
+              },
+              "profile": {
+                "type": "string",
+                "title": "Focus",
+                "enum": [
+                  "technology",
+                  "forecast",
+                  "business",
+                  "economic",
+                  "market",
+                  "risk",
+                  "policy",
+                  "investment"
+                ],
+                "default": "technology"
+              },
+              "depth": {
+                "type": "string",
+                "title": "Depth",
+                "enum": [
+                  "brief",
+                  "standard",
+                  "deep"
+                ],
+                "default": "standard"
+              },
+              "focus": {
+                "type": "array",
+                "title": "Focus Topics",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "customInstructions": {
+                "type": "string",
+                "title": "Custom Instructions"
+              },
+              "audience": {
+                "type": "string",
+                "title": "Audience",
+                "default": "operator"
+              }
+            },
+            "additionalProperties": true
+          },
+          "dedupe": {
+            "type": "object",
+            "title": "Deduplication",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "title": "Enabled",
+                "default": true
+              },
+              "windowHours": {
+                "type": "integer",
+                "title": "Window Hours",
+                "minimum": 1,
+                "maximum": 8760,
+                "default": 72
+              },
+              "seen": {
+                "type": "array",
+                "title": "Seen Items",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": true
+                }
+              },
+              "maxSeen": {
+                "type": "integer",
+                "title": "Max Seen",
+                "minimum": 10,
+                "maximum": 10000,
+                "default": 500
+              }
+            },
+            "x-advanced": true
+          },
+          "ai": {
+            "type": "object",
+            "title": "AI",
+            "properties": {
+              "enabled": {
+                "type": "boolean",
+                "title": "Write with AI",
+                "default": true
+              },
+              "provider": {
+                "type": "string",
+                "title": "Provider",
+                "enum": [
+                  "openai_compatible",
+                  "extractive"
+                ],
+                "default": "openai_compatible"
+              },
+              "baseUrl": {
+                "type": "string",
+                "title": "API Base URL",
+                "format": "uri"
+              },
+              "endpoint": {
+                "type": "string",
+                "title": "Endpoint"
+              },
+              "model": {
+                "type": "string",
+                "title": "Model",
+                "default": "gpt-4o-mini"
+              },
+              "temperature": {
+                "type": "number",
+                "title": "Temperature",
+                "minimum": 0,
+                "maximum": 2,
+                "default": 0.2
+              },
+              "maxTokens": {
+                "type": "integer",
+                "title": "Max Tokens",
+                "minimum": 200,
+                "maximum": 12000,
+                "default": 1800
+              },
+              "timeoutMs": {
+                "type": "integer",
+                "title": "Request Timeout (ms)",
+                "minimum": 1000,
+                "maximum": 300000,
+                "default": 60000
+              },
+              "retries": {
+                "type": "integer",
+                "title": "Retries",
+                "minimum": 0,
+                "maximum": 5,
+                "default": 2
+              },
+              "jsonMode": {
+                "type": "boolean",
+                "title": "JSON Mode",
+                "default": true
+              }
+            },
+            "x-advanced": true
+          },
+          "output": {
+            "type": "object",
+            "title": "Output Formatting",
+            "properties": {
+              "format": {
+                "type": "string",
+                "title": "Format Mode",
+                "default": "channel_message"
+              },
+              "product": {
+                "type": "string",
+                "title": "Product",
+                "enum": [
+                  "hacker_news_daily",
+                  "intelligence_briefing"
+                ]
+              },
+              "maxCharacters": {
+                "type": "integer",
+                "title": "Maximum Length",
+                "minimum": 500,
+                "maximum": 30000,
+                "default": 3500
+              },
+              "includeSources": {
+                "type": "boolean",
+                "title": "Include Source Links",
+                "default": true
+              },
+              "includeMetadata": {
+                "type": "boolean",
+                "title": "Include Metadata",
+                "default": false
+              }
+            },
+            "x-advanced": true
           }
         }
       }

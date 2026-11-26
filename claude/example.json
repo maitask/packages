@@ -1,12 +1,9 @@
 {
   "input": {
-    "model": "claude-3-sonnet-20240229",
+    "model": "claude-sonnet-4-5",
+    "system": "You are a helpful product assistant.",
     "maxTokens": 400,
     "messages": [
-      {
-        "role": "system",
-        "content": "You are a helpful product assistant."
-      },
       {
         "role": "user",
         "content": "Summarize the main announcements from AWS re:Invent 2024."

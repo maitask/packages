@@ -71,13 +71,34 @@
           "text": {
             "type": "string",
             "title": "Text",
-            "default": "Hello from Maitask! 🚀"
+            "default": "Hello from Maitask!"
+          },
+          "fileUrl": {
+            "type": "string",
+            "title": "File Url",
+            "format": "uri"
+          },
+          "caption": {
+            "type": "string",
+            "title": "Caption"
           }
         }
       },
       "options": {
         "type": "object",
         "properties": {
+          "botToken": {
+            "type": "string",
+            "title": "Bot Token",
+            "format": "password"
+          },
+          "baseUrl": {
+            "type": "string",
+            "title": "Base Url",
+            "default": "https://api.telegram.org",
+            "format": "uri",
+            "x-advanced": true
+          },
           "chatId": {
             "type": "string",
             "title": "Chat Id",
@@ -88,8 +109,8 @@
             "title": "Message Type",
             "enum": [
               "text",
-              "markdown",
-              "html"
+              "photo",
+              "document"
             ],
             "default": "text"
           },
@@ -98,9 +119,8 @@
             "title": "Parse Mode",
             "enum": [
               "Markdown",
-              "HTML",
               "MarkdownV2",
-              "None"
+              "HTML"
             ],
             "default": "Markdown"
           },

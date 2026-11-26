@@ -153,6 +153,11 @@
       "options": {
         "type": "object",
         "properties": {
+          "webhookUrl": {
+            "type": "string",
+            "title": "Webhook Url",
+            "format": "password"
+          },
           "channel": {
             "type": "string",
             "title": "Channel",

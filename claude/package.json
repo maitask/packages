@@ -56,13 +56,18 @@
           "model": {
             "type": "string",
             "title": "Model",
-            "default": "claude-3-sonnet-20240229"
+            "default": "claude-sonnet-4-5"
           },
           "maxTokens": {
             "type": "integer",
             "title": "Max Tokens",
             "default": 400,
             "x-advanced": true
+          },
+          "system": {
+            "type": "string",
+            "title": "System",
+            "default": "You are a helpful product assistant."
           },
           "messages": {
             "type": "array",
@@ -74,12 +79,16 @@
                 "role": {
                   "type": "string",
                   "title": "Role",
-                  "default": "system"
+                  "enum": [
+                    "user",
+                    "assistant"
+                  ],
+                  "default": "user"
                 },
                 "content": {
                   "type": "string",
                   "title": "Content",
-                  "default": "You are a helpful product assistant."
+                  "default": "Summarize the main announcements from AWS re:Invent 2024."
                 }
               }
             }
@@ -103,5 +112,11 @@
         }
       }
     }
-  }
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md",
+    "example.json"
+  ]
 }

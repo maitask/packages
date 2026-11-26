@@ -85,6 +85,10 @@
           "mode": {
             "type": "string",
             "title": "Mode",
+            "enum": [
+              "chunked",
+              "sse"
+            ],
             "default": "sse"
           },
           "event_name": {
@@ -94,8 +98,7 @@
           },
           "tokenSecret": {
             "type": "string",
-            "title": "Token Secret",
-            "format": "password"
+            "title": "Token Secret"
           }
         }
       }

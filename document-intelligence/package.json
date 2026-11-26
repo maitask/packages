@@ -19,7 +19,8 @@
     "index.js",
     "index.d.ts",
     "README.md",
-    "example.json"
+    "example.json",
+    "README_zh-CN.md"
   ],
   "engines": {
     "node": ">=18.0.0"
@@ -73,9 +74,18 @@
             "items": {
               "type": "object",
               "properties": {
-                "title": { "type": "string", "title": "Title" },
-                "text": { "type": "string", "title": "Text" },
-                "url": { "type": "string", "title": "URL" }
+                "title": {
+                  "type": "string",
+                  "title": "Title"
+                },
+                "text": {
+                  "type": "string",
+                  "title": "Text"
+                },
+                "url": {
+                  "type": "string",
+                  "title": "URL"
+                }
               }
             }
           }
@@ -87,24 +97,53 @@
           "task": {
             "type": "string",
             "title": "Task",
-            "enum": ["summarize", "classify", "extract"],
+            "enum": [
+              "summarize",
+              "classify",
+              "extract"
+            ],
             "default": "summarize"
           },
           "language": {
             "type": "string",
             "title": "Language",
-            "enum": ["zh-CN", "en"],
+            "enum": [
+              "zh-CN",
+              "en"
+            ],
             "default": "zh-CN"
           },
           "labels": {
             "type": "array",
             "title": "Labels",
-            "items": { "type": "string" },
+            "items": {
+              "type": "string"
+            },
             "x-advanced": true
           },
           "schema": {
             "type": "object",
             "title": "Extraction schema",
+            "properties": {
+              "type": {
+                "type": "string",
+                "title": "Type",
+                "default": "object"
+              },
+              "properties": {
+                "type": "object",
+                "title": "Properties",
+                "additionalProperties": true
+              },
+              "required": {
+                "type": "array",
+                "title": "Required",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "additionalProperties": true,
             "x-advanced": true
           },
           "ai": {
