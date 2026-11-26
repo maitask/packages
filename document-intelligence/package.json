@@ -123,26 +123,7 @@
           },
           "schema": {
             "type": "object",
-            "title": "Extraction schema",
-            "properties": {
-              "type": {
-                "type": "string",
-                "title": "Type",
-                "default": "object"
-              },
-              "properties": {
-                "type": "object",
-                "title": "Properties",
-                "additionalProperties": true
-              },
-              "required": {
-                "type": "array",
-                "title": "Required",
-                "items": {
-                  "type": "string"
-                }
-              }
-            },
+            "title": "Schema",
             "additionalProperties": true,
             "x-advanced": true
           },
@@ -152,12 +133,12 @@
             "properties": {
               "apiKey": {
                 "type": "string",
-                "title": "API key",
+                "title": "API Key",
                 "format": "password"
               },
               "baseUrl": {
                 "type": "string",
-                "title": "API base URL",
+                "title": "Base URL",
                 "format": "uri"
               },
               "model": {
@@ -170,12 +151,16 @@
                 "title": "Temperature",
                 "minimum": 0,
                 "maximum": 2,
-                "x-advanced": true
+                "x-advanced": true,
+                "default": 0.2
               },
               "maxTokens": {
                 "type": "integer",
                 "title": "Max tokens",
-                "x-advanced": true
+                "x-advanced": true,
+                "minimum": 256,
+                "maximum": 8192,
+                "default": 1600
               }
             }
           },
@@ -191,9 +176,40 @@
               "maxCharacters": {
                 "type": "integer",
                 "title": "Maximum length",
-                "x-advanced": true
+                "x-advanced": true,
+                "minimum": 200,
+                "maximum": 20000,
+                "default": 4000
               }
             }
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout (ms)",
+            "minimum": 1000,
+            "maximum": 180000,
+            "default": 60000,
+            "x-advanced": true
+          },
+          "retries": {
+            "type": "integer",
+            "title": "Retries",
+            "minimum": 0,
+            "maximum": 4,
+            "default": 1,
+            "x-advanced": true
+          },
+          "allowPrivateHosts": {
+            "type": "boolean",
+            "title": "Allow Private Hosts",
+            "default": false,
+            "x-advanced": true
+          },
+          "allowInsecureHttp": {
+            "type": "boolean",
+            "title": "Allow Insecure HTTP",
+            "default": false,
+            "x-advanced": true
           }
         }
       }

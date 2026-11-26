@@ -70,10 +70,12 @@
         "properties": {
           "expression": {
             "type": "string",
-            "title": "Expression",
-            "default": "0 */6 * * 1-5"
+            "title": "Expression"
           }
-        }
+        },
+        "required": [
+          "expression"
+        ]
       },
       "options": {
         "type": "object",
@@ -81,17 +83,23 @@
           "operation": {
             "type": "string",
             "title": "Operation",
-            "default": "next"
+            "enum": [
+              "parse",
+              "next",
+              "validate",
+              "describe"
+            ],
+            "default": "parse"
           },
           "count": {
             "type": "integer",
             "title": "Count",
-            "default": 3
+            "default": 5,
+            "minimum": 1
           },
           "from": {
             "type": "string",
-            "title": "From",
-            "default": "2025-01-01T08:00:00Z"
+            "title": "From"
           }
         }
       }

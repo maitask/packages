@@ -9,10 +9,13 @@ export interface Message {
 
 export interface ExecuteInput {
     messages?: Message[];
+    text?: string;
+    prompt?: string;
     model?: string;
     temperature?: number;
     top_p?: number;
     top_k?: number;
+    maxTokens?: number;
     max_tokens?: number;
     num_predict?: number;
     stream?: boolean;
@@ -24,12 +27,17 @@ export interface ExecuteInput {
 export interface ExecuteOptions {
     baseUrl?: string;
     base_url?: string;
+    allowPrivateHosts?: boolean;
+    allowInsecureHttp?: boolean;
+    timeoutMs?: number;
+    retries?: number;
     openaiCompat?: boolean;
     openai_compat?: boolean;
     model?: string;
     temperature?: number;
     top_p?: number;
     top_k?: number;
+    maxTokens?: number;
     max_tokens?: number;
     num_predict?: number;
     stream?: boolean;
@@ -39,6 +47,10 @@ export interface ExecuteOptions {
 }
 
 export interface ExecuteContext {
+    env?: {
+        OLLAMA_BASE_URL?: string;
+        [key: string]: string | undefined;
+    };
     [key: string]: any;
 }
 

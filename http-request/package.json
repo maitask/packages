@@ -63,7 +63,6 @@
           "url": {
             "type": "string",
             "title": "Url",
-            "default": "https://api.maitask.com/health",
             "format": "uri"
           },
           "method": {
@@ -159,20 +158,23 @@
           "timeoutMs": {
             "type": "integer",
             "title": "Timeout Ms",
-            "default": 30000,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 10,
+            "maximum": 120000
           },
           "maxResponseBytes": {
             "type": "integer",
             "title": "Max Response Bytes",
-            "default": 8388608,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 1,
+            "maximum": 52428800
           },
           "maxRedirects": {
             "type": "integer",
             "title": "Max Redirects",
-            "default": 5,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 0,
+            "maximum": 10
           },
           "responseType": {
             "type": "string",
@@ -189,8 +191,7 @@
             "title": "Accepted Statuses",
             "items": {
               "type": "integer",
-              "title": "Accepted Statuses",
-              "default": 200
+              "title": "Accepted Statuses"
             },
             "x-advanced": true
           },
@@ -200,13 +201,11 @@
             "properties": {
               "min": {
                 "type": "integer",
-                "title": "Min",
-                "default": 200
+                "title": "Min"
               },
               "max": {
                 "type": "integer",
-                "title": "Max",
-                "default": 299
+                "title": "Max"
               }
             },
             "x-advanced": true
@@ -235,8 +234,7 @@
                 "title": "Statuses",
                 "items": {
                   "type": "integer",
-                  "title": "Statuses",
-                  "default": 408
+                  "title": "Statuses"
                 }
               },
               "initialDelayMs": {
@@ -268,7 +266,10 @@
             },
             "x-advanced": true
           }
-        }
+        },
+        "required": [
+          "url"
+        ]
       },
       "options": {
         "type": "object",
@@ -277,19 +278,25 @@
             "type": "integer",
             "title": "Timeout Ms",
             "default": 30000,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 10,
+            "maximum": 120000
           },
           "maxResponseBytes": {
             "type": "integer",
             "title": "Max Response Bytes",
             "default": 8388608,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 1,
+            "maximum": 52428800
           },
           "maxRedirects": {
             "type": "integer",
             "title": "Max Redirects",
             "default": 5,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 0,
+            "maximum": 10
           },
           "allowInsecureHttp": {
             "type": "boolean",

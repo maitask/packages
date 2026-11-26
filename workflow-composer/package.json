@@ -112,7 +112,10 @@
             ],
             "default": "zh-CN"
           }
-        }
+        },
+        "required": [
+          "description"
+        ]
       },
       "options": {
         "type": "object",
@@ -146,11 +149,43 @@
             "title": "Temperature",
             "minimum": 0,
             "maximum": 2,
-            "x-advanced": true
+            "x-advanced": true,
+            "default": 0.2
           },
           "maxTokens": {
             "type": "integer",
             "title": "Max tokens",
+            "x-advanced": true,
+            "minimum": 512,
+            "maximum": 8192,
+            "default": 3500
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout (ms)",
+            "minimum": 1000,
+            "maximum": 180000,
+            "default": 90000,
+            "x-advanced": true
+          },
+          "retries": {
+            "type": "integer",
+            "title": "Retries",
+            "minimum": 0,
+            "maximum": 3,
+            "default": 1,
+            "x-advanced": true
+          },
+          "allowPrivateHosts": {
+            "type": "boolean",
+            "title": "Allow Private Hosts",
+            "default": false,
+            "x-advanced": true
+          },
+          "allowInsecureHttp": {
+            "type": "boolean",
+            "title": "Allow Insecure HTTP",
+            "default": false,
             "x-advanced": true
           }
         }

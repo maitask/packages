@@ -54,12 +54,15 @@
         "properties": {
           "prompt": {
             "type": "string",
-            "title": "Prompt",
-            "default": "A minimalistic poster of a robotic crane at sunset"
+            "title": "Prompt"
           },
           "provider": {
             "type": "string",
             "title": "Provider",
+            "enum": [
+              "openai",
+              "stability"
+            ],
             "default": "openai"
           },
           "model": {
@@ -71,13 +74,11 @@
             "type": "string",
             "title": "Size",
             "default": "1024x1024"
-          },
-          "apiKey": {
-            "type": "string",
-            "title": "Api Key",
-            "format": "password"
           }
-        }
+        },
+        "required": [
+          "prompt"
+        ]
       },
       "options": {
         "type": "object",
@@ -100,7 +101,9 @@
             "type": "integer",
             "title": "Timeout Ms",
             "default": 30000,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 1000,
+            "maximum": 120000
           }
         }
       }

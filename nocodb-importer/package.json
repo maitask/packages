@@ -53,10 +53,12 @@
         "properties": {
           "content": {
             "type": "string",
-            "title": "Content",
-            "default": "name,email,plan\nAlice,alice@example.com,Pro\nBob,bob@example.com,Free"
+            "title": "Content"
           }
-        }
+        },
+        "required": [
+          "content"
+        ]
       },
       "options": {
         "type": "object",
@@ -64,7 +66,6 @@
           "baseUrl": {
             "type": "string",
             "title": "Base Url",
-            "default": "https://nocodb.example.com",
             "format": "uri"
           },
           "token": {
@@ -74,25 +75,42 @@
           },
           "baseId": {
             "type": "string",
-            "title": "Base Id",
-            "default": "proj_123456"
+            "title": "Base Id"
           },
           "tableName": {
             "type": "string",
-            "title": "Table Name",
-            "default": "customers"
+            "title": "Table Name"
           },
           "dryRun": {
             "type": "boolean",
             "title": "Dry Run",
-            "default": true
+            "default": false
           },
           "delimiter": {
             "type": "string",
             "title": "Delimiter",
             "default": ","
+          },
+          "allowPrivateHosts": {
+            "type": "boolean",
+            "title": "Allow Private Hosts",
+            "default": false,
+            "x-advanced": true
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout (ms)",
+            "minimum": 1000,
+            "maximum": 120000,
+            "default": 30000,
+            "x-advanced": true
           }
-        }
+        },
+        "required": [
+          "baseUrl",
+          "baseId",
+          "tableName"
+        ]
       }
     }
   },

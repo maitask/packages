@@ -78,8 +78,7 @@
             "enum": [
               "sendgrid",
               "mailgun"
-            ],
-            "default": "sendgrid"
+            ]
           },
           "from": {
             "type": "object",
@@ -277,7 +276,12 @@
             },
             "x-advanced": true
           }
-        }
+        },
+        "required": [
+          "provider",
+          "from",
+          "to"
+        ]
       },
       "options": {
         "type": "object",
@@ -300,13 +304,17 @@
             "type": "integer",
             "title": "Timeout Ms",
             "default": 30000,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 10,
+            "maximum": 120000
           },
           "maxResponseBytes": {
             "type": "integer",
             "title": "Max Response Bytes",
             "default": 65536,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 1,
+            "maximum": 1048576
           },
           "allowInsecureHttp": {
             "type": "boolean",

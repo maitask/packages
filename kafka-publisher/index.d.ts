@@ -55,12 +55,12 @@ export interface KafkaDeliveryData {
 export interface KafkaSuccessMetadata {
   readonly proxyUrl: string;
   readonly timestamp: string;
-  readonly version: '0.1.0';
+  readonly version: '0.1.1';
 }
 
 export interface KafkaFailureMetadata {
   readonly timestamp: string;
-  readonly version: '0.1.0';
+  readonly version: '0.1.1';
 }
 
 export type KafkaMetadata = KafkaSuccessMetadata | KafkaFailureMetadata;

@@ -9,6 +9,7 @@ export interface S3StorageInput {
 export interface S3StorageOptions {
   timeoutMs?: number;
   allowInsecureHttp?: boolean;
+  allowPrivateHosts?: boolean;
   allowPrivateHost?: boolean;
 }
 

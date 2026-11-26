@@ -18,6 +18,8 @@ export interface ExecuteInput {
 export interface ExecuteOptions {
   apiKey?: string;
   baseUrl?: string;
+  allowPrivateHosts?: boolean;
+  allowInsecureHttp?: boolean;
   model?: string;
   language?: 'zh-CN' | 'en';
   temperature?: number;
@@ -25,12 +27,27 @@ export interface ExecuteOptions {
   timeoutMs?: number;
   retries?: number;
   catalog?: CatalogEntry[];
+  ai?: {
+    apiKey?: string;
+    baseUrl?: string;
+    allowPrivateHosts?: boolean;
+    allowInsecureHttp?: boolean;
+    model?: string;
+    [key: string]: unknown;
+  };
+}
+
+export interface ExecuteContext {
+  secrets?: Record<string, string | undefined>;
+  env?: Record<string, string | undefined>;
+  defaults?: Record<string, unknown>;
+  [key: string]: unknown;
 }
 
 export function execute(
   input?: ExecuteInput,
   options?: ExecuteOptions,
-  context?: Record<string, unknown>
+  context?: ExecuteContext
 ): Promise<{
   success: boolean;
   data?: Record<string, unknown>;

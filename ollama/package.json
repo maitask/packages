@@ -68,12 +68,16 @@
                 "role": {
                   "type": "string",
                   "title": "Role",
-                  "default": "system"
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant"
+                  ],
+                  "default": "user"
                 },
                 "content": {
                   "type": "string",
-                  "title": "Content",
-                  "default": "You are a concise assistant."
+                  "title": "Content"
                 }
               }
             }
@@ -86,8 +90,9 @@
           "temperature": {
             "type": "number",
             "title": "Temperature",
-            "default": 0.7,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 0,
+            "maximum": 2
           }
         }
       },
@@ -104,6 +109,32 @@
             "type": "boolean",
             "title": "Openai Compat",
             "default": false
+          },
+          "allowPrivateHosts": {
+            "type": "boolean",
+            "title": "Allow Private Hosts",
+            "x-advanced": true
+          },
+          "allowInsecureHttp": {
+            "type": "boolean",
+            "title": "Allow Insecure HTTP",
+            "x-advanced": true
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout (ms)",
+            "minimum": 1000,
+            "maximum": 300000,
+            "default": 60000,
+            "x-advanced": true
+          },
+          "retries": {
+            "type": "integer",
+            "title": "Retries",
+            "minimum": 0,
+            "maximum": 5,
+            "default": 2,
+            "x-advanced": true
           }
         }
       }

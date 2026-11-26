@@ -67,30 +67,71 @@
       }
     },
     "schemas": {
+      "input": {
+        "type": [
+          "array",
+          "object",
+          "string"
+        ],
+        "title": "JSON Input",
+        "description": "JSON array, object, JSON string, or wrapper object with data.",
+        "items": {},
+        "properties": {
+          "data": {
+            "type": "array",
+            "title": "Data",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          }
+        }
+      },
       "options": {
         "type": "object",
         "properties": {
           "operation": {
             "type": "string",
             "title": "Operation",
-            "default": "filter"
+            "enum": [
+              "query",
+              "map",
+              "filter",
+              "extract",
+              "flatten",
+              "unflatten"
+            ],
+            "default": "query"
           },
           "condition": {
             "type": "object",
             "title": "Condition",
-            "properties": {
-              "age": {
-                "type": "object",
-                "title": "Age",
-                "properties": {
-                  "$gte": {
-                    "type": "integer",
-                    "title": "$gte",
-                    "default": 30
-                  }
-                }
-              }
-            }
+            "additionalProperties": true
+          },
+          "path": {
+            "type": "string",
+            "title": "JSONPath",
+            "x-advanced": true
+          },
+          "mapping": {
+            "type": "object",
+            "title": "Mapping",
+            "additionalProperties": true,
+            "x-advanced": true
+          },
+          "fields": {
+            "type": "array",
+            "title": "Fields",
+            "items": {
+              "type": "string"
+            },
+            "x-advanced": true
+          },
+          "separator": {
+            "type": "string",
+            "title": "Separator",
+            "default": ".",
+            "x-advanced": true
           }
         }
       }

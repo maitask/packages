@@ -1,7 +1,7 @@
 {
   "name": "@maitask/pdf-parser",
   "version": "0.1.1",
-  "description": "Extract Info metadata and uncompressed text operators from PDF bytes",
+  "description": "Extract Info metadata and text from uncompressed or FlateDecode PDF streams",
   "main": "index.js",
   "types": "index.d.ts",
   "type": "commonjs",
@@ -41,7 +41,7 @@
     "locales": {
       "en": {
         "display_name": "PDF Parser",
-        "description": "Extract Info metadata and uncompressed text operators from PDF bytes",
+        "description": "Extract Info metadata and text from uncompressed or FlateDecode PDF streams",
         "category": "Data Processing & Transformation",
         "keywords": [
           "maitask",
@@ -56,7 +56,7 @@
       },
       "zh": {
         "display_name": "PDF 解析器",
-        "description": "从 PDF 字节中提取 Info 元数据和未压缩文本运算符，加密文件直接失败。",
+        "description": "提取 PDF 的 Info 元数据以及未压缩或 FlateDecode 压缩文本流，加密文件直接失败。",
         "category": "数据处理与转换",
         "keywords": [
           "PDF",
@@ -74,8 +74,7 @@
         "properties": {
           "base64": {
             "type": "string",
-            "title": "Base64",
-            "default": "JVBERi0xLjQKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyAvUGFnZXMgMiAwIFIgPj4KZW5kb2JqCjIgMCBvYmoKPDwgL1R5cGUgL1BhZ2VzIC9LaWRzIFszIDAgUl0gL0NvdW50IDEgPj4KZW5kb2JqCjMgMCBvYmoKPDwgL1R5cGUgL1BhZ2UgL1BhcmVudCAyIDAgUiAvTWVkaWFCb3ggWzAgMCAyMDAgMjAwXSAvQ29udGVudHMgNCAwIFIgPj4KZW5kb2JqCjQgMCBvYmoKPDwgL0xlbmd0aCA1NSA+PgpzdHJlYW0KQlQKNzIgMTIwIFRkCihIZWxsbyBNYWl0YXNrKSBUagpFVAplbmRzdHJlYW0KZW5kb2JqCjUgMCBvYmoKPDwgL1RpdGxlIChTYW1wbGUgRG9jdW1lbnQpIC9BdXRob3IgKE1haXRhc2spID4+CmVuZG9iagp0cmFpbGVyCjw8IC9Sb290IDEgMCBSIC9JbmZvIDUgMCBSIC9TaXplIDYgPj4KJSVFT0YK"
+            "title": "Base64"
           }
         }
       },
@@ -85,7 +84,9 @@
           "maxTextLength": {
             "type": "integer",
             "title": "Max Text Length",
-            "default": 20000
+            "default": 200000,
+            "minimum": 1,
+            "maximum": 2000000
           }
         }
       }

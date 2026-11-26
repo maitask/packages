@@ -72,18 +72,34 @@
       }
     },
     "schemas": {
+      "input": {
+        "type": [
+          "array",
+          "object"
+        ],
+        "title": "Data",
+        "description": "Array of row objects, arrays of cells, primitive values, or a single row object.",
+        "items": {},
+        "additionalProperties": true
+      },
       "options": {
         "type": "object",
         "properties": {
           "filename": {
             "type": "string",
-            "title": "Filename",
-            "default": "reports/quarterly-scorecard.csv"
+            "title": "Filename"
           },
           "sheet_name": {
             "type": "string",
-            "title": "Sheet name",
-            "default": "Q4 Metrics"
+            "title": "Sheet name"
+          },
+          "headers": {
+            "type": "array",
+            "title": "Headers",
+            "items": {
+              "type": "string"
+            },
+            "x-advanced": true
           }
         }
       }

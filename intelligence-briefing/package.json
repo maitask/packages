@@ -43,7 +43,7 @@
                   "zh-CN",
                   "en"
                 ],
-                "default": "zh-CN"
+                "default": "en"
               },
               "profile": {
                 "type": "string",
@@ -58,7 +58,7 @@
                   "policy",
                   "investment"
                 ],
-                "default": "forecast"
+                "default": "technology"
               },
               "depth": {
                 "type": "string",
@@ -87,10 +87,10 @@
             "properties": {
               "maxItems": {
                 "type": "integer",
-                "title": "Stories",
+                "title": "Max Items",
                 "minimum": 1,
                 "maximum": 30,
-                "default": 5
+                "default": 8
               },
               "minScore": {
                 "type": "number",
@@ -124,12 +124,12 @@
               },
               "apiKey": {
                 "type": "string",
-                "title": "API key",
+                "title": "API Key",
                 "format": "password"
               },
               "baseUrl": {
                 "type": "string",
-                "title": "API base URL",
+                "title": "Base URL",
                 "format": "uri"
               },
               "model": {
@@ -158,12 +158,16 @@
                 "title": "Temperature",
                 "minimum": 0,
                 "maximum": 2,
-                "x-advanced": true
+                "x-advanced": true,
+                "default": 0.2
               },
               "maxTokens": {
                 "type": "integer",
                 "title": "Max tokens",
-                "x-advanced": true
+                "x-advanced": true,
+                "minimum": 200,
+                "maximum": 12000,
+                "default": 1800
               }
             }
           },
@@ -177,8 +181,7 @@
                 "enum": [
                   "hacker_news_daily",
                   "intelligence_briefing"
-                ],
-                "default": "hacker_news_daily"
+                ]
               },
               "includeSources": {
                 "type": "boolean",
@@ -188,9 +191,24 @@
               "maxCharacters": {
                 "type": "integer",
                 "title": "Maximum length",
-                "x-advanced": true
+                "x-advanced": true,
+                "minimum": 500,
+                "maximum": 30000,
+                "default": 3500
               }
             }
+          },
+          "allowPrivateHosts": {
+            "type": "boolean",
+            "title": "Allow Private Hosts",
+            "default": false,
+            "x-advanced": true
+          },
+          "allowInsecureHttp": {
+            "type": "boolean",
+            "title": "Allow Insecure HTTP",
+            "default": false,
+            "x-advanced": true
           }
         }
       },
@@ -261,8 +279,7 @@
                     "hackernews",
                     "items",
                     "inline"
-                  ],
-                  "default": "hackernews"
+                  ]
                 },
                 "storyType": {
                   "type": "string",
@@ -312,7 +329,7 @@
             "properties": {
               "maxItems": {
                 "type": "integer",
-                "title": "Stories",
+                "title": "Max Items",
                 "minimum": 1,
                 "maximum": 30,
                 "default": 8

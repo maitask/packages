@@ -3,12 +3,14 @@
  */
 
 export interface Message {
-    role: 'user' | 'assistant';
-    content: string;
+    role: 'system' | 'user' | 'assistant';
+    content: string | any[];
 }
 
 export interface ExecuteInput {
     messages?: Message[];
+    text?: string;
+    prompt?: string;
     model?: string;
     system?: string | any[];
     maxTokens?: number;
@@ -23,8 +25,9 @@ export interface ExecuteInput {
 
 export interface ExecuteOptions {
     apiKey?: string;
-    api_key?: string;
     baseUrl?: string;
+    allowPrivateHosts?: boolean;
+    allowInsecureHttp?: boolean;
     timeoutMs?: number;
     retries?: number;
     model?: string;

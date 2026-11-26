@@ -24,6 +24,8 @@ export interface ExecuteOptions {
   schema?: Record<string, unknown>;
   apiKey?: string;
   baseUrl?: string;
+  allowPrivateHosts?: boolean;
+  allowInsecureHttp?: boolean;
   model?: string;
   temperature?: number;
   maxTokens?: number;
@@ -32,9 +34,13 @@ export interface ExecuteOptions {
   ai?: {
     apiKey?: string;
     baseUrl?: string;
+    allowPrivateHosts?: boolean;
+    allowInsecureHttp?: boolean;
     model?: string;
     temperature?: number;
     maxTokens?: number;
+    timeoutMs?: number;
+    retries?: number;
   };
   output?: {
     includeSources?: boolean;
@@ -44,6 +50,7 @@ export interface ExecuteOptions {
 
 export interface ExecuteContext {
   secrets?: Record<string, string | undefined>;
+  env?: Record<string, string | undefined>;
   execution_id?: string;
   [key: string]: unknown;
 }

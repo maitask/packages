@@ -39,16 +39,46 @@ export interface ExecuteOptions {
     /** AI API key */
     apiKey?: string;
     api_key?: string;
+    /** Processing task override */
+    task?: 'transcribe' | 'translate' | 'analyze' | 'generate' | 'summarize';
+    /** AI provider override */
+    provider?: 'whisper' | 'gemini' | 'openai';
+    /** Model name override */
+    model?: string;
+    /** Audio MIME type */
+    mimeType?: string;
+    /** Voice for TTS generation */
+    voice?: 'alloy' | 'echo' | 'fable' | 'onyx' | 'nova' | 'shimmer' | 'marin' | 'cedar';
+    /** Response format */
+    response_format?: 'json' | 'text' | 'srt' | 'verbose_json' | 'vtt' | 'mp3' | 'opus' | 'aac' | 'flac';
+    /** Speed for TTS (0.25 to 4.0) */
+    speed?: number;
+    /** Instruction for how to speak (gpt-4o-mini-tts only) */
+    instruction?: string;
+    /** Request timeout in milliseconds */
+    timeoutMs?: number;
+    /** Maximum audio/response bytes override */
+    maxResponseBytes?: number;
+    /** Allow fetching private or internal audioUrl hosts */
+    allowPrivateHosts?: boolean;
     [key: string]: any;
 }
 
 export interface ExecuteContext {
+    secrets?: {
+        OPENAI_API_KEY?: string;
+        GEMINI_API_KEY?: string;
+        GOOGLE_API_KEY?: string;
+        [key: string]: string | undefined;
+    };
     [key: string]: any;
 }
 
 export interface WhisperResult {
     /** Transcribed text */
     text: string;
+    /** Response format when returned as plain text/srt/vtt */
+    format?: string;
     /** Detected language */
     language?: string;
     /** Audio duration in seconds */
@@ -103,6 +133,7 @@ export interface ExecuteResult {
         type: string;
     };
     metadata: {
+        package?: string;
         provider?: string;
         task?: string;
         timestamp: string;

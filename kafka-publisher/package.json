@@ -59,8 +59,7 @@
         "properties": {
           "topic": {
             "type": "string",
-            "title": "Topic",
-            "default": "user.events"
+            "title": "Topic"
           },
           "messages": {
             "type": "array",
@@ -71,35 +70,32 @@
               "properties": {
                 "event": {
                   "type": "string",
-                  "title": "Event",
-                  "default": "signup"
+                  "title": "Event"
                 },
                 "userId": {
                   "type": "string",
-                  "title": "User Id",
-                  "default": "u-1"
+                  "title": "User Id"
                 }
               }
             }
           },
           "key": {
             "type": "string",
-            "title": "Key",
-            "default": "u-1"
+            "title": "Key"
           },
           "headers": {
             "type": "object",
             "title": "Headers",
-            "properties": {
-              "X-Trace-Source": {
-                "type": "string",
-                "title": "X Trace Source",
-                "default": "maitask"
-              }
+            "additionalProperties": {
+              "type": "string"
             },
             "x-advanced": true
           }
-        }
+        },
+        "required": [
+          "topic",
+          "messages"
+        ]
       },
       "options": {
         "type": "object",
@@ -107,16 +103,20 @@
           "proxyUrl": {
             "type": "string",
             "title": "Proxy Url",
-            "default": "https://kafka-proxy.internal",
             "format": "uri"
           },
           "timeoutMs": {
             "type": "integer",
             "title": "Timeout Ms",
             "default": 30000,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 1,
+            "maximum": 120000
           }
-        }
+        },
+        "required": [
+          "proxyUrl"
+        ]
       }
     }
   }

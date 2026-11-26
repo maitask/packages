@@ -16,7 +16,7 @@ export interface Content {
 }
 
 export interface Message {
-    role: 'user' | 'assistant';
+    role: 'system' | 'user' | 'assistant' | 'model';
     content: string;
 }
 
@@ -24,6 +24,7 @@ export interface ExecuteInput {
     contents?: Content[];
     text?: string;
     prompt?: string;
+    system?: string;
     messages?: Message[];
     model?: string;
     temperature?: number;
@@ -33,6 +34,7 @@ export interface ExecuteInput {
     top_p?: number;
     topK?: number;
     top_k?: number;
+    stream?: boolean;
     stopSequences?: string[];
     responseMimeType?: string;
     safetySettings?: any[];
@@ -41,11 +43,13 @@ export interface ExecuteInput {
 
 export interface ExecuteOptions {
     apiKey?: string;
-    api_key?: string;
     baseUrl?: string;
+    allowPrivateHosts?: boolean;
+    allowInsecureHttp?: boolean;
     timeoutMs?: number;
     retries?: number;
     model?: string;
+    stream?: boolean;
     temperature?: number;
     maxOutputTokens?: number;
     max_tokens?: number;
@@ -61,6 +65,7 @@ export interface ExecuteOptions {
 
 export interface ExecuteContext {
     secrets?: {
+        GEMINI_API_KEY?: string;
         GOOGLE_API_KEY?: string;
     };
     env?: {

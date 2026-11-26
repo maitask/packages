@@ -71,13 +71,60 @@
       }
     },
     "schemas": {
+      "input": {
+        "type": [
+          "object",
+          "array",
+          "string"
+        ],
+        "title": "Input Data",
+        "description": "Array of records, JSON/line string, or wrapper object containing rows, records, or data.",
+        "items": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "properties": {
+          "rows": {
+            "type": "array",
+            "title": "Rows",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "records": {
+            "type": "array",
+            "title": "Records",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "x-advanced": true
+          },
+          "data": {
+            "type": "array",
+            "title": "Data",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "x-advanced": true
+          }
+        }
+      },
       "options": {
         "type": "object",
         "properties": {
           "operation": {
             "type": "string",
             "title": "Operation",
-            "default": "pipeline"
+            "enum": [
+              "transform",
+              "filter",
+              "aggregate",
+              "pipeline"
+            ],
+            "default": "transform"
           },
           "pipeline": {
             "type": "array",
@@ -88,8 +135,7 @@
               "properties": {
                 "type": {
                   "type": "string",
-                  "title": "Type",
-                  "default": "filter"
+                  "title": "Type"
                 },
                 "rules": {
                   "type": "array",

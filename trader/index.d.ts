@@ -278,6 +278,7 @@ export type TraderInput =
 export interface TraderOptions {
   readonly baseUrl?: string;
   readonly allowInsecureHttp?: boolean;
+  readonly allowPrivateHosts?: boolean;
   readonly timeoutMs?: number;
   readonly maxResponseBytes?: number;
   readonly apiKeySecret?: string;

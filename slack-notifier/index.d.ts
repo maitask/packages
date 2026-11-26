@@ -60,7 +60,7 @@ export interface SlackDeliveryData {
 
 export interface SlackSuccessMetadata {
   readonly package: '@maitask/slack-notifier';
-  readonly version: '0.1.0';
+  readonly version: '0.1.1';
   readonly provider: 'slack';
   readonly webhook: string;
   readonly responseStatus: number;
@@ -70,7 +70,7 @@ export interface SlackSuccessMetadata {
 
 export interface SlackFailureMetadata {
   readonly package: '@maitask/slack-notifier';
-  readonly version: '0.1.0';
+  readonly version: '0.1.1';
   readonly provider: 'slack';
   readonly webhook: string | null;
   readonly timestamp: string;

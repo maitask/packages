@@ -77,13 +77,11 @@
               "accountSnapshot",
               "cancelOrder",
               "placeOrder"
-            ],
-            "default": "marketSnapshot"
+            ]
           },
           "symbol": {
             "type": "string",
-            "title": "Symbol",
-            "default": "BTCUSDT"
+            "title": "Symbol"
           },
           "interval": {
             "type": "string",
@@ -103,13 +101,14 @@
               "1d",
               "3d",
               "1w"
-            ],
-            "default": "5m"
+            ]
           },
           "limit": {
             "type": "integer",
             "title": "Limit",
-            "default": 120
+            "default": 120,
+            "minimum": 20,
+            "maximum": 300
           },
           "exchange": {
             "type": "object",
@@ -122,8 +121,7 @@
                   "binance",
                   "aster",
                   "okx"
-                ],
-                "default": "binance"
+                ]
               },
               "market": {
                 "type": "string",
@@ -132,8 +130,7 @@
                   "spot",
                   "futures",
                   "swap"
-                ],
-                "default": "spot"
+                ]
               },
               "environment": {
                 "type": "string",
@@ -141,8 +138,7 @@
                 "enum": [
                   "testnet",
                   "mainnet"
-                ],
-                "default": "testnet"
+                ]
               }
             }
           },
@@ -399,7 +395,11 @@
             },
             "x-advanced": true
           }
-        }
+        },
+        "required": [
+          "action",
+          "symbol"
+        ]
       },
       "options": {
         "type": "object",
@@ -455,12 +455,22 @@
             "type": "integer",
             "title": "Timeout Ms",
             "default": 30000,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 10,
+            "maximum": 120000
           },
           "maxResponseBytes": {
             "type": "integer",
             "title": "Max Response Bytes",
             "default": 4194304,
+            "x-advanced": true,
+            "minimum": 1,
+            "maximum": 20971520
+          },
+          "allowPrivateHosts": {
+            "type": "boolean",
+            "title": "Allow Private Hosts",
+            "default": false,
             "x-advanced": true
           }
         }

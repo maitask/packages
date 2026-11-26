@@ -65,32 +65,51 @@
       }
     },
     "schemas": {
+      "input": {
+        "type": [
+          "object",
+          "array",
+          "string"
+        ],
+        "title": "Targets",
+        "description": "Target URL string, target object ({ url, label }), or array of URLs/target objects.",
+        "items": {},
+        "properties": {
+          "url": {
+            "type": "string",
+            "title": "URL",
+            "format": "uri"
+          },
+          "label": {
+            "type": "string",
+            "title": "Label"
+          },
+          "href": {
+            "type": "string",
+            "title": "Href",
+            "format": "uri",
+            "x-advanced": true
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "x-advanced": true
+          }
+        }
+      },
       "options": {
         "type": "object",
         "properties": {
           "selectors": {
             "type": "object",
             "title": "Selectors",
-            "properties": {
-              "headline": {
-                "type": "string",
-                "title": "Headline",
-                "default": "article h2"
-              },
-              "summary": {
-                "type": "string",
-                "title": "Summary",
-                "default": "article p"
-              }
-            }
+            "additionalProperties": true
           },
           "headingLevels": {
             "type": "array",
             "title": "Heading Levels",
             "items": {
-              "type": "string",
-              "title": "Heading Levels",
-              "default": "h1"
+              "type": "string"
             }
           },
           "linkFilters": {
@@ -101,21 +120,70 @@
                 "type": "array",
                 "title": "Include",
                 "items": {
-                  "type": "string",
-                  "title": "Include",
-                  "default": "/news/"
+                  "type": "string"
                 }
               },
               "exclude": {
                 "type": "array",
                 "title": "Exclude",
                 "items": {
-                  "type": "string",
-                  "title": "Exclude",
-                  "default": "?utm_"
+                  "type": "string"
                 }
               }
             }
+          },
+          "xpath": {
+            "type": "object",
+            "title": "XPath Selectors",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "x-advanced": true
+          },
+          "patterns": {
+            "type": "array",
+            "title": "Patterns",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            },
+            "x-advanced": true
+          },
+          "preserveWhitespace": {
+            "type": "boolean",
+            "title": "Preserve Whitespace",
+            "default": false,
+            "x-advanced": true
+          },
+          "headers": {
+            "type": "object",
+            "title": "Headers",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "x-advanced": true
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout (ms)",
+            "minimum": 1000,
+            "maximum": 120000,
+            "default": 30000,
+            "x-advanced": true
+          },
+          "maxBytes": {
+            "type": "integer",
+            "title": "Max Bytes",
+            "minimum": 1024,
+            "maximum": 10485760,
+            "default": 5242880,
+            "x-advanced": true
+          },
+          "allowPrivateHosts": {
+            "type": "boolean",
+            "title": "Allow Private Hosts",
+            "default": false,
+            "x-advanced": true
           }
         }
       }

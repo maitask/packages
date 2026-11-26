@@ -56,10 +56,24 @@ export interface BriefingAiConfig {
   enabled?: boolean;
   provider?: 'openai_compatible' | 'extractive' | 'none' | 'disabled' | string;
   apiKey?: string;
-  api_key?: string;
   baseUrl?: string;
-  base_url?: string;
   endpoint?: string;
+  allowPrivateHosts?: boolean;
+  allowInsecureHttp?: boolean;
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  max_tokens?: number;
+  timeoutMs?: number;
+  timeout_ms?: number;
+  retries?: number;
+  jsonMode?: boolean;
+  json_mode?: boolean;
+}
+
+export interface BriefingInputAiConfig {
+  enabled?: boolean;
+  provider?: 'openai_compatible' | 'extractive' | 'none' | 'disabled' | string;
   model?: string;
   temperature?: number;
   maxTokens?: number;
@@ -144,11 +158,7 @@ export interface IntelligenceBriefingInput {
   dedupe?: BriefingDedupeConfig;
   enrichment?: BriefingEnrichmentConfig;
   output?: BriefingOutputConfig;
-  ai?: BriefingAiConfig;
-  apiKey?: string;
-  api_key?: string;
-  baseUrl?: string;
-  base_url?: string;
+  ai?: BriefingInputAiConfig;
   model?: string;
   [key: string]: unknown;
 }

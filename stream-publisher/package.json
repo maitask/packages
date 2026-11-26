@@ -73,13 +73,22 @@
       }
     },
     "schemas": {
+      "input": {
+        "type": [
+          "array",
+          "object"
+        ],
+        "title": "Events",
+        "description": "Array of event payloads or a single event object to stream.",
+        "items": {},
+        "additionalProperties": true
+      },
       "options": {
         "type": "object",
         "properties": {
           "url": {
             "type": "string",
             "title": "Url",
-            "default": "https://events.example.com/ingest",
             "format": "uri"
           },
           "mode": {
@@ -89,18 +98,48 @@
               "chunked",
               "sse"
             ],
-            "default": "sse"
+            "default": "chunked"
           },
           "event_name": {
             "type": "string",
-            "title": "Event name",
-            "default": "maitask-event"
+            "title": "Event name"
           },
           "tokenSecret": {
             "type": "string",
             "title": "Token Secret"
+          },
+          "headers": {
+            "type": "object",
+            "title": "Headers",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "x-advanced": true
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout (ms)",
+            "minimum": 1,
+            "maximum": 120000,
+            "default": 30000,
+            "x-advanced": true
+          },
+          "allowInsecureHttp": {
+            "type": "boolean",
+            "title": "Allow Insecure HTTP",
+            "default": false,
+            "x-advanced": true
+          },
+          "allowPrivateHosts": {
+            "type": "boolean",
+            "title": "Allow Private Hosts",
+            "default": false,
+            "x-advanced": true
           }
-        }
+        },
+        "required": [
+          "url"
+        ]
       }
     }
   }

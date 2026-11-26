@@ -58,7 +58,6 @@
           "audioUrl": {
             "type": "string",
             "title": "Audio Url",
-            "default": "https://storage.googleapis.com/maitask/examples/meeting-snippet.mp3",
             "format": "uri"
           },
           "audioData": {
@@ -80,8 +79,7 @@
           },
           "language": {
             "type": "string",
-            "title": "Language",
-            "default": "en"
+            "title": "Language"
           },
           "provider": {
             "type": "string",
@@ -95,13 +93,11 @@
           },
           "model": {
             "type": "string",
-            "title": "Model",
-            "default": "whisper-1"
+            "title": "Model"
           },
           "prompt": {
             "type": "string",
-            "title": "Prompt",
-            "default": "Transcribe the meeting and highlight action items for the team."
+            "title": "Prompt"
           },
           "text": {
             "type": "string",
@@ -111,13 +107,11 @@
           "voice": {
             "type": "string",
             "title": "Voice",
-            "default": "alloy",
             "x-advanced": true
           },
           "response_format": {
             "type": "string",
             "title": "Response Format",
-            "default": "mp3",
             "x-advanced": true
           },
           "speed": {
@@ -144,6 +138,12 @@
             "minimum": 1000,
             "maximum": 120000,
             "default": 30000,
+            "x-advanced": true
+          },
+          "allowPrivateHosts": {
+            "type": "boolean",
+            "title": "Allow Private Hosts",
+            "default": false,
             "x-advanced": true
           }
         }

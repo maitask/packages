@@ -55,26 +55,34 @@
           "operation": {
             "type": "string",
             "title": "Operation",
-            "default": "upload"
+            "enum": [
+              "list",
+              "upload",
+              "download",
+              "delete"
+            ]
           },
           "presignedUrl": {
             "type": "string",
             "title": "Presigned Url",
-            "default": "https://bucket.s3.amazonaws.com/path/file.txt?...",
             "format": "uri"
           },
           "body": {
             "type": "string",
-            "title": "Body",
-            "default": "hello world"
+            "title": "Body"
           },
           "timeoutMs": {
             "type": "integer",
             "title": "Timeout Ms",
-            "default": 30000,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 1,
+            "maximum": 120000
           }
-        }
+        },
+        "required": [
+          "operation",
+          "presignedUrl"
+        ]
       },
       "options": {
         "type": "object",
@@ -83,11 +91,19 @@
             "type": "integer",
             "title": "Timeout Ms",
             "default": 30000,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 1,
+            "maximum": 120000
           },
           "allowInsecureHttp": {
             "type": "boolean",
             "title": "Allow Insecure HTTP",
+            "default": false,
+            "x-advanced": true
+          },
+          "allowPrivateHosts": {
+            "type": "boolean",
+            "title": "Allow Private Hosts",
             "default": false,
             "x-advanced": true
           }

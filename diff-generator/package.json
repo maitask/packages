@@ -71,59 +71,18 @@
           "old": {
             "type": "object",
             "title": "Old",
-            "properties": {
-              "name": {
-                "type": "string",
-                "title": "Name",
-                "default": "Maitask Engine"
-              },
-              "version": {
-                "type": "string",
-                "title": "Version",
-                "default": "0.1.0"
-              },
-              "features": {
-                "type": "array",
-                "title": "Features",
-                "items": {
-                  "type": "string",
-                  "title": "Features",
-                  "default": "packages"
-                }
-              }
-            }
+            "additionalProperties": true
           },
           "new": {
             "type": "object",
             "title": "New",
-            "properties": {
-              "name": {
-                "type": "string",
-                "title": "Name",
-                "default": "Maitask Engine"
-              },
-              "version": {
-                "type": "string",
-                "title": "Version",
-                "default": "0.2.0"
-              },
-              "features": {
-                "type": "array",
-                "title": "Features",
-                "items": {
-                  "type": "string",
-                  "title": "Features",
-                  "default": "packages"
-                }
-              },
-              "status": {
-                "type": "string",
-                "title": "Status",
-                "default": "beta"
-              }
-            }
+            "additionalProperties": true
           }
-        }
+        },
+        "required": [
+          "old",
+          "new"
+        ]
       },
       "options": {
         "type": "object",
@@ -131,7 +90,13 @@
           "mode": {
             "type": "string",
             "title": "Mode",
-            "default": "json"
+            "enum": [
+              "auto",
+              "json",
+              "text",
+              "array"
+            ],
+            "default": "auto"
           }
         }
       }

@@ -78,7 +78,6 @@
           "url": {
             "type": "string",
             "title": "Url",
-            "default": "https://registry-1.docker.io/v2/library/ubuntu/manifests/latest",
             "format": "uri"
           },
           "method": {
@@ -93,12 +92,8 @@
           "headers": {
             "type": "object",
             "title": "Headers",
-            "properties": {
-              "Accept": {
-                "type": "string",
-                "title": "Accept",
-                "default": "application/vnd.oci.image.manifest.v1+json"
-              }
+            "additionalProperties": {
+              "type": "string"
             },
             "x-advanced": true
           },
@@ -109,7 +104,7 @@
               "restrictPaths": {
                 "type": "boolean",
                 "title": "Restrict Paths",
-                "default": true
+                "default": false
               },
               "allowedPaths": {
                 "type": "array",
@@ -123,24 +118,39 @@
               "maxRedirects": {
                 "type": "integer",
                 "title": "Max Redirects",
-                "default": 4,
-                "x-advanced": true
+                "default": 5,
+                "x-advanced": true,
+                "minimum": 0,
+                "maximum": 10
               },
               "timeoutMs": {
                 "type": "integer",
                 "title": "Timeout Ms",
                 "default": 30000,
-                "x-advanced": true
+                "x-advanced": true,
+                "minimum": 10,
+                "maximum": 120000
               },
               "maxResponseBytes": {
                 "type": "integer",
                 "title": "Max Response Bytes",
                 "default": 8388608,
+                "x-advanced": true,
+                "minimum": 1,
+                "maximum": 52428800
+              },
+              "allowPrivateHosts": {
+                "type": "boolean",
+                "title": "Allow Private Hosts",
+                "default": false,
                 "x-advanced": true
               }
             }
           }
-        }
+        },
+        "required": [
+          "url"
+        ]
       }
     }
   }

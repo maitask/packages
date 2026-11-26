@@ -56,7 +56,7 @@
           "model": {
             "type": "string",
             "title": "Model",
-            "default": "gpt-4o-mini"
+            "default": "gpt-5"
           },
           "messages": {
             "type": "array",
@@ -68,12 +68,16 @@
                 "role": {
                   "type": "string",
                   "title": "Role",
-                  "default": "system"
+                  "enum": [
+                    "system",
+                    "user",
+                    "assistant"
+                  ],
+                  "default": "user"
                 },
                 "content": {
                   "type": "string",
-                  "title": "Content",
-                  "default": "You are a helpful engineering assistant."
+                  "title": "Content"
                 }
               }
             }
@@ -81,13 +85,22 @@
           "temperature": {
             "type": "number",
             "title": "Temperature",
-            "default": 0.6,
-            "x-advanced": true
+            "default": 0.7,
+            "x-advanced": true,
+            "minimum": 0,
+            "maximum": 2
           },
           "maxTokens": {
             "type": "integer",
             "title": "Max Tokens",
-            "default": 500,
+            "default": 1000,
+            "x-advanced": true,
+            "minimum": 1
+          },
+          "stream": {
+            "type": "boolean",
+            "title": "Stream",
+            "default": false,
             "x-advanced": true
           }
         }
@@ -99,6 +112,40 @@
             "type": "string",
             "title": "Api Key",
             "format": "password"
+          },
+          "baseUrl": {
+            "type": "string",
+            "title": "Base URL",
+            "format": "uri",
+            "x-advanced": true
+          },
+          "allowPrivateHosts": {
+            "type": "boolean",
+            "title": "Allow Private Hosts",
+            "default": false,
+            "x-advanced": true
+          },
+          "allowInsecureHttp": {
+            "type": "boolean",
+            "title": "Allow Insecure HTTP",
+            "default": false,
+            "x-advanced": true
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout (ms)",
+            "minimum": 1000,
+            "maximum": 300000,
+            "default": 60000,
+            "x-advanced": true
+          },
+          "retries": {
+            "type": "integer",
+            "title": "Retries",
+            "minimum": 0,
+            "maximum": 5,
+            "default": 2,
+            "x-advanced": true
           }
         }
       }

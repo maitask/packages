@@ -70,8 +70,7 @@
         "properties": {
           "text": {
             "type": "string",
-            "title": "Text",
-            "default": "Hello from Maitask!"
+            "title": "Text"
           },
           "fileUrl": {
             "type": "string",
@@ -101,8 +100,7 @@
           },
           "chatId": {
             "type": "string",
-            "title": "Chat Id",
-            "default": "@maitask_updates"
+            "title": "Chat Id"
           },
           "messageType": {
             "type": "string",
@@ -133,9 +131,14 @@
             "type": "integer",
             "title": "Timeout Ms",
             "default": 30000,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 1,
+            "maximum": 120000
           }
-        }
+        },
+        "required": [
+          "chatId"
+        ]
       }
     }
   }

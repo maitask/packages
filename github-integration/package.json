@@ -60,27 +60,33 @@
           "action": {
             "type": "string",
             "title": "Action",
-            "default": "createIssue"
+            "enum": [
+              "listRepositories",
+              "getRepository",
+              "listIssues",
+              "createIssue",
+              "listPullRequests",
+              "getPullRequest",
+              "createPullRequest",
+              "getUser",
+              "request"
+            ]
           },
           "owner": {
             "type": "string",
-            "title": "Owner",
-            "default": "acme"
+            "title": "Owner"
           },
           "repository": {
             "type": "string",
-            "title": "Repository",
-            "default": "service"
+            "title": "Repository"
           },
           "title": {
             "type": "string",
-            "title": "Title",
-            "default": "Production incident follow-up"
+            "title": "Title"
           },
           "body": {
             "type": "string",
-            "title": "Body",
-            "default": "Track remediation and verification work."
+            "title": "Body"
           },
           "labels": {
             "type": "array",
@@ -91,7 +97,10 @@
               "default": "operations"
             }
           }
-        }
+        },
+        "required": [
+          "action"
+        ]
       },
       "options": {
         "type": "object",
@@ -100,12 +109,34 @@
             "type": "integer",
             "title": "Timeout Ms",
             "default": 30000,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 10,
+            "maximum": 120000
           },
           "maxResponseBytes": {
             "type": "integer",
             "title": "Max Response Bytes",
             "default": 4194304,
+            "x-advanced": true,
+            "minimum": 1,
+            "maximum": 20971520
+          },
+          "baseUrl": {
+            "type": "string",
+            "title": "Base URL",
+            "format": "uri",
+            "x-advanced": true
+          },
+          "token": {
+            "type": "string",
+            "title": "Token",
+            "format": "password",
+            "x-advanced": true
+          },
+          "allowInsecureHttp": {
+            "type": "boolean",
+            "title": "Allow Insecure HTTP",
+            "default": false,
             "x-advanced": true
           }
         }

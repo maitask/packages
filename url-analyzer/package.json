@@ -71,10 +71,12 @@
           "url": {
             "type": "string",
             "title": "Url",
-            "default": "https://www.example.com/products/42?ref=campaign&utm_source=newsletter#features",
             "format": "uri"
           }
-        }
+        },
+        "required": [
+          "url"
+        ]
       },
       "options": {
         "type": "object",
@@ -82,7 +84,14 @@
           "operation": {
             "type": "string",
             "title": "Operation",
-            "default": "analyze"
+            "enum": [
+              "parse",
+              "validate",
+              "normalize",
+              "query",
+              "analyze"
+            ],
+            "default": "parse"
           }
         }
       }

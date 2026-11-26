@@ -70,10 +70,12 @@
         "properties": {
           "xml": {
             "type": "string",
-            "title": "Xml",
-            "default": "<catalog>\n  <book id=\"bk101\">\n    <title>AI at Work</title>\n    <author>Ada Lovelace</author>\n    <price currency=\"USD\">39.99</price>\n  </book>\n  <book id=\"bk102\">\n    <title>Scaling Data Pipelines</title>\n    <author>Alan Turing</author>\n    <price currency=\"USD\">29.50</price>\n  </book>\n</catalog>"
+            "title": "Xml"
           }
-        }
+        },
+        "required": [
+          "xml"
+        ]
       },
       "options": {
         "type": "object",
@@ -81,12 +83,21 @@
           "operation": {
             "type": "string",
             "title": "Operation",
-            "default": "query"
+            "enum": [
+              "parse",
+              "query"
+            ],
+            "default": "parse"
           },
           "xpath": {
             "type": "string",
-            "title": "Xpath",
-            "default": "//book[price>30]/title"
+            "title": "Xpath"
+          },
+          "preserveWhitespace": {
+            "type": "boolean",
+            "title": "Preserve Whitespace",
+            "default": false,
+            "x-advanced": true
           }
         }
       }

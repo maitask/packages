@@ -74,8 +74,7 @@
         "properties": {
           "text": {
             "type": "string",
-            "title": "Text",
-            "default": "Deployment succeeded :rocket:"
+            "title": "Text"
           },
           "blocks": {
             "type": "array",
@@ -86,24 +85,12 @@
               "properties": {
                 "type": {
                   "type": "string",
-                  "title": "Type",
-                  "default": "section"
+                  "title": "Type"
                 },
                 "text": {
                   "type": "object",
                   "title": "Text",
-                  "properties": {
-                    "type": {
-                      "type": "string",
-                      "title": "Type",
-                      "default": "mrkdwn"
-                    },
-                    "text": {
-                      "type": "string",
-                      "title": "Text",
-                      "default": "*Service:* api-gateway\n*Version:* 1.4.2"
-                    }
-                  }
+                  "additionalProperties": true
                 }
               }
             }
@@ -117,32 +104,14 @@
               "properties": {
                 "color": {
                   "type": "string",
-                  "title": "Color",
-                  "default": "#36C5F0"
+                  "title": "Color"
                 },
                 "fields": {
                   "type": "array",
                   "title": "Fields",
                   "items": {
                     "type": "object",
-                    "title": "Fields",
-                    "properties": {
-                      "title": {
-                        "type": "string",
-                        "title": "Title",
-                        "default": "Environment"
-                      },
-                      "value": {
-                        "type": "string",
-                        "title": "Value",
-                        "default": "production"
-                      },
-                      "short": {
-                        "type": "boolean",
-                        "title": "Short",
-                        "default": true
-                      }
-                    }
+                    "additionalProperties": true
                   }
                 }
               }
@@ -160,8 +129,7 @@
           },
           "channel": {
             "type": "string",
-            "title": "Channel",
-            "default": "#deployments"
+            "title": "Channel"
           },
           "username": {
             "type": "string",
@@ -170,13 +138,11 @@
           },
           "threadTs": {
             "type": "string",
-            "title": "Thread Ts",
-            "default": "1700000000.000001"
+            "title": "Thread Ts"
           },
           "iconEmoji": {
             "type": "string",
-            "title": "Icon Emoji",
-            "default": ":rocket:"
+            "title": "Icon Emoji"
           },
           "linkNames": {
             "type": "boolean",
@@ -192,7 +158,9 @@
             "type": "integer",
             "title": "Timeout Ms",
             "default": 30000,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 1,
+            "maximum": 120000
           }
         }
       }

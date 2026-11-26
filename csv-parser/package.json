@@ -76,13 +76,16 @@
         "properties": {
           "text": {
             "type": "string",
-            "title": "Text",
-            "default": "name,role,team,salary\nAlice,Data Scientist,Research,155000\nBob,Product Manager,Growth,142500\nCara,Engineer,Platform,168000"
+            "title": "Text"
           },
           "path": {
             "type": "string",
-            "title": "Path",
-            "default": "people.csv"
+            "title": "Path"
+          },
+          "base64": {
+            "type": "string",
+            "title": "Base64",
+            "x-advanced": true
           }
         }
       },

@@ -309,7 +309,7 @@ export interface GitHubSummary {
 
 export interface GitHubSuccessMetadata {
   readonly package: '@maitask/github-integration';
-  readonly version: '1.0.0';
+  readonly version: '1.0.1';
   readonly provider: 'github';
   readonly action: GitHubAction;
   readonly executionId: string | null;
@@ -322,7 +322,7 @@ export interface GitHubSuccessMetadata {
 
 export interface GitHubFailureMetadata {
   readonly package: '@maitask/github-integration';
-  readonly version: '1.0.0';
+  readonly version: '1.0.1';
   readonly provider: 'github';
   readonly action: GitHubAction | null;
   readonly executionId: string | null;

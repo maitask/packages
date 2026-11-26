@@ -70,10 +70,12 @@
         "properties": {
           "text": {
             "type": "string",
-            "title": "Text",
-            "default": "# Release Notes\n\n- Added CSV parser support\n- Improved Playground package examples\n\n```bash\nmaitask run @maitask/csv-parser --input data.csv\n```"
+            "title": "Text"
           }
-        }
+        },
+        "required": [
+          "text"
+        ]
       },
       "options": {
         "type": "object",
@@ -81,12 +83,15 @@
           "format": {
             "type": "string",
             "title": "Format",
+            "enum": [
+              "html",
+              "plain"
+            ],
             "default": "html"
           },
           "template": {
             "type": "string",
-            "title": "Template",
-            "default": "<article class=\"prose\">{{content}}</article>"
+            "title": "Template"
           }
         }
       }

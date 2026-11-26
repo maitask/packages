@@ -52,7 +52,7 @@ export interface TelegramDeliveryData {
 
 export interface TelegramMetadata {
   readonly package: '@maitask/telegram-bot';
-  readonly version: '0.1.0';
+  readonly version: '0.1.1';
   readonly provider: 'telegram';
   readonly method?: 'sendMessage' | 'sendPhoto' | 'sendDocument';
   readonly timestamp: string;

@@ -65,18 +65,59 @@
       }
     },
     "schemas": {
+      "input": {
+        "type": [
+          "object",
+          "string",
+          "array"
+        ],
+        "title": "YAML or JSON Input",
+        "description": "YAML/JSON string, wrapper object ({ text, yaml, data, json }), or JSON object/array.",
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "format": "textarea"
+          },
+          "yaml": {
+            "type": "string",
+            "title": "YAML",
+            "format": "textarea",
+            "x-advanced": true
+          },
+          "data": {
+            "type": "object",
+            "title": "Data",
+            "additionalProperties": true,
+            "x-advanced": true
+          },
+          "json": {
+            "type": "object",
+            "title": "JSON",
+            "additionalProperties": true,
+            "x-advanced": true
+          }
+        }
+      },
       "options": {
         "type": "object",
         "properties": {
           "direction": {
             "type": "string",
             "title": "Direction",
-            "default": "yaml-to-json"
+            "enum": [
+              "auto",
+              "yaml-to-json",
+              "json-to-yaml"
+            ],
+            "default": "auto"
           },
           "indent": {
             "type": "integer",
             "title": "Indent",
-            "default": 2
+            "default": 2,
+            "minimum": 1,
+            "maximum": 16
           }
         }
       }

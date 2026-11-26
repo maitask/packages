@@ -56,23 +56,29 @@
           "model": {
             "type": "string",
             "title": "Model",
-            "default": "gemini-2.5-flash"
+            "default": "gemini-2.5-pro"
           },
           "text": {
             "type": "string",
-            "title": "Text",
-            "default": "Generate three launch ideas for a developer tooling newsletter."
+            "title": "Text"
           },
           "temperature": {
             "type": "number",
             "title": "Temperature",
-            "default": 0.7,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 0,
+            "maximum": 2
           },
           "maxOutputTokens": {
             "type": "integer",
             "title": "Max Output Tokens",
-            "default": 512,
+            "x-advanced": true,
+            "minimum": 1
+          },
+          "stream": {
+            "type": "boolean",
+            "title": "Stream",
+            "default": false,
             "x-advanced": true
           }
         }
@@ -84,6 +90,40 @@
             "type": "string",
             "title": "Api Key",
             "format": "password"
+          },
+          "baseUrl": {
+            "type": "string",
+            "title": "Base URL",
+            "format": "uri",
+            "x-advanced": true
+          },
+          "allowPrivateHosts": {
+            "type": "boolean",
+            "title": "Allow Private Hosts",
+            "default": false,
+            "x-advanced": true
+          },
+          "allowInsecureHttp": {
+            "type": "boolean",
+            "title": "Allow Insecure HTTP",
+            "default": false,
+            "x-advanced": true
+          },
+          "timeoutMs": {
+            "type": "integer",
+            "title": "Timeout (ms)",
+            "minimum": 1000,
+            "maximum": 300000,
+            "default": 60000,
+            "x-advanced": true
+          },
+          "retries": {
+            "type": "integer",
+            "title": "Retries",
+            "minimum": 0,
+            "maximum": 5,
+            "default": 2,
+            "x-advanced": true
           }
         }
       }

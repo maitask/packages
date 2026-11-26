@@ -9,6 +9,8 @@ export interface Message {
 
 export interface ExecuteInput {
     messages?: Message[];
+    text?: string;
+    prompt?: string;
     model?: string;
     temperature?: number;
     maxTokens?: number;
@@ -18,6 +20,7 @@ export interface ExecuteInput {
     presence_penalty?: number;
     jsonMode?: boolean;
     json_mode?: boolean;
+    response_format?: { type?: string };
     stream?: boolean;
     functions?: any[];
     function_call?: any;
@@ -27,8 +30,9 @@ export interface ExecuteInput {
 
 export interface ExecuteOptions {
     apiKey?: string;
-    api_key?: string;
     baseUrl?: string;
+    allowPrivateHosts?: boolean;
+    allowInsecureHttp?: boolean;
     timeoutMs?: number;
     retries?: number;
     model?: string;
@@ -74,6 +78,7 @@ export interface ExecuteResult {
         type: string;
     };
     metadata: {
+        package?: string;
         provider: string;
         timestamp: string;
         version: string;

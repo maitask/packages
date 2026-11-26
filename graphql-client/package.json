@@ -53,32 +53,29 @@
           "url": {
             "type": "string",
             "title": "Url",
-            "default": "https://api.example.com/graphql",
             "format": "uri"
           },
           "query": {
             "type": "string",
-            "title": "Query",
-            "default": "query User($id: ID!) { user(id: $id) { id email } }"
+            "title": "Query"
           },
           "variables": {
             "type": "object",
             "title": "Variables",
-            "properties": {
-              "id": {
-                "type": "string",
-                "title": "Id",
-                "default": "42"
-              }
-            }
+            "additionalProperties": true
           },
           "timeoutMs": {
             "type": "integer",
             "title": "Timeout Ms",
-            "default": 20000,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 1,
+            "maximum": 120000
           }
-        }
+        },
+        "required": [
+          "url",
+          "query"
+        ]
       },
       "options": {
         "type": "object",
@@ -98,6 +95,14 @@
             "type": "integer",
             "title": "Timeout Ms",
             "default": 30000,
+            "x-advanced": true,
+            "minimum": 1,
+            "maximum": 120000
+          },
+          "allowPrivateHosts": {
+            "type": "boolean",
+            "title": "Allow Private Hosts",
+            "default": false,
             "x-advanced": true
           }
         }

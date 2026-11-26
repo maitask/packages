@@ -26,7 +26,7 @@
         "properties": {
           "storyType": {
             "type": "string",
-            "title": "Story list",
+            "title": "Story Type",
             "enum": [
               "top",
               "best",
@@ -47,7 +47,7 @@
           "includeComments": {
             "type": "boolean",
             "title": "Include comments",
-            "default": true
+            "default": false
           },
           "commentLimit": {
             "type": "integer",
@@ -82,6 +82,12 @@
             "minimum": 1000,
             "maximum": 120000,
             "default": 30000,
+            "x-advanced": true
+          },
+          "allowPrivateHosts": {
+            "type": "boolean",
+            "title": "Allow Private Hosts",
+            "default": false,
             "x-advanced": true
           }
         }

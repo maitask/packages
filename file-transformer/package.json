@@ -53,20 +53,36 @@
         "properties": {
           "data": {
             "type": "string",
-            "title": "Data",
-            "default": "{\"name\":\"Alice\",\"age\":30}"
+            "title": "Data"
           },
           "from": {
             "type": "string",
             "title": "From",
-            "default": "json"
+            "enum": [
+              "json",
+              "csv",
+              "xml",
+              "yaml",
+              "toml"
+            ]
           },
           "to": {
             "type": "string",
             "title": "To",
-            "default": "yaml"
+            "enum": [
+              "json",
+              "csv",
+              "xml",
+              "yaml",
+              "toml"
+            ]
           }
-        }
+        },
+        "required": [
+          "data",
+          "from",
+          "to"
+        ]
       },
       "options": {
         "type": "object",
@@ -96,7 +112,8 @@
             "type": "integer",
             "title": "YAML Indent",
             "default": 2,
-            "x-advanced": true
+            "x-advanced": true,
+            "minimum": 2
           }
         }
       }
