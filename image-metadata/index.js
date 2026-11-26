@@ -171,7 +171,8 @@ function detectFormat(bytes) {
         return 'BMP';
     }
 
-    if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
+    if (bytes.length >= 12 &&
+        bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46 &&
         bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50) {
         return 'WebP';
     }
@@ -183,6 +184,7 @@ function detectFormat(bytes) {
  * Extract PNG dimensions
  */
 function extractPngDimensions(bytes) {
+    if (bytes.length < 24) return null;
     const width = ((bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19]) >>> 0;
     const height = ((bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23]) >>> 0;
 
@@ -193,6 +195,7 @@ function extractPngDimensions(bytes) {
  * Extract PNG color info
  */
 function extractPngColorInfo(bytes) {
+    if (bytes.length < 26) return null;
     const bitDepth = bytes[24];
     const colorType = bytes[25];
 
@@ -265,6 +268,7 @@ function extractBasicExif(bytes) {
  * Extract GIF dimensions
  */
 function extractGifDimensions(bytes) {
+    if (bytes.length < 10) return null;
     const width = bytes[6] | (bytes[7] << 8);
     const height = bytes[8] | (bytes[9] << 8);
 
@@ -275,6 +279,7 @@ function extractGifDimensions(bytes) {
  * Extract BMP dimensions
  */
 function extractBmpDimensions(bytes) {
+    if (bytes.length < 26) return null;
     const width = bytes[18] | (bytes[19] << 8) | (bytes[20] << 16) | (bytes[21] << 24);
     const height = bytes[22] | (bytes[23] << 8) | (bytes[24] << 16) | (bytes[25] << 24);
 
@@ -285,6 +290,7 @@ function extractBmpDimensions(bytes) {
  * Extract BMP color info
  */
 function extractBmpColorInfo(bytes) {
+    if (bytes.length < 30) return null;
     const bitDepth = bytes[28] | (bytes[29] << 8);
 
     return {

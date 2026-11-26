@@ -23,8 +23,13 @@
  */
 function execute(input, options = {}, context = {}) {
     try {
-        const direction = options.direction || 'auto';
-        const indent = options.indent || 2;
+        const safeOptions = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
+        const direction = safeOptions.direction || 'auto';
+        const rawIndent = safeOptions.indent === undefined ? 2 : Number(safeOptions.indent);
+        if (!Number.isFinite(rawIndent) || rawIndent < 1 || rawIndent > 16) {
+            throw new Error('indent must be a number between 1 and 16');
+        }
+        const indent = Math.floor(rawIndent);
 
         let result;
         let detectedDirection;
@@ -259,13 +264,13 @@ function parseValue(value) {
  * Convert JSON to YAML
  */
 function jsonToYaml(data, indent = 2) {
-    return serializeYaml(data, 0, indent);
+    return serializeYaml(data, 0, indent, new WeakSet());
 }
 
 /**
  * Serialize data to YAML format
  */
-function serializeYaml(data, level, indent) {
+function serializeYaml(data, level, indent, seen = new WeakSet()) {
     const space = ' '.repeat(level * indent);
 
     if (data === null || data === undefined) {
@@ -287,51 +292,64 @@ function serializeYaml(data, level, indent) {
         return data;
     }
 
-    if (Array.isArray(data)) {
-        if (data.length === 0) {
-            return '[]';
-        }
-
-        const items = data.map(item => {
-            const value = serializeYaml(item, level + 1, indent);
-            if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
-                const lines = value.split('\n');
-                const first = lines[0];
-                const rest = lines.slice(1).join('\n');
-                return `${space}- ${first}\n${rest}`;
-            }
-            return `${space}- ${value}`;
-        });
-
-        return items.join('\n');
-    }
-
     if (typeof data === 'object') {
-        const keys = Object.keys(data);
-
-        if (keys.length === 0) {
-            return '{}';
+        if (seen.has(data)) {
+            throw new Error('Cannot serialize circular object reference to YAML');
         }
-
-        const pairs = keys.map(key => {
-            const value = data[key];
-            const serialized = serializeYaml(value, level + 1, indent);
-
-            if (typeof value === 'object' && value !== null) {
-                if (Array.isArray(value) && value.length > 0) {
-                    return `${space}${key}:\n${serialized}`;
-                } else if (!Array.isArray(value) && Object.keys(value).length > 0) {
-                    return `${space}${key}:\n${serialized}`;
-                }
-            }
-
-            return `${space}${key}: ${serialized}`;
-        });
-
-        return pairs.join('\n');
+        seen.add(data);
     }
 
-    return String(data);
+    try {
+        if (Array.isArray(data)) {
+            if (data.length === 0) {
+                return '[]';
+            }
+
+            const items = data.map(item => {
+                const value = serializeYaml(item, level + 1, indent, seen);
+                if (typeof item === 'object' && item !== null && !Array.isArray(item)) {
+                    const lines = value.split('\n');
+                    const first = lines[0];
+                    const rest = lines.slice(1).join('\n');
+                    return rest ? `${space}- ${first}\n${rest}` : `${space}- ${first}`;
+                }
+                return `${space}- ${value}`;
+            });
+
+            return items.join('\n');
+        }
+
+        if (typeof data === 'object') {
+            const keys = Object.keys(data);
+
+            if (keys.length === 0) {
+                return '{}';
+            }
+
+            const pairs = keys.map(key => {
+                const value = data[key];
+                const serialized = serializeYaml(value, level + 1, indent, seen);
+
+                if (typeof value === 'object' && value !== null) {
+                    if (Array.isArray(value) && value.length > 0) {
+                        return `${space}${key}:\n${serialized}`;
+                    } else if (!Array.isArray(value) && Object.keys(value).length > 0) {
+                        return `${space}${key}:\n${serialized}`;
+                    }
+                }
+
+                return `${space}${key}: ${serialized}`;
+            });
+
+            return pairs.join('\n');
+        }
+
+        return String(data);
+    } finally {
+        if (typeof data === 'object' && data !== null) {
+            seen.delete(data);
+        }
+    }
 }
 
 /**

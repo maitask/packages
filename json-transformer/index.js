@@ -23,28 +23,29 @@
  */
 function execute(input, options = {}, context = {}) {
     try {
+        const opts = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
         const data = ensureJsonData(input);
-        const operation = options.operation || 'query';
+        const operation = opts.operation || 'query';
 
         let result;
         switch (operation) {
             case 'query':
-                result = queryJson(data, options.path || '$');
+                result = queryJson(data, opts.path || '$');
                 break;
             case 'map':
-                result = mapData(data, options.mapping || {});
+                result = mapData(data, opts.mapping || {});
                 break;
             case 'filter':
-                result = filterData(data, options.condition || {});
+                result = filterData(data, opts.condition || {});
                 break;
             case 'extract':
-                result = extractFields(data, options.fields || []);
+                result = extractFields(data, opts.fields || []);
                 break;
             case 'flatten':
-                result = flattenData(data, options.separator || '.');
+                result = flattenData(data, opts.separator || '.');
                 break;
             case 'unflatten':
-                result = unflattenData(data, options.separator || '.');
+                result = unflattenData(data, opts.separator || '.');
                 break;
             default:
                 throw new Error(`Unknown operation: ${operation}`);
@@ -195,7 +196,7 @@ function evaluatePath(data, tokens) {
             switch (token.type) {
                 case 'property':
                     if (typeof item === 'object' && !Array.isArray(item)) {
-                        if (item[token.value] !== undefined) {
+                        if (isSafePathKey(token.value) && Object.hasOwn(item, token.value) && item[token.value] !== undefined) {
                             next.push(item[token.value]);
                         }
                     }
@@ -204,7 +205,7 @@ function evaluatePath(data, tokens) {
                 case 'index':
                     if (Array.isArray(item)) {
                         const index = token.value < 0 ? item.length + token.value : token.value;
-                        if (item[index] !== undefined) {
+                        if (index >= 0 && index < item.length && item[index] !== undefined) {
                             next.push(item[index]);
                         }
                     }
@@ -214,12 +215,16 @@ function evaluatePath(data, tokens) {
                     if (Array.isArray(item)) {
                         next.push(...item);
                     } else if (typeof item === 'object') {
-                        next.push(...Object.values(item));
+                        for (const key of Object.keys(item)) {
+                            if (Object.hasOwn(item, key) && isSafePathKey(key)) {
+                                next.push(item[key]);
+                            }
+                        }
                     }
                     break;
 
                 case 'recursive':
-                    collectRecursive(item, next);
+                    collectRecursive(item, next, new WeakSet());
                     break;
             }
         }
@@ -233,20 +238,26 @@ function evaluatePath(data, tokens) {
 /**
  * Collect all values recursively
  */
-function collectRecursive(obj, result) {
+function collectRecursive(obj, result, seen = new WeakSet()) {
     if (obj === null || typeof obj !== 'object') {
         return;
     }
+    if (seen.has(obj)) {
+        return;
+    }
+    seen.add(obj);
 
     if (Array.isArray(obj)) {
         for (const item of obj) {
             result.push(item);
-            collectRecursive(item, result);
+            collectRecursive(item, result, seen);
         }
     } else {
-        for (const value of Object.values(obj)) {
+        for (const key of Object.keys(obj)) {
+            if (!Object.hasOwn(obj, key) || !isSafePathKey(key)) continue;
+            const value = obj[key];
             result.push(value);
-            collectRecursive(value, result);
+            collectRecursive(value, result, seen);
         }
     }
 }
@@ -256,17 +267,20 @@ function collectRecursive(obj, result) {
  * mapping: { newKey: 'path.to.value', ... }
  */
 function mapData(data, mapping) {
-    const result = {};
+    const result = Object.create(null);
+    if (!mapping || typeof mapping !== 'object') {
+        return result;
+    }
 
-    for (const [targetKey, sourcePath] of Object.entries(mapping)) {
+    for (const targetKey of Object.keys(mapping)) {
+        if (!Object.hasOwn(mapping, targetKey) || !isSafePathKey(targetKey)) continue;
+        const sourcePath = mapping[targetKey];
         if (typeof sourcePath === 'string') {
             const value = getNestedValue(data, sourcePath);
             if (value !== undefined) {
                 result[targetKey] = value;
             }
-        } else if (typeof sourcePath === 'function') {
-            result[targetKey] = sourcePath(data);
-        } else {
+        } else if (typeof sourcePath !== 'function') {
             result[targetKey] = sourcePath;
         }
     }
@@ -278,7 +292,7 @@ function mapData(data, mapping) {
  * Get nested value using dot notation
  */
 function getNestedValue(obj, path) {
-    const parts = path.split('.');
+    const parts = String(path || '').split('.');
     let current = obj;
 
     for (const part of parts) {
@@ -288,13 +302,20 @@ function getNestedValue(obj, path) {
 
         const arrayMatch = part.match(/^(.+)\[(\d+)\]$/);
         if (arrayMatch) {
-            current = current[arrayMatch[1]];
+            const prop = arrayMatch[1];
+            if (!isSafePathKey(prop) || typeof current !== 'object' || !Object.hasOwn(current, prop)) {
+                return undefined;
+            }
+            current = current[prop];
             if (Array.isArray(current)) {
-                current = current[parseInt(arrayMatch[2])];
+                current = current[parseInt(arrayMatch[2], 10)];
             } else {
                 return undefined;
             }
         } else {
+            if (!isSafePathKey(part) || typeof current !== 'object' || !Object.hasOwn(current, part)) {
+                return undefined;
+            }
             current = current[part];
         }
     }
@@ -318,12 +339,16 @@ function filterData(data, condition) {
  * Check if item matches condition
  */
 function matchesCondition(item, condition) {
-    for (const [key, value] of Object.entries(condition)) {
+    if (!condition || typeof condition !== 'object') return true;
+    for (const key of Object.keys(condition)) {
+        if (!Object.hasOwn(condition, key) || !isSafePathKey(key)) continue;
+        const value = condition[key];
         const itemValue = getNestedValue(item, key);
 
         if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-            for (const [op, opValue] of Object.entries(value)) {
-                if (!evaluateOperator(itemValue, op, opValue)) {
+            for (const op of Object.keys(value)) {
+                if (!Object.hasOwn(value, op)) continue;
+                if (!evaluateOperator(itemValue, op, value[op])) {
                     return false;
                 }
             }
@@ -351,7 +376,16 @@ function evaluateOperator(value, operator, target) {
         case '$in': return Array.isArray(target) && target.includes(value);
         case '$nin': return Array.isArray(target) && !target.includes(value);
         case '$exists': return (value !== undefined) === target;
-        case '$regex': return new RegExp(target).test(String(value));
+        case '$regex': {
+            const pattern = target instanceof RegExp ? target.source : String(target ?? '');
+            if (!pattern || pattern.length > 512) return false;
+            try {
+                const regex = target instanceof RegExp ? target : new RegExp(pattern);
+                return regex.test(String(value ?? ''));
+            } catch {
+                return false;
+            }
+        }
         default: return false;
     }
 }
@@ -371,9 +405,9 @@ function extractFields(data, fields) {
  * Extract fields from a single object
  */
 function extractFromObject(obj, fields) {
-    const result = {};
+    const result = Object.create(null);
 
-    for (const field of fields) {
+    for (const field of Array.isArray(fields) ? fields : []) {
         const value = getNestedValue(obj, field);
         if (value !== undefined) {
             setNestedValue(result, field, value);
@@ -416,11 +450,17 @@ function setNestedValue(obj, path, value) {
  * Flatten nested object
  */
 function flattenData(data, separator = '.') {
-    const result = {};
+    const result = Object.create(null);
+    const seen = new WeakSet();
 
     function flatten(obj, prefix = '') {
-        for (const [key, value] of Object.entries(obj)) {
+        if (!obj || typeof obj !== 'object' || seen.has(obj)) return;
+        seen.add(obj);
+        for (const key of Object.keys(obj)) {
+            if (!Object.hasOwn(obj, key) || !isSafePathKey(key)) continue;
+            const value = obj[key];
             const newKey = prefix ? `${prefix}${separator}${key}` : key;
+            if (!isSafePathKey(newKey)) continue;
 
             if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
                 flatten(value, newKey);
@@ -438,10 +478,15 @@ function flattenData(data, separator = '.') {
  * Unflatten object
  */
 function unflattenData(data, separator = '.') {
-    const result = {};
+    const result = Object.create(null);
+    if (!data || typeof data !== 'object') return result;
+    const sepText = String(separator || '.');
+    const escapedSep = sepText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const sepRegex = new RegExp(escapedSep, 'g');
 
-    for (const [key, value] of Object.entries(data)) {
-        setNestedValue(result, key.replace(new RegExp(separator.replace('.', '\\.'), 'g'), '.'), value);
+    for (const key of Object.keys(data)) {
+        if (!Object.hasOwn(data, key) || !isSafePathKey(key)) continue;
+        setNestedValue(result, key.replace(sepRegex, '.'), data[key]);
     }
 
     return result;

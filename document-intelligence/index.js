@@ -10,19 +10,28 @@ const DEFAULT_API_BASE_URL = 'https://api.openai.com/v1';
 const MAX_SOURCE_TEXT_CHARS = 24_000;
 const MAX_DOCUMENTS = 20;
 
+const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
+const MAX_ERROR_BYTES = 16 * 1024;
+
 async function execute(input = {}, options = {}, context = {}) {
   const startedAt = Date.now();
+  let config = null;
 
   try {
     ensureFetch();
-    const config = buildConfig(input, options, context);
-    const documents = collectDocuments(input, config);
+    const safeInput = isPlainObject(input) ? input : {};
+    const safeOptions = isPlainObject(options) ? options : {};
+    const safeContext = isPlainObject(context) ? context : {};
+    config = buildConfig(safeInput, safeOptions, safeContext);
+    const documents = collectDocuments(safeInput, config);
     if (!documents.length) {
       return buildFailure(
         new Error('Provide text, documents, or upstream items with readable content'),
         startedAt,
-        context,
-        'DOCUMENT_INPUT_REQUIRED'
+        safeContext,
+        'DOCUMENT_INPUT_REQUIRED',
+        null,
+        config
       );
     }
 
@@ -32,9 +41,10 @@ async function execute(input = {}, options = {}, context = {}) {
       return buildFailure(
         new Error('The model did not return a publishable document result'),
         startedAt,
-        context,
+        safeContext,
         'DOCUMENT_OUTPUT_INVALID',
-        result.usage
+        result.usage,
+        config
       );
     }
 
@@ -88,7 +98,7 @@ async function execute(input = {}, options = {}, context = {}) {
         contract_version: CONTRACT_VERSION,
         package: PACKAGE_NAME,
         version: PACKAGE_VERSION,
-        execution_id: context?.execution_id || null,
+        execution_id: safeContext?.execution_id || null,
         task: config.task,
         language: config.language,
         model: config.model,
@@ -100,20 +110,19 @@ async function execute(input = {}, options = {}, context = {}) {
       citations
     };
   } catch (error) {
-    return buildFailure(error, startedAt, context);
+    return buildFailure(error, startedAt, context, undefined, null, config);
   }
 }
 
 function buildConfig(input, options, context) {
-  const ai = options.ai && typeof options.ai === 'object' ? options.ai : {};
-  const output = options.output && typeof options.output === 'object' ? options.output : {};
-  const apiKey =
-    ai.apiKey ||
-    ai.api_key ||
-    options.apiKey ||
-    options.api_key ||
-    context?.secrets?.OPENAI_API_KEY ||
-    context?.secrets?.DOCUMENT_INTELLIGENCE_API_KEY;
+  const ai = isPlainObject(options.ai) ? options.ai : {};
+  const output = isPlainObject(options.output) ? options.output : {};
+  const apiKey = firstString(
+    ai.apiKey,
+    options.apiKey,
+    context?.secrets?.OPENAI_API_KEY,
+    context?.secrets?.DOCUMENT_INTELLIGENCE_API_KEY
+  );
   if (!apiKey) {
     throw Object.assign(new Error('AI API key is required'), {
       code: 'DOCUMENT_AI_KEY_REQUIRED'
@@ -136,13 +145,16 @@ function buildConfig(input, options, context) {
     });
   }
 
+  const allowPrivateHosts = options.allowPrivateHosts === true || ai.allowPrivateHosts === true;
+  const allowInsecureHttp = options.allowInsecureHttp === true || ai.allowInsecureHttp === true || allowPrivateHosts;
+
   return {
     task,
     language,
     labels: uniqueStrings(options.labels || input.labels),
-    schema: options.schema && typeof options.schema === 'object' ? options.schema : null,
+    schema: isPlainObject(options.schema) ? options.schema : null,
     apiKey,
-    baseUrl: normalizeBaseUrl(ai.baseUrl || options.baseUrl, DEFAULT_API_BASE_URL),
+    baseUrl: normalizeBaseUrl(ai.baseUrl || options.baseUrl, DEFAULT_API_BASE_URL, allowPrivateHosts, allowInsecureHttp),
     model: String(ai.model || options.model || 'gpt-5.5').trim(),
     temperature: readNumber(ai.temperature ?? options.temperature, 0.2, 0, 2),
     maxTokens: readBoundedInt(ai.maxTokens ?? options.maxTokens, 256, 8192, 1600),
@@ -246,14 +258,22 @@ async function requestModel(documents, config) {
   );
 
   if (!response.ok) {
-    const bodyText = await response.text().catch(() => '');
+    const bodyText = await readBoundedText(response, MAX_ERROR_BYTES, false);
     throw Object.assign(new Error(bodyText || `Document intelligence request failed (${response.status})`), {
       code: 'DOCUMENT_AI_REQUEST_FAILED',
       status: response.status
     });
   }
 
-  const payload = await response.json();
+  const rawText = await readBoundedText(response, MAX_RESPONSE_BYTES, true);
+  let payload;
+  try {
+    payload = rawText ? JSON.parse(rawText) : {};
+  } catch {
+    throw Object.assign(new Error('Document intelligence response is not valid JSON'), {
+      code: 'DOCUMENT_AI_INVALID_JSON'
+    });
+  }
   const content = payload.choices?.[0]?.message?.content;
   if (!content || typeof content !== 'string') {
     throw Object.assign(new Error('The model returned an empty completion'), {
@@ -352,7 +372,8 @@ function normalizeUsage(usage) {
   };
 }
 
-function buildFailure(error, startedAt, context, code, usage) {
+function buildFailure(error, startedAt, context, code, usage, config = null) {
+  const safeMessage = redactErrorMessage(error?.message || 'Document intelligence failed', config, context);
   return {
     success: false,
     data: {
@@ -364,7 +385,7 @@ function buildFailure(error, startedAt, context, code, usage) {
       }
     },
     error: {
-      message: error?.message || 'Document intelligence failed',
+      message: safeMessage,
       code: code || error?.code || 'DOCUMENT_INTELLIGENCE_ERROR',
       type: error?.name || 'DocumentIntelligenceError'
     },
@@ -383,22 +404,51 @@ function buildFailure(error, startedAt, context, code, usage) {
 
 async function requestWithRetry(url, init, timeoutMs, retries) {
   let attempt = 0;
+  const runtimeFetch = usesMaitaskRuntimeFetch();
   while (true) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    const controller = runtimeFetch ? null : new AbortController();
+    const timeout = runtimeFetch ? null : setTimeout(() => controller.abort(), timeoutMs);
     try {
-      const response = await fetch(url, { ...init, signal: controller.signal, timeoutMs });
-      if (response.ok || attempt >= retries || ![408, 409, 425, 429].includes(response.status) && response.status < 500) {
+      const fetchInit = {
+        ...init,
+        redirect: 'manual',
+        timeoutMs
+      };
+      if (runtimeFetch) {
+        fetchInit.maxResponseBytes = MAX_RESPONSE_BYTES;
+      } else {
+        fetchInit.signal = controller.signal;
+      }
+      const response = await fetch(url, fetchInit);
+      if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+        if (response?.body && typeof response.body.cancel === 'function') {
+          try { await response.body.cancel(); } catch {}
+        }
+        throw Object.assign(new Error('HTTP redirects are not allowed'), {
+          code: 'DOCUMENT_AI_REDIRECT_BLOCKED'
+        });
+      }
+      if (response.ok || attempt >= retries || (![408, 409, 425, 429].includes(response.status) && response.status < 500)) {
         return response;
+      }
+      if (response?.body && typeof response.body.cancel === 'function') {
+        try { await response.body.cancel(); } catch {}
       }
       await sleep(Math.min(500 * 2 ** attempt, 4000));
       attempt += 1;
     } catch (error) {
-      if (attempt >= retries) throw error;
+      if (error?.code === 'DOCUMENT_AI_REDIRECT_BLOCKED' || attempt >= retries) {
+        if (error?.name === 'AbortError') {
+          throw new Error(`Document intelligence request timed out after ${timeoutMs}ms`);
+        }
+        throw error;
+      }
       await sleep(Math.min(500 * 2 ** attempt, 4000));
       attempt += 1;
     } finally {
-      clearTimeout(timeout);
+      if (timeout !== null) {
+        clearTimeout(timeout);
+      }
     }
   }
 }
@@ -409,9 +459,177 @@ function ensureFetch() {
   }
 }
 
-function normalizeBaseUrl(value, fallback) {
-  const raw = String(value || fallback).trim().replace(/\/+$/, '');
-  return raw || fallback;
+function normalizeBaseUrl(value, fallback, allowPrivateHosts, allowInsecureHttp) {
+  const raw = String(value || fallback).trim();
+  if (!raw) {
+    throw new Error('baseUrl must not be empty');
+  }
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error('baseUrl must be a valid URL');
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error('baseUrl must not embed credentials');
+  }
+  if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && allowInsecureHttp)) {
+    throw new Error('baseUrl must use https unless allowInsecureHttp is enabled');
+  }
+  if (!allowPrivateHosts && isBlockedHost(parsed.hostname)) {
+    throw new Error('baseUrl must not point to a private or internal host');
+  }
+  return parsed.toString().replace(/\/+$/, '');
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function usesMaitaskRuntimeFetch() {
+  return Boolean(
+    typeof Deno !== 'undefined' &&
+      Deno &&
+      Deno.core &&
+      Deno.core.ops &&
+      typeof Deno.core.ops.op_http_request === 'function'
+  );
+}
+
+function redactErrorMessage(message, config, context) {
+  let safe = String(message || 'Document intelligence failed');
+  const secrets = [
+    config?.apiKey,
+    context?.secrets?.OPENAI_API_KEY,
+    context?.secrets?.DOCUMENT_INTELLIGENCE_API_KEY
+  ];
+  for (const secret of secrets) {
+    if (typeof secret === 'string' && secret.length > 0) {
+      safe = safe.split(secret).join('[redacted]');
+    }
+  }
+  return safe.replace(/[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/gi, '[redacted-url]');
+}
+
+async function readBoundedText(response, maxBytes, throwOnLimit) {
+  if (response?.body && typeof response.body.getReader === 'function') {
+    const reader = response.body.getReader();
+    const decoder = typeof TextDecoder === 'function' ? new TextDecoder() : null;
+    let out = '';
+    let totalBytes = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!value) continue;
+        if (totalBytes + value.byteLength > maxBytes) {
+          if (throwOnLimit) {
+            throw new Error(`Document intelligence response exceeds ${maxBytes} byte limit`);
+          }
+          const remaining = maxBytes - totalBytes;
+          if (remaining > 0) {
+            const slice = value.subarray(0, remaining);
+            out += decoder ? decoder.decode(slice, { stream: true }) : String.fromCharCode(...slice);
+          }
+          break;
+        }
+        out += decoder ? decoder.decode(value, { stream: true }) : String.fromCharCode(...value);
+        totalBytes += value.byteLength;
+      }
+    } finally {
+      try {
+        await reader.cancel();
+      } catch {}
+    }
+    if (decoder) out += decoder.decode();
+    return out;
+  }
+  const text = await response.text();
+  if (typeof text === 'string' && text.length > maxBytes) {
+    if (throwOnLimit) {
+      throw new Error(`Document intelligence response exceeds ${maxBytes} byte limit`);
+    }
+    return text.slice(0, maxBytes);
+  }
+  return text || '';
+}
+
+function isBlockedHost(hostname) {
+  const normalized = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
+  if (
+    !normalized ||
+    normalized === 'localhost' ||
+    normalized === 'local' ||
+    normalized === 'internal' ||
+    normalized === 'localdomain' ||
+    normalized.endsWith('.localhost') ||
+    normalized.endsWith('.local') ||
+    normalized.endsWith('.internal') ||
+    normalized.endsWith('.localdomain')
+  ) {
+    return true;
+  }
+  if (normalized.includes(':')) {
+    const clean = normalized.split('%')[0];
+    const hextets = parseIpv6Hextets(clean);
+    if (!hextets) return true;
+    const allZero = hextets.every(part => part === 0);
+    const isLoopback = hextets.slice(0, 7).every(part => part === 0) && hextets[7] === 1;
+    if (allZero || isLoopback) return true;
+    if ((hextets[0] & 0xffc0) === 0xfe80) return true;
+    if ((hextets[0] & 0xfe00) === 0xfc00) return true;
+    if (hextets.slice(0, 5).every(part => part === 0) && hextets[5] === 0xffff) return true;
+    return false;
+  }
+  const ipv4 = normalized.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!ipv4) return false;
+  const [, a, b, c, d] = ipv4.map(Number);
+  if ([a, b, c, d].some(octet => octet < 0 || octet > 255)) return true;
+  return (
+    a === 10 ||
+    a === 127 ||
+    a === 0 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168)
+  );
+}
+
+function parseIpv6Hextets(address) {
+  const halves = address.split('::');
+  if (halves.length > 2) return null;
+  const parsePart = part => {
+    if (!part) return [];
+    const tokens = part.split(':');
+    const out = [];
+    for (let i = 0; i < tokens.length; i += 1) {
+      const token = tokens[i];
+      if (!token) return null;
+      if (token.includes('.')) {
+        if (i !== tokens.length - 1) return null;
+        const v4 = token.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+        if (!v4) return null;
+        const octets = v4.slice(1).map(Number);
+        if (octets.some(o => o < 0 || o > 255)) return null;
+        out.push((octets[0] << 8) | octets[1], (octets[2] << 8) | octets[3]);
+      } else {
+        if (!/^[0-9a-f]{1,4}$/i.test(token)) return null;
+        out.push(parseInt(token, 16));
+      }
+    }
+    return out;
+  };
+  const left = parsePart(halves[0]);
+  if (!left) return null;
+  if (halves.length === 1) {
+    return left.length === 8 ? left : null;
+  }
+  const right = parsePart(halves[1]);
+  if (!right) return null;
+  const missing = 8 - (left.length + right.length);
+  if (missing < 1) return null;
+  return [...left, ...new Array(missing).fill(0), ...right];
 }
 
 function parseJsonObject(content) {

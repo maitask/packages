@@ -95,8 +95,23 @@ function renderHtml(markdown, options = {}) {
         html = escapeHtml(html);
     }
 
-    html = processImages(html);
-    html = processLinks(html);
+    const mediaTokens = [];
+    const reserveMediaToken = htmlSnippet => {
+        const idx = mediaTokens.length;
+        mediaTokens.push(htmlSnippet);
+        return `@@MAITASK_MEDIA_${idx}@@`;
+    };
+
+    html = html.replace(/!\[([^\]]*)\]\(((?:[^()\s]+|\([^()\s]*\))+)\)/g, (_match, alt, src) => {
+        const safeSrc = escapeHtmlAttr(sanitizeSafeUrl(unescapeHtmlBasic(src), true));
+        const safeAlt = escapeHtmlAttr(alt);
+        return reserveMediaToken(`<img src="${safeSrc}" alt="${safeAlt}" />`);
+    });
+    html = html.replace(/\[([^\]]+)\]\(((?:[^()\s]+|\([^()\s]*\))+)\)/g, (_match, label, href) => {
+        const safeHref = escapeHtmlAttr(sanitizeSafeUrl(unescapeHtmlBasic(href), false));
+        const formattedLabel = processItalic(processBold(label));
+        return reserveMediaToken(`<a href="${safeHref}">${formattedLabel}</a>`);
+    });
     html = processHeadings(html);
     html = processBold(html);
     html = processItalic(html);
@@ -105,6 +120,11 @@ function renderHtml(markdown, options = {}) {
     html = processLists(html);
     html = processTables(html);
     html = processParagraphs(html);
+
+    html = html.replace(/@@MAITASK_MEDIA_(\d+)@@/g, (_match, rawIndex) => {
+        const idx = Number(rawIndex);
+        return Number.isInteger(idx) && idx >= 0 && idx < mediaTokens.length ? mediaTokens[idx] : '';
+    });
 
     html = html.replace(/@@MAITASK_CODE_(\d+)@@/g, (_match, rawIndex) => {
         const idx = Number(rawIndex);

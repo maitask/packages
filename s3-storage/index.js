@@ -13,11 +13,12 @@ const MAX_DOWNLOAD_BYTES = 10 * 1024 * 1024;
 
 async function execute(input, options = {}, context = {}) {
   try {
+    const safeOptions = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
     const payload = asObject(input);
     const operation = normalizeOperation(payload.operation);
-    const timeoutMs = readTimeout(payload.timeoutMs ?? options?.timeoutMs);
+    const timeoutMs = readTimeout(payload.timeoutMs ?? safeOptions.timeoutMs);
 
-    const result = await runWithPresignedUrl(operation, payload, options, timeoutMs);
+    const result = await runWithPresignedUrl(operation, payload, safeOptions, timeoutMs);
 
     return {
       success: true,
@@ -56,7 +57,8 @@ function validatePresignedUrl(rawUrl, options = {}) {
     throw new Error('presignedUrl must use https');
   }
   const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
-  if (options?.allowPrivateHost !== true && isBlockedHost(host)) {
+  const allowPrivate = options?.allowPrivateHosts === true || options?.allowPrivateHost === true;
+  if (!allowPrivate && isBlockedHost(host)) {
     throw new Error('presignedUrl host is not permitted');
   }
   return parsed.toString();
@@ -250,20 +252,39 @@ function extractXmlTag(xml, tag) {
     .replace(/&amp;/g, '&');
 }
 
+function usesMaitaskRuntimeFetch() {
+  return Boolean(
+    typeof Deno !== 'undefined' &&
+      Deno &&
+      Deno.core &&
+      Deno.core.ops &&
+      typeof Deno.core.ops.op_http_request === 'function'
+  );
+}
+
 async function fetchWithTimeout(url, { method, headers, body, timeoutMs }) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const runtimeFetch = usesMaitaskRuntimeFetch();
+  const controller = runtimeFetch ? null : new AbortController();
+  const timer = runtimeFetch ? null : setTimeout(() => controller.abort(), timeoutMs);
 
   try {
-    const response = await fetch(url, {
+    const fetchInit = {
       method,
       headers,
       body,
       redirect: 'manual',
-      timeoutMs,
-      signal: controller.signal
-    });
+      timeoutMs
+    };
+    if (runtimeFetch) {
+      fetchInit.maxResponseBytes = MAX_DOWNLOAD_BYTES;
+    } else {
+      fetchInit.signal = controller.signal;
+    }
+    const response = await fetch(url, fetchInit);
     if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+      if (response?.body && typeof response.body.cancel === 'function') {
+        try { await response.body.cancel(); } catch {}
+      }
       throw new Error('Presigned URL redirects are not permitted');
     }
     return response;
@@ -273,20 +294,49 @@ async function fetchWithTimeout(url, { method, headers, body, timeoutMs }) {
     }
     throw error;
   } finally {
-    clearTimeout(timer);
+    if (timer !== null) {
+      clearTimeout(timer);
+    }
   }
 }
 
 async function readBoundedText(response, maxBytes) {
   const contentLength = Number(response.headers?.get?.('content-length') || 0);
   if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    if (response?.body && typeof response.body.cancel === 'function') {
+      try { await response.body.cancel(); } catch {}
+    }
     throw new Error(`Response exceeds ${maxBytes} byte limit`);
+  }
+  if (response?.body && typeof response.body.getReader === 'function') {
+    const reader = response.body.getReader();
+    const decoder = typeof TextDecoder === 'function' ? new TextDecoder() : null;
+    let out = '';
+    let totalBytes = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!value) continue;
+        if (totalBytes + value.byteLength > maxBytes) {
+          throw new Error(`Response exceeds ${maxBytes} byte limit`);
+        }
+        out += decoder ? decoder.decode(value, { stream: true }) : String.fromCharCode(...value);
+        totalBytes += value.byteLength;
+      }
+    } finally {
+      try {
+        await reader.cancel();
+      } catch {}
+    }
+    if (decoder) out += decoder.decode();
+    return out;
   }
   const text = await response.text();
-  if (text.length > maxBytes) {
+  if (typeof text === 'string' && text.length > maxBytes) {
     throw new Error(`Response exceeds ${maxBytes} byte limit`);
   }
-  return text;
+  return text || '';
 }
 
 async function ensureOk(response) {

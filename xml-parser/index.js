@@ -69,10 +69,12 @@ function ensureXml(input) {
     throw new Error('Invalid input: XML string expected');
 }
 
+const MAX_XML_DEPTH = 256;
+
 function parseXml(xml, options = {}) {
-    const preserveWhitespace = options.preserveWhitespace === true;
+    const preserveWhitespace = options && options.preserveWhitespace === true;
     const source = String(xml || '');
-    const documentNode = createXmlNode('#document', {});
+    const documentNode = createXmlNode('#document', Object.create(null));
     const stack = [documentNode];
     let index = 0;
 
@@ -134,6 +136,9 @@ function parseXml(xml, options = {}) {
         stack[stack.length - 1]._children.push(node);
 
         if (!selfClosing) {
+            if (stack.length >= MAX_XML_DEPTH) {
+                throw new Error(`XML nesting exceeds maximum depth (${MAX_XML_DEPTH})`);
+            }
             stack.push(node);
         }
 
@@ -199,12 +204,17 @@ function parseTag(tagSource) {
     };
 }
 
+function isSafeKey(key) {
+    return key !== '__proto__' && key !== 'constructor' && key !== 'prototype';
+}
+
 function parseAttributes(attrSource) {
-    const attributes = {};
+    const attributes = Object.create(null);
     const regex = /([A-Za-z_][\w:.-]*)\s*=\s*("([^"]*)"|'([^']*)')/g;
     let match;
 
     while ((match = regex.exec(attrSource)) !== null) {
+        if (!isSafeKey(match[1])) continue;
         attributes[match[1]] = decodeXml(match[3] !== undefined ? match[3] : match[4]);
     }
 
@@ -420,11 +430,12 @@ function extractXPathOutput(node, output) {
     return node;
 }
 
-function getNodeText(node) {
+function getNodeText(node, depth = 0) {
+    if (!node || depth > MAX_XML_DEPTH) return '';
     const parts = [];
     if (node._text) parts.push(node._text);
     (node._children || []).forEach(child => {
-        const text = getNodeText(child);
+        const text = getNodeText(child, depth + 1);
         if (text) parts.push(text);
     });
     return parts.join('').trim();
@@ -432,13 +443,14 @@ function getNodeText(node) {
 
 function getDescendants(node) {
     const result = [];
-    function visit(current) {
+    function visit(current, depth) {
+        if (!current || depth >= MAX_XML_DEPTH) return;
         (current._children || []).forEach(child => {
             result.push(child);
-            visit(child);
+            visit(child, depth + 1);
         });
     }
-    visit(node);
+    visit(node, 0);
     return result;
 }
 

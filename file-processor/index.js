@@ -167,13 +167,13 @@ function applyPreprocess(data, config, metadata) {
 
         var kind = (step.type || step.name || '').toLowerCase();
         if (kind === 'deduplicate' || kind === 'dedupe') {
-            var seen = {};
+            var seen = Object.create(null);
             var keys = step.keys || (step.key ? [step.key] : []);
             var unique = [];
             for (var j = 0; j < working.length; j++) {
                 var item = working[j];
                 var signature = keys.length > 0 ? keys.map(function (key) { return stringifySafe(getByPath(item, key)); }).join('::') : stringifySafe(item);
-                if (!seen[signature]) {
+                if (!Object.hasOwn(seen, signature)) {
                     seen[signature] = true;
                     unique.push(item);
                 }
@@ -353,11 +353,7 @@ function resolveRuleValue(item, descriptor, fallbackKey) {
     }
 
     if (typeof descriptor === 'function') {
-        try {
-            return descriptor(item, fallbackKey);
-        } catch (err) {
-            return undefined;
-        }
+        return undefined;
     }
 
     if (!isPlainObject(descriptor)) {
@@ -367,9 +363,9 @@ function resolveRuleValue(item, descriptor, fallbackKey) {
     var sourcePath = descriptor.from || descriptor.field || descriptor.path || fallbackKey;
     var value;
 
-    if (descriptor.hasOwnProperty('value')) {
+    if (Object.hasOwn(descriptor, 'value')) {
         value = descriptor.value;
-    } else if (descriptor.hasOwnProperty('constant')) {
+    } else if (Object.hasOwn(descriptor, 'constant')) {
         value = descriptor.constant;
     } else if (descriptor.template) {
         value = interpolateTemplate(descriptor.template, item);
@@ -379,18 +375,12 @@ function resolveRuleValue(item, descriptor, fallbackKey) {
         value = getByPath(item, sourcePath);
     }
 
-    if ((value === undefined || value === null || value === '') && descriptor.hasOwnProperty('default')) {
+    if ((value === undefined || value === null || value === '') && Object.hasOwn(descriptor, 'default')) {
         value = descriptor.default;
     }
 
     value = applyTypeConversion(value, descriptor.type, descriptor);
     value = applyValueTransforms(value, descriptor);
-
-    if (descriptor.rename && typeof descriptor.rename === 'string') {
-        var renamed = {};
-        renamed[descriptor.rename] = value;
-        return renamed[descriptor.rename];
-    }
 
     return value;
 }
@@ -778,7 +768,7 @@ function applyAggregations(data, rules) {
         return computeAggregateForGroup(data, config.metrics);
     }
 
-    var groups = {};
+    var groups = Object.create(null);
     for (var i = 0; i < data.length; i++) {
         var row = data[i];
         var keyParts = [];
@@ -786,7 +776,7 @@ function applyAggregations(data, rules) {
             keyParts.push(stringifySafe(getByPath(row, config.groupBy[g])));
         }
         var signature = keyParts.join('::');
-        if (!groups[signature]) {
+        if (!Object.hasOwn(groups, signature)) {
             groups[signature] = { rows: [], keyParts: keyParts };
         }
         groups[signature].rows.push(row);
@@ -796,9 +786,11 @@ function applyAggregations(data, rules) {
     var groupKeys = Object.keys(groups);
     for (var k = 0; k < groupKeys.length; k++) {
         var group = groups[groupKeys[k]];
-        var record = {};
+        var record = Object.create(null);
         for (var idx = 0; idx < config.groupBy.length; idx++) {
-            record[config.groupBy[idx]] = parsePossibleNumber(group.keyParts[idx]);
+            var groupField = config.groupBy[idx];
+            if (!isSafeKey(groupField)) continue;
+            record[groupField] = parsePossibleNumber(group.keyParts[idx]);
         }
         var metricsResult = computeAggregateForGroup(group.rows, config.metrics);
         mergeObjects(record, metricsResult);
@@ -889,7 +881,7 @@ function normalizeMetric(metric, fallbackName) {
 }
 
 function computeAggregateForGroup(rows, metrics) {
-    var result = {};
+    var result = Object.create(null);
 
     for (var i = 0; i < metrics.length; i++) {
         var metric = metrics[i];
@@ -911,7 +903,9 @@ function computeAggregateForGroup(rows, metrics) {
             var factor = Math.pow(10, metric.precision);
             computed = Math.round(computed * factor) / factor;
         }
-        result[metric.as || op] = computed;
+        var metricKey = metric.as || op;
+        if (!isSafeKey(metricKey)) continue;
+        result[metricKey] = computed;
     }
 
     return result;
@@ -925,11 +919,11 @@ function computeMetric(op, values, totalCount) {
     }
 
     if (operation === 'count_distinct' || operation === 'distinct') {
-        var seen = {};
+        var seen = Object.create(null);
         var unique = 0;
         for (var i = 0; i < values.length; i++) {
             var key = stringifySafe(values[i]);
-            if (!seen[key]) {
+            if (!Object.hasOwn(seen, key)) {
                 seen[key] = true;
                 unique++;
             }
@@ -1063,6 +1057,9 @@ function getByPath(obj, path) {
     }
 
     if (path.indexOf('.') === -1) {
+        if (!isSafeKey(path) || !Object.hasOwn(obj, path)) {
+            return undefined;
+        }
         return obj[path];
     }
 
@@ -1070,7 +1067,7 @@ function getByPath(obj, path) {
     var current = obj;
     for (var i = 0; i < segments.length; i++) {
         var seg = segments[i];
-        if (current === null || current === undefined || !isSafeKey(seg) || !Object.prototype.hasOwnProperty.call(current, seg)) {
+        if (current === null || current === undefined || !isSafeKey(seg) || !Object.hasOwn(current, seg)) {
             return undefined;
         }
         current = current[seg];

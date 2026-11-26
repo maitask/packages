@@ -39,7 +39,7 @@ async function execute(input = {}, options = {}, context = {}) {
         let schema = config.schema;
 
         if (config.schema_url && !schema) {
-            schema = await fetchSchemaFromUrl(config.schema_url);
+            schema = await fetchSchemaFromUrl(config.schema_url, config.allowPrivateHosts);
         }
 
         const validationResults = Array.isArray(data)
@@ -111,24 +111,16 @@ async function execute(input = {}, options = {}, context = {}) {
 
 function buildConfig(input, options, context) {
     const trustedOptions = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
-    const rawInputConfig = input && typeof input.config === 'object' && !Array.isArray(input.config) ? input.config : {};
-    const safeInputConfig = {};
-    for (const key of Object.keys(rawInputConfig)) {
-        if (key === 'schema_url' || key === 'schemaUrl' || key === 'validation_mode' || key === 'validationMode' || !isSafeKey(key)) {
-            continue;
-        }
-        safeInputConfig[key] = rawInputConfig[key];
-    }
-    const source = mergeObjects(safeInputConfig, trustedOptions);
 
     return {
-        schema: source.schema,
+        schema: trustedOptions.schema,
         schema_url: trustedOptions.schema_url,
+        allowPrivateHosts: trustedOptions.allowPrivateHosts === true,
         validation_mode: normalizeValidationMode(trustedOptions.validation_mode),
-        required_fields: Array.isArray(source.required_fields) ? source.required_fields : [],
-        data_types: source.data_types && typeof source.data_types === 'object' && !Array.isArray(source.data_types) ? source.data_types : {},
-        custom_rules: Array.isArray(source.custom_rules) ? source.custom_rules : [],
-        stop_on_first_error: Boolean(source.stop_on_first_error)
+        required_fields: Array.isArray(trustedOptions.required_fields) ? trustedOptions.required_fields : [],
+        data_types: trustedOptions.data_types && typeof trustedOptions.data_types === 'object' && !Array.isArray(trustedOptions.data_types) ? trustedOptions.data_types : {},
+        custom_rules: Array.isArray(trustedOptions.custom_rules) ? trustedOptions.custom_rules : [],
+        stop_on_first_error: Boolean(trustedOptions.stop_on_first_error)
     };
 }
 
@@ -140,7 +132,68 @@ function normalizeValidationMode(value) {
     return 'strict';
 }
 
-async function fetchSchemaFromUrl(url) {
+const MAX_SCHEMA_BYTES = 1024 * 1024;
+const MAX_SCHEMA_DEPTH = 64;
+const MAX_PATTERN_LENGTH = 512;
+const CRITICAL_RULES = new Set([
+    'required',
+    'datatype',
+    'type',
+    'schema',
+    '$ref',
+    'const',
+    'enum',
+    'not',
+    'oneOf',
+    'anyOf',
+    'allOf',
+    'dependencies',
+    'validation'
+]);
+
+function usesMaitaskRuntimeFetch() {
+    return Boolean(
+        typeof Deno !== 'undefined' &&
+        Deno &&
+        Deno.core &&
+        Deno.core.ops &&
+        typeof Deno.core.ops.op_http_request === 'function'
+    );
+}
+
+async function readBoundedSchemaText(response, maxBytes) {
+    if (response?.body && typeof response.body.getReader === 'function') {
+        const reader = response.body.getReader();
+        const decoder = typeof TextDecoder === 'function' ? new TextDecoder() : null;
+        let out = '';
+        let totalBytes = 0;
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                if (!value) continue;
+                if (totalBytes + value.byteLength > maxBytes) {
+                    throw new Error('schema_url response exceeds 1MB limit');
+                }
+                out += decoder ? decoder.decode(value, { stream: true }) : String.fromCharCode(...value);
+                totalBytes += value.byteLength;
+            }
+        } finally {
+            try {
+                await reader.cancel();
+            } catch {}
+        }
+        if (decoder) out += decoder.decode();
+        return out;
+    }
+    const text = await response.text();
+    if (typeof text === 'string' && text.length > maxBytes) {
+        throw new Error('schema_url response exceeds 1MB limit');
+    }
+    return text || '';
+}
+
+async function fetchSchemaFromUrl(url, allowPrivateHosts = false) {
     let parsed;
     try {
         parsed = new URL(String(url || '').trim());
@@ -153,35 +206,51 @@ async function fetchSchemaFromUrl(url) {
     if (parsed.username || parsed.password) {
         throw new Error('schema_url must not contain embedded credentials');
     }
-    if (isBlockedHost(parsed.hostname)) {
+    if (!allowPrivateHosts && isBlockedHost(parsed.hostname)) {
         throw new Error('schema_url host is not permitted');
     }
 
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 10000);
+    const runtimeFetch = usesMaitaskRuntimeFetch();
+    const controller = runtimeFetch ? null : new AbortController();
+    const timer = runtimeFetch ? null : setTimeout(() => controller.abort(), 10000);
     try {
-        const response = await fetch(parsed.toString(), {
+        const fetchInit = {
             method: 'GET',
             headers: {
                 'Accept': 'application/json'
             },
             redirect: 'manual',
-            timeoutMs: 10000,
-            signal: controller.signal
-        });
+            timeoutMs: 10000
+        };
+        if (runtimeFetch) {
+            fetchInit.maxResponseBytes = MAX_SCHEMA_BYTES;
+        } else {
+            fetchInit.signal = controller.signal;
+        }
+        const response = await fetch(parsed.toString(), fetchInit);
         if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+            if (response?.body && typeof response.body.cancel === 'function') {
+                try { await response.body.cancel(); } catch {}
+            }
             throw new Error('schema_url redirects are not allowed');
         }
         if (!response.ok) {
-            throw new Error(`Failed to fetch schema from ${parsed.origin}${parsed.pathname}: ${response.status}`);
+            if (response?.body && typeof response.body.cancel === 'function') {
+                try { await response.body.cancel(); } catch {}
+            }
+            throw new Error(`Failed to fetch schema (status ${response.status})`);
         }
-        const text = await response.text();
-        if (text.length > 1024 * 1024) {
-            throw new Error('schema_url response exceeds 1MB limit');
-        }
+        const text = await readBoundedSchemaText(response, MAX_SCHEMA_BYTES);
         return JSON.parse(text);
+    } catch (error) {
+        if (error?.name === 'AbortError') {
+            throw new Error('schema_url request timed out after 10000ms');
+        }
+        throw error;
     } finally {
-        clearTimeout(timer);
+        if (timer !== null) {
+            clearTimeout(timer);
+        }
     }
 }
 
@@ -287,29 +356,48 @@ function validateObject(data, schema, config) {
 function validateItem(item, schema, config, index) {
     const errors = [];
     const warnings = [];
+    const collected = [];
 
     // Schema validation
     if (schema) {
         const schemaErrors = validateAgainstSchema(item, schema);
-        errors.push(...schemaErrors);
+        collected.push(...schemaErrors);
     }
 
     // Required fields validation
     if (config.required_fields.length > 0) {
         const requiredErrors = validateRequiredFields(item, config.required_fields);
-        errors.push(...requiredErrors);
+        collected.push(...requiredErrors);
     }
 
     // Data types validation
     if (Object.keys(config.data_types).length > 0) {
         const typeErrors = validateDataTypes(item, config.data_types);
-        errors.push(...typeErrors);
+        collected.push(...typeErrors);
     }
 
     // Custom rules validation
     if (config.custom_rules.length > 0) {
         const customErrors = validateCustomRules(item, config.custom_rules);
-        errors.push(...customErrors);
+        collected.push(...customErrors);
+    }
+
+    if (config.validation_mode === 'loose') {
+        for (const entry of collected) {
+            const isCritical = entry.severity === 'critical' || CRITICAL_RULES.has(entry.rule);
+            if (isCritical) {
+                errors.push(entry);
+            } else {
+                warnings.push({
+                    field: entry.field,
+                    rule: entry.rule,
+                    message: entry.message,
+                    severity: 'warning'
+                });
+            }
+        }
+    } else {
+        errors.push(...collected);
     }
 
     // Data quality checks
@@ -329,7 +417,7 @@ function validateItem(item, schema, config, index) {
 
 function validateAgainstSchema(item, schema) {
     try {
-        return validateSchemaValue(item, schema, 'root', schema);
+        return validateSchemaValue(item, schema, 'root', schema, 0, new Set());
     } catch (error) {
         const errors = [];
         errors.push({
@@ -342,7 +430,10 @@ function validateAgainstSchema(item, schema) {
     }
 }
 
-function validateSchemaValue(value, schema, path, rootSchema) {
+function validateSchemaValue(value, schema, path, rootSchema, depth = 0, visitedRefs = new Set()) {
+    if (depth > MAX_SCHEMA_DEPTH) {
+        return [schemaError(path, 'schema', `Schema validation exceeded maximum recursion depth (${MAX_SCHEMA_DEPTH})`)];
+    }
     if (schema === true || schema === undefined || schema === null) return [];
     if (schema === false) {
         return [schemaError(path, 'schema', 'Value is not allowed by schema')];
@@ -351,11 +442,18 @@ function validateSchemaValue(value, schema, path, rootSchema) {
         return [schemaError(path, 'schema', 'Schema must be an object or boolean')];
     }
 
-    const resolvedSchema = schema.$ref ? resolveSchemaRef(rootSchema, schema.$ref) : schema;
-    if (resolvedSchema !== schema) {
-        return validateSchemaValue(value, resolvedSchema, path, rootSchema);
+    if (schema.$ref) {
+        const refKey = String(schema.$ref);
+        if (visitedRefs.has(refKey)) {
+            return [schemaError(path, '$ref', `Circular JSON Schema $ref detected: ${refKey}`)];
+        }
+        const resolvedRef = resolveSchemaRef(rootSchema, refKey);
+        const nextVisited = new Set(visitedRefs);
+        nextVisited.add(refKey);
+        return validateSchemaValue(value, resolvedRef, path, rootSchema, depth + 1, nextVisited);
     }
 
+    const resolvedSchema = schema;
     const errors = [];
 
     if (resolvedSchema.type !== undefined && !matchesSchemaType(value, resolvedSchema.type)) {
@@ -377,26 +475,26 @@ function validateSchemaValue(value, schema, path, rootSchema) {
 
     if (resolvedSchema.allOf) {
         for (const subSchema of ensureArray(resolvedSchema.allOf)) {
-            errors.push(...validateSchemaValue(value, subSchema, path, rootSchema));
+            errors.push(...validateSchemaValue(value, subSchema, path, rootSchema, depth + 1, new Set(visitedRefs)));
         }
     }
 
     if (resolvedSchema.anyOf) {
         const candidates = ensureArray(resolvedSchema.anyOf);
-        if (!candidates.some(subSchema => validateSchemaValue(value, subSchema, path, rootSchema).length === 0)) {
+        if (!candidates.some(subSchema => validateSchemaValue(value, subSchema, path, rootSchema, depth + 1, new Set(visitedRefs)).length === 0)) {
             errors.push(schemaError(path, 'anyOf', 'Value does not match any allowed schema'));
         }
     }
 
     if (resolvedSchema.oneOf) {
         const candidates = ensureArray(resolvedSchema.oneOf);
-        const matches = candidates.filter(subSchema => validateSchemaValue(value, subSchema, path, rootSchema).length === 0);
+        const matches = candidates.filter(subSchema => validateSchemaValue(value, subSchema, path, rootSchema, depth + 1, new Set(visitedRefs)).length === 0);
         if (matches.length !== 1) {
             errors.push(schemaError(path, 'oneOf', `Value must match exactly one schema, matched ${matches.length}`));
         }
     }
 
-    if (resolvedSchema.not && validateSchemaValue(value, resolvedSchema.not, path, rootSchema).length === 0) {
+    if (resolvedSchema.not && validateSchemaValue(value, resolvedSchema.not, path, rootSchema, depth + 1, new Set(visitedRefs)).length === 0) {
         errors.push(schemaError(path, 'not', 'Value matches a schema it must not match'));
     }
 
@@ -405,9 +503,9 @@ function validateSchemaValue(value, schema, path, rootSchema) {
     } else if (typeof value === 'number' && Number.isFinite(value)) {
         validateNumberConstraints(value, resolvedSchema, path, errors);
     } else if (Array.isArray(value)) {
-        validateArrayConstraints(value, resolvedSchema, path, rootSchema, errors);
+        validateArrayConstraints(value, resolvedSchema, path, rootSchema, errors, depth + 1);
     } else if (isPlainObject(value)) {
-        validateObjectConstraints(value, resolvedSchema, path, rootSchema, errors);
+        validateObjectConstraints(value, resolvedSchema, path, rootSchema, errors, depth + 1);
     }
 
     return errors;
@@ -421,9 +519,18 @@ function validateStringConstraints(value, schema, path, errors) {
         errors.push(schemaError(path, 'maxLength', `String length must be at most ${schema.maxLength}`));
     }
     if (schema.pattern !== undefined) {
-        const regex = new RegExp(schema.pattern);
-        if (!regex.test(value)) {
-            errors.push(schemaError(path, 'pattern', `String does not match pattern ${schema.pattern}`));
+        const patternStr = String(schema.pattern);
+        if (patternStr.length > MAX_PATTERN_LENGTH) {
+            errors.push(schemaError(path, 'pattern', `Schema pattern exceeds maximum length of ${MAX_PATTERN_LENGTH}`));
+        } else {
+            try {
+                const regex = new RegExp(patternStr);
+                if (!regex.test(value)) {
+                    errors.push(schemaError(path, 'pattern', `String does not match pattern ${patternStr}`));
+                }
+            } catch {
+                errors.push(schemaError(path, 'pattern', `Invalid schema pattern ${patternStr}`));
+            }
         }
     }
     if (schema.format && !matchesFormat(value, schema.format)) {
@@ -455,7 +562,7 @@ function validateNumberConstraints(value, schema, path, errors) {
     }
 }
 
-function validateArrayConstraints(value, schema, path, rootSchema, errors) {
+function validateArrayConstraints(value, schema, path, rootSchema, errors, depth = 1) {
     if (schema.minItems !== undefined && value.length < schema.minItems) {
         errors.push(schemaError(path, 'minItems', `Array must contain at least ${schema.minItems} item(s)`));
     }
@@ -469,7 +576,7 @@ function validateArrayConstraints(value, schema, path, rootSchema, errors) {
     if (Array.isArray(schema.items)) {
         schema.items.forEach((itemSchema, index) => {
             if (index < value.length) {
-                errors.push(...validateSchemaValue(value[index], itemSchema, `${path}[${index}]`, rootSchema));
+                errors.push(...validateSchemaValue(value[index], itemSchema, `${path}[${index}]`, rootSchema, depth, new Set()));
             }
         });
         if (schema.additionalItems === false && value.length > schema.items.length) {
@@ -477,17 +584,17 @@ function validateArrayConstraints(value, schema, path, rootSchema, errors) {
         } else if (schema.additionalItems && typeof schema.additionalItems === 'object') {
             value.slice(schema.items.length).forEach((item, offset) => {
                 const index = schema.items.length + offset;
-                errors.push(...validateSchemaValue(item, schema.additionalItems, `${path}[${index}]`, rootSchema));
+                errors.push(...validateSchemaValue(item, schema.additionalItems, `${path}[${index}]`, rootSchema, depth, new Set()));
             });
         }
     } else if (schema.items && typeof schema.items === 'object') {
         value.forEach((item, index) => {
-            errors.push(...validateSchemaValue(item, schema.items, `${path}[${index}]`, rootSchema));
+            errors.push(...validateSchemaValue(item, schema.items, `${path}[${index}]`, rootSchema, depth, new Set()));
         });
     }
 
     if (schema.contains) {
-        const matchCount = value.filter(item => validateSchemaValue(item, schema.contains, path, rootSchema).length === 0).length;
+        const matchCount = value.filter(item => validateSchemaValue(item, schema.contains, path, rootSchema, depth, new Set()).length === 0).length;
         const minContains = schema.minContains === undefined ? 1 : schema.minContains;
         if (matchCount < minContains) {
             errors.push(schemaError(path, 'contains', `Array must contain at least ${minContains} matching item(s)`));
@@ -498,7 +605,7 @@ function validateArrayConstraints(value, schema, path, rootSchema, errors) {
     }
 }
 
-function validateObjectConstraints(value, schema, path, rootSchema, errors) {
+function validateObjectConstraints(value, schema, path, rootSchema, errors, depth = 1) {
     const keys = Object.keys(value);
     if (schema.minProperties !== undefined && keys.length < schema.minProperties) {
         errors.push(schemaError(path, 'minProperties', `Object must have at least ${schema.minProperties} property/properties`));
@@ -520,18 +627,28 @@ function validateObjectConstraints(value, schema, path, rootSchema, errors) {
         for (const key of Object.keys(schema.properties)) {
             if (Object.prototype.hasOwnProperty.call(value, key)) {
                 validatedKeys.add(key);
-                errors.push(...validateSchemaValue(value[key], schema.properties[key], joinPath(path, key), rootSchema));
+                errors.push(...validateSchemaValue(value[key], schema.properties[key], joinPath(path, key), rootSchema, depth, new Set()));
             }
         }
     }
 
     if (schema.patternProperties && typeof schema.patternProperties === 'object') {
         for (const pattern of Object.keys(schema.patternProperties)) {
-            const regex = new RegExp(pattern);
+            if (pattern.length > MAX_PATTERN_LENGTH) {
+                errors.push(schemaError(path, 'pattern', `Schema patternProperties key exceeds maximum length of ${MAX_PATTERN_LENGTH}`));
+                continue;
+            }
+            let regex;
+            try {
+                regex = new RegExp(pattern);
+            } catch {
+                errors.push(schemaError(path, 'pattern', `Invalid schema patternProperties regex ${pattern}`));
+                continue;
+            }
             for (const key of keys) {
                 if (regex.test(key)) {
                     validatedKeys.add(key);
-                    errors.push(...validateSchemaValue(value[key], schema.patternProperties[pattern], joinPath(path, key), rootSchema));
+                    errors.push(...validateSchemaValue(value[key], schema.patternProperties[pattern], joinPath(path, key), rootSchema, depth, new Set()));
                 }
             }
         }
@@ -539,7 +656,7 @@ function validateObjectConstraints(value, schema, path, rootSchema, errors) {
 
     if (schema.propertyNames) {
         for (const key of keys) {
-            errors.push(...validateSchemaValue(key, schema.propertyNames, `${path} property name`, rootSchema));
+            errors.push(...validateSchemaValue(key, schema.propertyNames, `${path} property name`, rootSchema, depth, new Set()));
         }
     }
 
@@ -550,7 +667,7 @@ function validateObjectConstraints(value, schema, path, rootSchema, errors) {
         }
     } else if (schema.additionalProperties && typeof schema.additionalProperties === 'object') {
         for (const key of extras) {
-            errors.push(...validateSchemaValue(value[key], schema.additionalProperties, joinPath(path, key), rootSchema));
+            errors.push(...validateSchemaValue(value[key], schema.additionalProperties, joinPath(path, key), rootSchema, depth, new Set()));
         }
     }
 
@@ -565,7 +682,7 @@ function validateObjectConstraints(value, schema, path, rootSchema, errors) {
                     }
                 }
             } else if (dependency && typeof dependency === 'object') {
-                errors.push(...validateSchemaValue(value, dependency, path, rootSchema));
+                errors.push(...validateSchemaValue(value, dependency, path, rootSchema, depth, new Set()));
             }
         }
     }
@@ -591,7 +708,7 @@ function resolveSchemaRef(rootSchema, ref) {
         .map(part => part.replace(/~1/g, '/').replace(/~0/g, '~'));
     let current = rootSchema;
     for (const part of parts) {
-        if (!current || typeof current !== 'object' || !(part in current)) {
+        if (!current || typeof current !== 'object' || !isSafeKey(part) || !Object.hasOwn(current, part)) {
             throw new Error(`Unable to resolve JSON Schema $ref ${ref}`);
         }
         current = current[part];
@@ -770,11 +887,12 @@ function validateCustomRules(item, customRules) {
         }
 
         if (!isValid) {
+            const severity = rule.critical === true || rule.severity === 'critical' ? 'critical' : 'error';
             errors.push({
                 field: rule.field,
                 rule: rule.rule,
                 message: rule.message || `Field ${rule.field} failed ${rule.rule} validation`,
-                severity: 'error'
+                severity
             });
         }
     });
@@ -838,9 +956,11 @@ function generateValidationSummary(results) {
     const allErrors = results.flatMap(r => r.errors);
     const allWarnings = results.flatMap(r => r.warnings);
 
-    const errorsByRule = {};
+    const errorsByRule = Object.create(null);
     allErrors.forEach(error => {
-        errorsByRule[error.rule] = (errorsByRule[error.rule] || 0) + 1;
+        const ruleKey = String(error.rule || 'unknown');
+        if (!isSafeKey(ruleKey)) return;
+        errorsByRule[ruleKey] = (Object.hasOwn(errorsByRule, ruleKey) ? errorsByRule[ruleKey] : 0) + 1;
     });
 
     return {

@@ -85,7 +85,7 @@ collect_package_dirs() {
     return
   fi
 
-  find "$PACKAGES_DIR" -mindepth 2 -maxdepth 2 -name package.json -print0 |
+  find "$PACKAGES_DIR" \( -name node_modules -o -name .worktrees \) -prune -o -mindepth 2 -maxdepth 2 -name package.json -print0 |
     sort -z |
     while IFS= read -r -d '' package_json; do
       printf '%s\0' "$(dirname "$package_json")"

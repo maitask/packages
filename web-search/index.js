@@ -46,38 +46,67 @@ async function execute(input, options, context) {
 }
 
 function buildConfig(input, options, context) {
-    var source = mergeObjects(options || {}, input || {});
-    if (context && context.defaults && typeof context.defaults === 'object') {
-        source = mergeObjects(context.defaults, source);
-    }
-    if (context && context.env && typeof context.env === 'object' && context.env.WEB_SEARCH_BASE_URL && !source.baseUrl) {
-        source.baseUrl = context.env.WEB_SEARCH_BASE_URL;
+    var safeOptions = isPlainObject(options) ? options : {};
+    var safeInput = isPlainObject(input) ? input : {};
+    var baseConfig = context && isPlainObject(context.defaults)
+        ? mergeObjects(context.defaults, safeOptions)
+        : mergeObjects({}, safeOptions);
+
+    var trustedEnvBaseUrl = context && isPlainObject(context.env) && context.env.WEB_SEARCH_BASE_URL
+        ? context.env.WEB_SEARCH_BASE_URL
+        : null;
+    if (trustedEnvBaseUrl && !baseConfig.baseUrl) {
+        baseConfig.baseUrl = trustedEnvBaseUrl;
     }
 
-    var limit = typeof source.limit === 'number' ? source.limit : 10;
+    var allowPrivateHosts = baseConfig.allowPrivateHosts === true;
+    var rawTimeout = Number(baseConfig.timeoutMs);
+    var timeoutMs = Number.isFinite(rawTimeout) && rawTimeout > 0
+        ? Math.min(Math.max(Math.trunc(rawTimeout), 1000), 120000)
+        : 30000;
+    var rawMaxBytes = Number(baseConfig.maxResponseBytes);
+    var maxResponseBytes = Number.isFinite(rawMaxBytes) && rawMaxBytes > 0
+        ? Math.min(Math.max(Math.trunc(rawMaxBytes), 1024), 10 * 1024 * 1024)
+        : 5 * 1024 * 1024;
+
+    var limitSource = safeInput.limit !== undefined ? safeInput.limit : baseConfig.limit;
+    var limit = typeof limitSource === 'number' ? limitSource : 10;
     if (limit < 1) limit = 1;
     if (limit > 100) limit = 100;  // Allow up to 100 results
 
-    var page = typeof source.page === 'number' ? source.page : 1;
+    var pageSource = safeInput.page !== undefined ? safeInput.page : baseConfig.page;
+    var page = typeof pageSource === 'number' ? pageSource : 1;
     if (page < 1) page = 1;
 
-    var offset = typeof source.offset === 'number' ? source.offset : (page - 1) * limit;
+    var offsetSource = safeInput.offset !== undefined ? safeInput.offset : baseConfig.offset;
+    var offset = typeof offsetSource === 'number' ? offsetSource : (page - 1) * limit;
     if (offset < 0) offset = 0;
 
+    var rawQuery = safeInput.query !== undefined ? safeInput.query : baseConfig.query;
+    var rawEngine = safeInput.engine !== undefined ? safeInput.engine : baseConfig.engine;
+    var rawLanguage = safeInput.language !== undefined ? safeInput.language : baseConfig.language;
+    var rawRegion = safeInput.region !== undefined ? safeInput.region : baseConfig.region;
+    var includeSnippetsVal = safeInput.includeSnippets !== undefined ? safeInput.includeSnippets : baseConfig.includeSnippets;
+    var safeSearchVal = safeInput.safeSearch !== undefined ? safeInput.safeSearch : baseConfig.safeSearch;
+    var nextPageTokenVal = safeInput.nextPageToken !== undefined ? safeInput.nextPageToken : baseConfig.nextPageToken;
+
     return {
-        query: (source.query || '').trim(),
-        engine: (source.engine || 'duckduckgo').toLowerCase(),
+        query: String(rawQuery || '').trim(),
+        engine: String(rawEngine || 'duckduckgo').toLowerCase(),
         limit: limit,
         page: page,
         offset: offset,
-        language: (source.language || 'en').toLowerCase(),
-        region: (source.region || 'us').toLowerCase(),
-        includeSnippets: source.includeSnippets !== false,
-        safeSearch: source.safeSearch || 'moderate',
-        headers: source.headers || {},
-        nextPageToken: source.nextPageToken || null,
-        baseUrl: source.baseUrl ? normalizeBaseUrl(source.baseUrl) : null,
-        engineBaseUrls: normalizeEngineBaseUrls(source.engineBaseUrls)
+        language: String(rawLanguage || 'en').toLowerCase(),
+        region: String(rawRegion || 'us').toLowerCase(),
+        includeSnippets: includeSnippetsVal !== false,
+        safeSearch: safeSearchVal || 'moderate',
+        headers: normalizeHeaders(baseConfig.headers),
+        nextPageToken: nextPageTokenVal || null,
+        timeoutMs: timeoutMs,
+        maxResponseBytes: maxResponseBytes,
+        allowPrivateHosts: allowPrivateHosts,
+        baseUrl: baseConfig.baseUrl ? normalizeBaseUrl(baseConfig.baseUrl, allowPrivateHosts) : null,
+        engineBaseUrls: normalizeEngineBaseUrls(baseConfig.engineBaseUrls, allowPrivateHosts)
     };
 }
 
@@ -117,7 +146,7 @@ async function searchDuckDuckGo(config) {
     var url = buildSearchUrl('duckduckgo', '/html/', params, config);
 
     try {
-        var html = await fetchPage(url, config.headers);
+        var html = await fetchPage(url, config);
         var results = parseDuckDuckGo(html, config.limit, config.includeSnippets);
 
         // Check if there are more results
@@ -154,7 +183,7 @@ async function searchBing(config) {
     var url = buildSearchUrl('bing', '/search', params, config);
 
     try {
-        var html = await fetchPage(url, config.headers);
+        var html = await fetchPage(url, config);
         var results = parseBing(html, config.limit, config.includeSnippets);
 
         // Check if there are more results
@@ -173,11 +202,7 @@ async function searchBing(config) {
             pagination: pagination
         };
     } catch (err) {
-        return {
-            engine: 'bing',
-            results: [],
-            metadata: { sourceUrl: url, error: err.message }
-        };
+        throw buildSearchError('Bing', url, err);
     }
 }
 
@@ -195,7 +220,7 @@ async function searchGoogle(config) {
     var url = buildSearchUrl('google', '/search', params, config);
 
     try {
-        var html = await fetchPage(url, config.headers);
+        var html = await fetchPage(url, config);
         var results = parseGoogle(html, config.limit, config.includeSnippets);
 
         // Check if there are more results
@@ -214,40 +239,67 @@ async function searchGoogle(config) {
             pagination: pagination
         };
     } catch (err) {
-        return {
-            engine: 'google',
-            results: [],
-            metadata: { sourceUrl: url, error: err.message }
-        };
+        throw buildSearchError('Google', url, err);
     }
 }
 
-async function fetchPage(url, headers) {
+async function fetchPage(url, config) {
     var requestHeaders = mergeObjects({
         'User-Agent': 'Mozilla/5.0 (compatible; MaitaskWebSearch/1.0)',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9'
-    }, headers || {});
+    }, config.headers || {});
+    var timeoutMs = config.timeoutMs || 30000;
+    var maxBytes = config.maxResponseBytes || (5 * 1024 * 1024);
+    var runtimeFetch = usesMaitaskRuntimeFetch();
+    var controller = runtimeFetch ? null : new AbortController();
+    var timer = runtimeFetch ? null : setTimeout(function () { controller.abort(); }, timeoutMs);
 
-    var response = await fetch(url, {
-        method: 'GET',
-        headers: requestHeaders
-    });
+    try {
+        var fetchInit = {
+            method: 'GET',
+            headers: requestHeaders,
+            redirect: 'manual',
+            timeoutMs: timeoutMs
+        };
+        if (runtimeFetch) {
+            fetchInit.maxResponseBytes = maxBytes;
+        } else {
+            fetchInit.signal = controller.signal;
+        }
 
-    var body = await response.text();
+        var response = await fetch(url, fetchInit);
+        if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+            if (response && response.body && typeof response.body.cancel === 'function') {
+                try { await response.body.cancel(); } catch (_err) {}
+            }
+            throw new Error('Search engine redirects are not allowed');
+        }
+        if (!response.ok) {
+            if (response && response.body && typeof response.body.cancel === 'function') {
+                try { await response.body.cancel(); } catch (_err) {}
+            }
+            throw new Error('Search request failed with status ' + response.status);
+        }
 
-    if (!response.ok) {
-        throw new Error('Request to ' + url + ' failed with status ' + response.status);
+        return await readBoundedText(response, maxBytes);
+    } catch (err) {
+        if (err && err.name === 'AbortError') {
+            throw new Error('Search request timed out after ' + timeoutMs + 'ms');
+        }
+        throw err;
+    } finally {
+        if (timer !== null) {
+            clearTimeout(timer);
+        }
     }
-
-    return body || '';
 }
 
-function buildSearchError(engine, url, err) {
-    var message = err && err.message ? err.message : String(err || 'Search request failed');
+function buildSearchError(engine, _url, err) {
+    var message = String(err && err.message ? err.message : (err || 'Search request failed'))
+        .replace(/[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/gi, '[redacted-url]');
     var error = new Error(engine + ' search request failed: ' + message);
     error.name = 'WebSearchRequestError';
-    error.sourceUrl = url;
     return error;
 }
 
@@ -579,8 +631,8 @@ function extractSnippetNearMatch(html, matchIndex, includeSnippets) {
 
 function buildQueryString(params) {
     var parts = [];
-    for (var key in params) {
-        if (params[key] !== undefined && params[key] !== null) {
+    for (var key of Object.keys(params)) {
+        if (Object.hasOwn(params, key) && params[key] !== undefined && params[key] !== null) {
             parts.push(encodeURIComponent(key) + '=' + encodeURIComponent(params[key]));
         }
     }
@@ -591,7 +643,7 @@ function buildSearchUrl(engine, path, params, config) {
     var query = buildQueryString(params);
     var baseUrl = config.engineBaseUrls[engine] || config.baseUrl;
     if (baseUrl) {
-        return joinUrl(baseUrl, path) + (query ? '?' + query : '');
+        return joinValidatedUrl(baseUrl, path) + (query ? '?' + query : '');
     }
 
     var defaultBases = {
@@ -599,44 +651,214 @@ function buildSearchUrl(engine, path, params, config) {
         bing: 'https://www.bing.com',
         google: 'https://www.google.com'
     };
-    return joinUrl(defaultBases[engine], path) + (query ? '?' + query : '');
+    return joinValidatedUrl(defaultBases[engine], path) + (query ? '?' + query : '');
 }
 
-function normalizeBaseUrl(value) {
+function normalizeBaseUrl(value, allowPrivateHosts) {
     var text = String(value || '').trim();
     if (!text) {
         throw new Error('baseUrl must not be empty');
     }
-    return text.replace(/\/+$/, '');
+    var parsed;
+    try {
+        parsed = new URL(text);
+    } catch (_err) {
+        throw new Error('baseUrl must be a valid URL');
+    }
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        throw new Error('baseUrl must use http or https');
+    }
+    if (parsed.username || parsed.password) {
+        throw new Error('baseUrl must not embed credentials');
+    }
+    if (!allowPrivateHosts && isBlockedHost(parsed.hostname)) {
+        throw new Error('baseUrl must not point to a private or internal host');
+    }
+    return parsed.toString().replace(/\/+$/, '');
 }
 
-function normalizeEngineBaseUrls(value) {
-    var result = {};
-    if (!value || typeof value !== 'object') {
+function normalizeEngineBaseUrls(value, allowPrivateHosts) {
+    var result = Object.create(null);
+    if (!isPlainObject(value)) {
         return result;
     }
     ['duckduckgo', 'bing', 'google'].forEach(function(engine) {
-        if (value[engine]) {
-            result[engine] = normalizeBaseUrl(value[engine]);
+        if (Object.hasOwn(value, engine) && value[engine]) {
+            result[engine] = normalizeBaseUrl(value[engine], allowPrivateHosts);
         }
     });
     return result;
 }
 
-function joinUrl(baseUrl, path) {
-    return normalizeBaseUrl(baseUrl) + '/' + String(path || '').replace(/^\/+/, '');
+function joinValidatedUrl(baseUrl, path) {
+    return String(baseUrl).replace(/\/+$/, '') + '/' + String(path || '').replace(/^\/+/, '');
 }
 
+function normalizeHeaders(value) {
+    var headers = Object.create(null);
+    if (!isPlainObject(value)) {
+        return headers;
+    }
+    var keys = Object.keys(value);
+    for (var i = 0; i < keys.length; i++) {
+        var key = keys[i];
+        if (!Object.hasOwn(value, key) || !isSafeKey(key)) continue;
+        var item = value[key];
+        if (item === undefined || item === null) continue;
+        if (!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(key) || /[\r\n\0]/.test(String(item))) {
+            throw new Error('Invalid header \'' + key + '\'');
+        }
+        headers[key] = String(item);
+    }
+    return headers;
+}
+
+function isPlainObject(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isSafeKey(key) {
+    return key !== '__proto__' && key !== 'constructor' && key !== 'prototype';
+}
 
 function mergeObjects(base, extra) {
-    var result = {};
-    for (var key in base) {
-        result[key] = base[key];
+    var result = Object.create(null);
+    var baseKeys = isPlainObject(base) ? Object.keys(base) : [];
+    for (var i = 0; i < baseKeys.length; i++) {
+        var key = baseKeys[i];
+        if (Object.hasOwn(base, key) && isSafeKey(key)) {
+            result[key] = base[key];
+        }
     }
-    for (var key in extra) {
-        result[key] = extra[key];
+    var extraKeys = isPlainObject(extra) ? Object.keys(extra) : [];
+    for (var j = 0; j < extraKeys.length; j++) {
+        var extraKey = extraKeys[j];
+        if (Object.hasOwn(extra, extraKey) && isSafeKey(extraKey)) {
+            result[extraKey] = extra[extraKey];
+        }
     }
     return result;
+}
+
+function isBlockedHost(hostname) {
+    var normalized = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
+    if (
+        !normalized ||
+        normalized === 'localhost' ||
+        normalized === 'local' ||
+        normalized === 'internal' ||
+        normalized === 'localdomain' ||
+        normalized.endsWith('.localhost') ||
+        normalized.endsWith('.local') ||
+        normalized.endsWith('.internal') ||
+        normalized.endsWith('.localdomain')
+    ) {
+        return true;
+    }
+    if (normalized.indexOf(':') !== -1) {
+        var clean = normalized.split('%')[0];
+        var hextets = parseIpv6Hextets(clean);
+        if (!hextets) return true;
+        var allZero = hextets.every(function(part) { return part === 0; });
+        var isLoopback = hextets.slice(0, 7).every(function(part) { return part === 0; }) && hextets[7] === 1;
+        if (allZero || isLoopback) return true;
+        if ((hextets[0] & 0xffc0) === 0xfe80) return true;
+        if ((hextets[0] & 0xfe00) === 0xfc00) return true;
+        if (hextets.slice(0, 5).every(function(part) { return part === 0; }) && hextets[5] === 0xffff) return true;
+        return false;
+    }
+    var ipv4 = normalized.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (!ipv4) return false;
+    var a = Number(ipv4[1]);
+    var b = Number(ipv4[2]);
+    var c = Number(ipv4[3]);
+    var d = Number(ipv4[4]);
+    if (a < 0 || a > 255 || b < 0 || b > 255 || c < 0 || c > 255 || d < 0 || d > 255) return true;
+    return (
+        a === 10 ||
+        a === 127 ||
+        a === 0 ||
+        (a === 100 && b >= 64 && b <= 127) ||
+        (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168)
+    );
+}
+
+function parseIpv6Hextets(address) {
+    var halves = address.split('::');
+    if (halves.length > 2) return null;
+    function parsePart(part) {
+        if (!part) return [];
+        var tokens = part.split(':');
+        var out = [];
+        for (var i = 0; i < tokens.length; i += 1) {
+            var token = tokens[i];
+            if (!token) return null;
+            if (token.indexOf('.') !== -1) {
+                if (i !== tokens.length - 1) return null;
+                var v4 = token.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+                if (!v4) return null;
+                var octets = [Number(v4[1]), Number(v4[2]), Number(v4[3]), Number(v4[4])];
+                if (octets.some(function(o) { return o < 0 || o > 255; })) return null;
+                out.push((octets[0] << 8) | octets[1], (octets[2] << 8) | octets[3]);
+            } else {
+                if (!/^[0-9a-f]{1,4}$/i.test(token)) return null;
+                out.push(parseInt(token, 16));
+            }
+        }
+        return out;
+    }
+    var left = parsePart(halves[0]);
+    if (!left) return null;
+    if (halves.length === 1) {
+        return left.length === 8 ? left : null;
+    }
+    var right = parsePart(halves[1]);
+    if (!right) return null;
+    var missing = 8 - (left.length + right.length);
+    if (missing < 1) return null;
+    return left.concat(new Array(missing).fill(0), right);
+}
+
+function usesMaitaskRuntimeFetch() {
+    return Boolean(
+        typeof Deno !== 'undefined' &&
+        Deno &&
+        Deno.core &&
+        Deno.core.ops &&
+        typeof Deno.core.ops.op_http_request === 'function'
+    );
+}
+
+async function readBoundedText(response, maxBytes) {
+    if (response && response.body && typeof response.body.getReader === 'function') {
+        var reader = response.body.getReader();
+        var decoder = typeof TextDecoder === 'function' ? new TextDecoder() : null;
+        var out = '';
+        var totalBytes = 0;
+        try {
+            while (true) {
+                var chunk = await reader.read();
+                if (chunk.done) break;
+                if (!chunk.value) continue;
+                if (totalBytes + chunk.value.byteLength > maxBytes) {
+                    throw new Error('Search response exceeds ' + maxBytes + ' byte limit');
+                }
+                out += decoder ? decoder.decode(chunk.value, { stream: true }) : String.fromCharCode.apply(null, chunk.value);
+                totalBytes += chunk.value.byteLength;
+            }
+        } finally {
+            try { await reader.cancel(); } catch (_err) {}
+        }
+        if (decoder) out += decoder.decode();
+        return out;
+    }
+    var text = await response.text();
+    if (typeof text === 'string' && text.length > maxBytes) {
+        throw new Error('Search response exceeds ' + maxBytes + ' byte limit');
+    }
+    return text || '';
 }
 
 function ensureFetch(packageName) {

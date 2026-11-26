@@ -23,8 +23,9 @@
  */
 function execute(input, options = {}, context = {}) {
     try {
+        const safeOptions = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
         const url = ensureUrl(input);
-        const operation = options.operation || 'parse';
+        const operation = safeOptions.operation || 'parse';
 
         let result;
         switch (operation) {
@@ -128,6 +129,18 @@ function parseUrl(url) {
 /**
  * Parse authority component
  */
+function isSafeKey(key) {
+    return key !== '__proto__' && key !== 'constructor' && key !== 'prototype';
+}
+
+function safeDecodeURIComponent(value) {
+    try {
+        return decodeURIComponent(value);
+    } catch {
+        return value;
+    }
+}
+
 function parseAuthority(authority) {
     if (!authority) {
         return {
@@ -139,27 +152,52 @@ function parseAuthority(authority) {
         };
     }
 
-    const authPattern = /^(?:([^:@]+)(?::([^@]+))?@)?([^:]+)(?::(\d+))?$/;
-    const match = authority.match(authPattern);
-
-    if (!match) {
-        return {
-            username: null,
-            password: null,
-            host: authority,
-            hostname: authority,
-            port: null
-        };
+    const atIndex = authority.lastIndexOf('@');
+    let userInfo = '';
+    let hostPort = authority;
+    if (atIndex !== -1) {
+        userInfo = authority.slice(0, atIndex);
+        hostPort = authority.slice(atIndex + 1);
     }
 
-    const [, username, password, hostname, port] = match;
+    let username = null;
+    let password = null;
+    if (userInfo) {
+        const colonIdx = userInfo.indexOf(':');
+        if (colonIdx !== -1) {
+            username = userInfo.slice(0, colonIdx) || null;
+            password = userInfo.slice(colonIdx + 1) || null;
+        } else {
+            username = userInfo;
+        }
+    }
+
+    let hostname = null;
+    let port = null;
+    if (hostPort.startsWith('[')) {
+        const ipv6Match = hostPort.match(/^\[([^\]]+)\](?::(\d+))?$/);
+        if (ipv6Match) {
+            hostname = `[${ipv6Match[1]}]`;
+            port = ipv6Match[2] ? parseInt(ipv6Match[2], 10) : null;
+        } else {
+            hostname = hostPort;
+        }
+    } else {
+        const colonIdx = hostPort.lastIndexOf(':');
+        if (colonIdx !== -1 && /^\d+$/.test(hostPort.slice(colonIdx + 1))) {
+            hostname = hostPort.slice(0, colonIdx) || null;
+            port = parseInt(hostPort.slice(colonIdx + 1), 10);
+        } else {
+            hostname = hostPort || null;
+        }
+    }
 
     return {
-        username: username || null,
-        password: password || null,
-        host: authority,
-        hostname: hostname || null,
-        port: port ? parseInt(port) : null
+        username,
+        password,
+        host: hostPort || authority,
+        hostname,
+        port
     };
 }
 
@@ -167,23 +205,29 @@ function parseAuthority(authority) {
  * Parse query string into key-value pairs
  */
 function parseQueryParams(query) {
-    const params = {};
+    const params = Object.create(null);
 
     if (!query) return params;
 
     const pairs = query.split('&');
 
     for (const pair of pairs) {
-        const [key, value] = pair.split('=').map(decodeURIComponent);
+        if (!pair) continue;
+        const eqIndex = pair.indexOf('=');
+        const rawKey = eqIndex === -1 ? pair : pair.slice(0, eqIndex);
+        const rawValue = eqIndex === -1 ? '' : pair.slice(eqIndex + 1);
+        const key = safeDecodeURIComponent(rawKey);
+        const value = safeDecodeURIComponent(rawValue);
+        if (!key || !isSafeKey(key)) continue;
 
-        if (key in params) {
+        if (Object.hasOwn(params, key)) {
             if (Array.isArray(params[key])) {
-                params[key].push(value || '');
+                params[key].push(value);
             } else {
-                params[key] = [params[key], value || ''];
+                params[key] = [params[key], value];
             }
         } else {
-            params[key] = value || '';
+            params[key] = value;
         }
     }
 
@@ -248,16 +292,53 @@ function validateUrl(url) {
 function isValidHostname(hostname) {
     if (!hostname) return false;
 
+    if (hostname.startsWith('[') && hostname.endsWith(']')) {
+        const inner = hostname.slice(1, -1).split('%')[0];
+        return isValidIpv6(inner);
+    }
+
     if (hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
         const parts = hostname.split('.');
         return parts.every(p => {
-            const num = parseInt(p);
+            const num = parseInt(p, 10);
             return num >= 0 && num <= 255;
         });
     }
 
     const domainPattern = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)*$/i;
     return domainPattern.test(hostname);
+}
+
+function isValidIpv6(address) {
+    const halves = String(address || '').split('::');
+    if (halves.length > 2) return false;
+    const parsePart = part => {
+        if (!part) return [];
+        const tokens = part.split(':');
+        const out = [];
+        for (let i = 0; i < tokens.length; i += 1) {
+            const token = tokens[i];
+            if (!token) return null;
+            if (token.includes('.')) {
+                if (i !== tokens.length - 1) return null;
+                const v4 = token.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+                if (!v4) return null;
+                const octets = v4.slice(1).map(Number);
+                if (octets.some(o => o < 0 || o > 255)) return null;
+                out.push((octets[0] << 8) | octets[1], (octets[2] << 8) | octets[3]);
+            } else {
+                if (!/^[0-9a-f]{1,4}$/i.test(token)) return null;
+                out.push(parseInt(token, 16));
+            }
+        }
+        return out;
+    };
+    const left = parsePart(halves[0]);
+    if (!left) return false;
+    if (halves.length === 1) return left.length === 8;
+    const right = parsePart(halves[1]);
+    if (!right) return false;
+    return left.length + right.length < 8;
 }
 
 /**

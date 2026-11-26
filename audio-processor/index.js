@@ -23,13 +23,19 @@ const PACKAGE_VERSION = '0.1.2';
  * @param {Object} context
  * @returns {Object}
  */
+const MAX_AUDIO_BYTES = 25 * 1024 * 1024;
+const MAX_TEXT_RESPONSE_BYTES = 5 * 1024 * 1024;
+
 async function execute(input = {}, options = {}, context = {}) {
   let activeApiKey = '';
   try {
-    const task = input.task || options.task || 'transcribe';
+    const safeInput = input && typeof input === 'object' && !Array.isArray(input) ? input : {};
+    const safeOptions = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
+    const safeContext = context && typeof context === 'object' && !Array.isArray(context) ? context : {};
+    const task = safeInput.task || safeOptions.task || 'transcribe';
     const provider =
-      input.provider || options.provider || (task === 'generate' ? 'openai' : 'whisper');
-    const apiKey = resolveProviderApiKey(provider, options, context);
+      safeInput.provider || safeOptions.provider || (task === 'generate' ? 'openai' : 'whisper');
+    const apiKey = resolveProviderApiKey(provider, safeOptions, safeContext);
     activeApiKey = apiKey;
 
     let result;
@@ -37,16 +43,16 @@ async function execute(input = {}, options = {}, context = {}) {
       if (provider !== 'openai') {
         throw new Error(`Unsupported provider: ${provider} with task: ${task}`);
       }
-      result = await generateAudioWithOpenAI(input, options, apiKey);
-    } else if (!input.audioUrl && !input.audioData) {
+      result = await generateAudioWithOpenAI(safeInput, safeOptions, apiKey);
+    } else if (!safeInput.audioUrl && !safeInput.audioData) {
       throw new Error('Either audioUrl or audioData is required');
     } else if (
       provider === 'whisper' ||
       (provider === 'openai' && (task === 'transcribe' || task === 'translate'))
     ) {
-      result = await processWithWhisper(input, options, apiKey);
+      result = await processWithWhisper(safeInput, safeOptions, apiKey);
     } else if (provider === 'gemini') {
-      result = await processWithGemini(input, options, apiKey);
+      result = await processWithGemini(safeInput, safeOptions, apiKey);
     } else {
       throw new Error(`Unsupported provider: ${provider} with task: ${task}`);
     }
@@ -100,10 +106,11 @@ async function processWithWhisper(input, options, apiKey) {
   const audioBytes = await readAudioBytes(input, options);
   const fields = [['model', model]];
 
+  const responseFormat = String(input.response_format || options.response_format || '').trim().toLowerCase();
   if (input.language) fields.push(['language', input.language]);
   if (input.prompt) fields.push(['prompt', input.prompt]);
   if (input.temperature !== undefined) fields.push(['temperature', String(input.temperature)]);
-  if (input.response_format) fields.push(['response_format', input.response_format]);
+  if (responseFormat) fields.push(['response_format', responseFormat]);
   if (input.timestamp_granularities) {
     fields.push(['timestamp_granularities', JSON.stringify(input.timestamp_granularities)]);
   }
@@ -139,7 +146,22 @@ async function processWithWhisper(input, options, apiKey) {
     throw new Error(`Whisper API Error (${response.status}): ${errorText}`);
   }
 
-  const whisperResult = await response.json();
+  if (responseFormat === 'text' || responseFormat === 'srt' || responseFormat === 'vtt') {
+    const rawText = await readBoundedText(response, MAX_TEXT_RESPONSE_BYTES, 'Whisper response exceeds byte limit');
+    return {
+      text: rawText,
+      format: responseFormat,
+      raw: rawText
+    };
+  }
+
+  let whisperResult;
+  if (!response?.body?.getReader && typeof response?.text !== 'function' && typeof response?.json === 'function') {
+    whisperResult = await response.json();
+  } else {
+    const rawJson = await readBoundedText(response, MAX_TEXT_RESPONSE_BYTES, 'Whisper response exceeds byte limit');
+    whisperResult = rawJson ? JSON.parse(rawJson) : {};
+  }
   return {
     text: whisperResult.text,
     language: whisperResult.language,
@@ -286,17 +308,16 @@ async function readAudioBytes(input, options = {}) {
     const audioResponse = await performFetch(
       parsed.toString(),
       {},
-      options,
+      { ...(options || {}), maxResponseBytes: MAX_AUDIO_BYTES },
       'audioUrl redirects are not allowed'
     );
     if (!audioResponse.ok) {
+      if (audioResponse?.body && typeof audioResponse.body.cancel === 'function') {
+        try { await audioResponse.body.cancel(); } catch {}
+      }
       throw new Error(`Failed to fetch audio (${audioResponse.status})`);
     }
-    const bytes = new Uint8Array(await audioResponse.arrayBuffer());
-    if (bytes.byteLength > 25 * 1024 * 1024) {
-      throw new Error('Audio payload exceeds 25MB limit');
-    }
-    return bytes;
+    return await readBoundedAudioBytes(audioResponse, MAX_AUDIO_BYTES);
   }
 
   if (input.audioData) {
@@ -304,6 +325,88 @@ async function readAudioBytes(input, options = {}) {
   }
 
   throw new Error('Either audioUrl or audioData is required');
+}
+
+async function readBoundedAudioBytes(response, maxBytes) {
+  const contentLength = Number(response.headers?.get?.('content-length') || 0);
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    if (response?.body && typeof response.body.cancel === 'function') {
+      try { await response.body.cancel(); } catch {}
+    }
+    throw new Error('Audio payload exceeds 25MB limit');
+  }
+  if (response?.body && typeof response.body.getReader === 'function') {
+    const reader = response.body.getReader();
+    const chunks = [];
+    let total = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!value) continue;
+        const part = value instanceof Uint8Array ? value : new Uint8Array(value);
+        if (total + part.byteLength > maxBytes) {
+          throw new Error('Audio payload exceeds 25MB limit');
+        }
+        chunks.push(part);
+        total += part.byteLength;
+      }
+    } finally {
+      try { await reader.cancel(); } catch {}
+    }
+    const merged = new Uint8Array(total);
+    let offset = 0;
+    for (const part of chunks) {
+      merged.set(part, offset);
+      offset += part.byteLength;
+    }
+    return merged;
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (bytes.byteLength > maxBytes) {
+    throw new Error('Audio payload exceeds 25MB limit');
+  }
+  return bytes;
+}
+
+async function readBoundedText(response, maxBytes, limitMessage) {
+  if (response?.body && typeof response.body.getReader === 'function') {
+    const reader = response.body.getReader();
+    const decoder = typeof TextDecoder === 'function' ? new TextDecoder() : null;
+    let out = '';
+    let total = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!value) continue;
+        if (total + value.byteLength > maxBytes) {
+          throw new Error(limitMessage);
+        }
+        out += decoder ? decoder.decode(value, { stream: true }) : String.fromCharCode(...value);
+        total += value.byteLength;
+      }
+    } finally {
+      try { await reader.cancel(); } catch {}
+    }
+    if (decoder) out += decoder.decode();
+    return out;
+  }
+  const text = await response.text();
+  if (typeof text === 'string' && text.length > maxBytes) {
+    throw new Error(limitMessage);
+  }
+  return text || '';
+}
+
+function usesMaitaskRuntimeFetch() {
+  return Boolean(
+    typeof Deno !== 'undefined' &&
+      Deno &&
+      Deno.core &&
+      Deno.core.ops &&
+      typeof Deno.core.ops.op_http_request === 'function'
+  );
 }
 
 function resolveTimeoutMs(options = {}) {
@@ -314,21 +417,32 @@ function resolveTimeoutMs(options = {}) {
 
 async function performFetch(url, init = {}, options = {}, redirectErrorMessage = 'HTTP redirects are not allowed') {
   const timeoutMs = resolveTimeoutMs(options);
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const runtimeFetch = usesMaitaskRuntimeFetch();
+  const controller = runtimeFetch ? null : new AbortController();
+  const timer = runtimeFetch ? null : setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, {
+    const fetchInit = {
       ...init,
       redirect: 'manual',
-      timeoutMs,
-      signal: controller.signal
-    });
+      timeoutMs
+    };
+    if (runtimeFetch) {
+      fetchInit.maxResponseBytes = options?.maxResponseBytes || MAX_TEXT_RESPONSE_BYTES;
+    } else {
+      fetchInit.signal = controller.signal;
+    }
+    const response = await fetch(url, fetchInit);
     if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+      if (response?.body && typeof response.body.cancel === 'function') {
+        try { await response.body.cancel(); } catch {}
+      }
       throw new Error(redirectErrorMessage);
     }
     return response;
   } finally {
-    clearTimeout(timer);
+    if (timer !== null) {
+      clearTimeout(timer);
+    }
   }
 }
 

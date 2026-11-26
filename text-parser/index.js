@@ -276,10 +276,10 @@ function decodeBase64ToUtf8(base64) {
  * Decode Base64 string to byte array
  */
 function decodeBase64ToBytes(base64) {
-    const clean = String(base64).replace(/[^A-Za-z0-9+/=]/g, '');
+    const clean = String(base64).replace(/\s+/g, '');
 
-    if (clean.length % 4 !== 0) {
-        throw new Error('Invalid Base64 string length');
+    if (!clean || clean.length % 4 !== 0 || !/^[A-Za-z0-9+/]*={0,2}$/.test(clean)) {
+        throw new Error('Invalid Base64 string');
     }
 
     const bytes = [];
@@ -290,8 +290,14 @@ function decodeBase64ToBytes(base64) {
         const enc3 = BASE64_ALPHABET.indexOf(clean[i + 2]);
         const enc4 = BASE64_ALPHABET.indexOf(clean[i + 3]);
 
-        if (enc1 < 0 || enc2 < 0) {
+        if (enc1 < 0 || enc2 < 0 || enc3 < 0 || enc4 < 0) {
             throw new Error('Invalid Base64 character');
+        }
+        if (enc1 === 64 || enc2 === 64 || (enc3 === 64 && enc4 !== 64)) {
+            throw new Error('Invalid Base64 padding');
+        }
+        if ((enc3 === 64 || enc4 === 64) && i + 4 < clean.length) {
+            throw new Error('Invalid Base64 padding placement');
         }
 
         const chr1 = (enc1 << 2) | (enc2 >> 4);
@@ -342,7 +348,7 @@ function bytesToUtf8(bytes) {
                 ((byte3 & 0x3F) << 6) |
                 (byte4 & 0x3F);
 
-            if (codePoint > 0x10000) {
+            if (codePoint >= 0x10000) {
                 const offset = codePoint - 0x10000;
                 result += String.fromCharCode((offset >> 10) + 0xD800, (offset & 0x3FF) + 0xDC00);
             } else {

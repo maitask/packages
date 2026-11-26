@@ -480,7 +480,7 @@ async function sendSlackMessage(config, payload) {
 
   try {
     const response = await postSlackJson(config.webhookUrl, payload, config.timeoutMs, controller.signal);
-    const body = await response.text();
+    const body = await readBoundedSlackText(response, 1024 * 1024);
     const responseTimeMs = Date.now() - startedAt;
 
     if (!response.ok || body.trim().toLowerCase() !== 'ok') {
@@ -500,6 +500,42 @@ async function sendSlackMessage(config, payload) {
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+async function readBoundedSlackText(response, maxBytes) {
+  if (response?.body && typeof response.body.getReader === 'function') {
+    const reader = response.body.getReader();
+    const decoder = typeof TextDecoder === 'function' ? new TextDecoder() : null;
+    let out = '';
+    let total = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!value) continue;
+        if (total + value.byteLength > maxBytes) {
+          throw slackError('Slack response exceeded maximum size limit', {
+            status: response.status,
+            retriable: false
+          });
+        }
+        out += decoder ? decoder.decode(value, { stream: true }) : String.fromCharCode(...value);
+        total += value.byteLength;
+      }
+    } finally {
+      try { await reader.cancel(); } catch {}
+    }
+    if (decoder) out += decoder.decode();
+    return out;
+  }
+  const text = await response.text();
+  if (typeof text === 'string' && text.length > maxBytes) {
+    throw slackError('Slack response exceeded maximum size limit', {
+      status: response.status,
+      retriable: false
+    });
+  }
+  return text || '';
 }
 
 async function postSlackJson(url, payload, timeoutMs, signal) {

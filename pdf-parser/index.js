@@ -161,7 +161,7 @@ function extractStreamTexts(source, maxBytes = 2_000_000) {
       continue;
     }
     try {
-      const inflatedBytes = inflateZlib(stringToBytes(body), Math.min(maxBytes * 4, 8_000_000));
+      const inflatedBytes = inflateZlib(stringToBytes(body), Math.min(Math.max(maxBytes * 4, 2_000_000), 8_000_000));
       decompressedStreams += 1;
       const inflatedText = bytesToLatin1(inflatedBytes);
       const extracted = extractTextOperators(inflatedText);

@@ -1,7 +1,12 @@
+const MAX_HTML_BYTES = 5 * 1024 * 1024;
+const MAX_PATTERN_LENGTH = 512;
+const MAX_PATTERN_MATCHES = 1000;
+
 async function execute(input, options = {}, context = {}) {
     const startedAt = Date.now();
     try {
         ensureFetch('web-scraper');
+        const safeOptions = isPlainObject(options) ? options : {};
         const targets = normalizeTargets(input);
         if (!targets.length) {
             throw new Error('At least one target url is required');
@@ -11,13 +16,13 @@ async function execute(input, options = {}, context = {}) {
 
         for (const target of targets) {
             try {
-                const scraped = await scrapeTarget(target, options);
+                const scraped = await scrapeTarget(target, safeOptions);
                 results.push(scraped);
             } catch (error) {
                 results.push({
                     url: typeof target === 'object' && target !== null ? target.url : target,
                     success: false,
-                    error: error.message || String(error)
+                    error: sanitizeErrorMessage(error)
                 });
             }
         }
@@ -70,7 +75,7 @@ async function execute(input, options = {}, context = {}) {
                 }
             },
             error: {
-                message: error.message || 'Web scraping failed',
+                message: sanitizeErrorMessage(error) || 'Web scraping failed',
                 code: 'WEB_SCRAPER_ERROR',
                 type: error.name || 'WebScraperError',
                 details: null
@@ -94,10 +99,14 @@ async function scrapeTarget(target, options) {
         throw new Error('Target url is required');
     }
 
-    const response = await fetchHtml(descriptor.url, options.headers || {});
+    const safeUrl = validateTargetUrl(descriptor.url, options);
+    const timeoutMs = readTimeoutMs(options.timeoutMs);
+    const maxBytes = readMaxBytes(options.maxBytes);
+    const headers = normalizeHeaders(options.headers);
+    const response = await fetchHtml(safeUrl, headers, timeoutMs, maxBytes);
     if (!response.ok) {
         return {
-            url: descriptor.url,
+            url: safeUrl,
             success: false,
             status: response.status,
             error: response.statusText || 'Request failed'
@@ -117,7 +126,7 @@ async function scrapeTarget(target, options) {
     }
 
     return {
-        url: descriptor.url,
+        url: safeUrl,
         label: descriptor.label || descriptor.name || null,
         status: response.status,
         success: true,
@@ -201,17 +210,26 @@ function evaluatePatterns(html, patterns) {
         if (!item.pattern) {
             return { name: item.name || 'pattern', matches: [] };
         }
+        const patternText = String(item.pattern);
+        if (patternText.length > MAX_PATTERN_LENGTH) {
+            return { name: item.name || 'pattern', error: `Pattern exceeds maximum length of ${MAX_PATTERN_LENGTH} characters`, matches: [] };
+        }
         try {
-            const regex = new RegExp(item.pattern, item.flags || 'gi');
+            const regex = new RegExp(patternText, item.flags || 'gi');
             const matches = [];
             let match;
             while ((match = regex.exec(html)) !== null) {
                 matches.push(match[0]);
+                if (matches.length >= MAX_PATTERN_MATCHES) break;
                 if (!regex.global) break;
+                if (match[0] === '') {
+                    if (regex.lastIndex >= html.length) break;
+                    regex.lastIndex += 1;
+                }
             }
-            return { name: item.name || item.pattern, matches };
+            return { name: item.name || patternText, matches };
         } catch (error) {
-            return { name: item.name || item.pattern || 'pattern', error: error.message, matches: [] };
+            return { name: item.name || patternText || 'pattern', error: error.message, matches: [] };
         }
     });
 }
@@ -230,11 +248,12 @@ function decodeEntities(value) {
 }
 
 function extractCustomSelectors(html, config) {
-    var result = {};
+    var result = Object.create(null);
 
     // Process CSS selectors
     if (config.css && typeof config.css === 'object') {
-        for (var key in config.css) {
+        for (var key of Object.keys(config.css)) {
+            if (!Object.hasOwn(config.css, key) || !isSafeKey(key)) continue;
             try {
                 result[key] = extractByCSS(html, config.css[key]);
             } catch (error) {
@@ -245,7 +264,8 @@ function extractCustomSelectors(html, config) {
 
     // Process XPath selectors
     if (config.xpath && typeof config.xpath === 'object') {
-        for (var key in config.xpath) {
+        for (var key of Object.keys(config.xpath)) {
+            if (!Object.hasOwn(config.xpath, key) || !isSafeKey(key)) continue;
             try {
                 result[key] = extractByXPath(html, config.xpath[key]);
             } catch (error) {
@@ -890,11 +910,17 @@ function buildElement(tag, rawAttributes, content, outerHtml) {
 }
 
 function parseAttributes(rawAttributes) {
-    var attrs = {};
+    var attrs = Object.create(null);
     var attrRegex = /([^\s=\/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
     var match;
     while ((match = attrRegex.exec(rawAttributes)) !== null) {
-        attrs[String(match[1]).toLowerCase()] = match[2] !== undefined
+        if (match[0] === '') {
+            attrRegex.lastIndex += 1;
+            continue;
+        }
+        var attrName = String(match[1]).toLowerCase();
+        if (!isSafeKey(attrName)) continue;
+        attrs[attrName] = match[2] !== undefined
             ? match[2]
             : match[3] !== undefined
                 ? match[3]
@@ -921,24 +947,248 @@ function escapeRegex(str) {
     return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
-async function fetchHtml(url, headers) {
-    const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-            'User-Agent': 'Mozilla/5.0 (compatible; MaitaskWebScraper/1.0)',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            ...headers
+function isPlainObject(value) {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isSafeKey(key) {
+    return key !== '__proto__' && key !== 'constructor' && key !== 'prototype';
+}
+
+function readTimeoutMs(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num) || num <= 0) return 30000;
+    return Math.min(Math.max(Math.trunc(num), 1000), 120000);
+}
+
+function readMaxBytes(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num) || num <= 0) return MAX_HTML_BYTES;
+    return Math.min(Math.max(Math.trunc(num), 1024), 20 * 1024 * 1024);
+}
+
+function normalizeHeaders(value) {
+    const headers = Object.create(null);
+    if (!isPlainObject(value)) return headers;
+    for (const key of Object.keys(value)) {
+        if (!Object.hasOwn(value, key) || !isSafeKey(key)) continue;
+        const item = value[key];
+        if (item === undefined || item === null) continue;
+        if (!/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(key) || /[\r\n\0]/.test(String(item))) {
+            throw new Error(`Invalid header '${key}'`);
         }
-    });
+        headers[key] = String(item);
+    }
+    return headers;
+}
 
-    const body = await response.text();
+function validateTargetUrl(rawUrl, options) {
+    const text = String(rawUrl || '').trim();
+    if (!text) {
+        throw new Error('Target url is required');
+    }
+    let parsed;
+    try {
+        parsed = new URL(text);
+    } catch {
+        throw new Error('Target url must be a valid URL');
+    }
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new Error('Target url must use http or https');
+    }
+    if (parsed.username || parsed.password) {
+        throw new Error('Target url must not include embedded credentials');
+    }
+    if (!options.allowPrivateHosts && isBlockedHost(parsed.hostname)) {
+        throw new Error('Target url must not point to a private or internal host');
+    }
+    return parsed.toString();
+}
 
-    return {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok,
-        body
+function isBlockedHost(hostname) {
+    const normalized = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
+    if (
+        !normalized ||
+        normalized === 'localhost' ||
+        normalized === 'local' ||
+        normalized === 'internal' ||
+        normalized === 'localdomain' ||
+        normalized.endsWith('.localhost') ||
+        normalized.endsWith('.local') ||
+        normalized.endsWith('.internal') ||
+        normalized.endsWith('.localdomain')
+    ) {
+        return true;
+    }
+    if (normalized.includes(':')) {
+        const clean = normalized.split('%')[0];
+        const hextets = parseIpv6Hextets(clean);
+        if (!hextets) return true;
+        const allZero = hextets.every(part => part === 0);
+        const isLoopback = hextets.slice(0, 7).every(part => part === 0) && hextets[7] === 1;
+        if (allZero || isLoopback) return true;
+        if ((hextets[0] & 0xffc0) === 0xfe80) return true;
+        if ((hextets[0] & 0xfe00) === 0xfc00) return true;
+        if (hextets.slice(0, 5).every(part => part === 0) && hextets[5] === 0xffff) return true;
+        return false;
+    }
+    const ipv4 = normalized.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (!ipv4) return false;
+    const [, a, b, c, d] = ipv4.map(Number);
+    if ([a, b, c, d].some(octet => octet < 0 || octet > 255)) return true;
+    return (
+        a === 10 ||
+        a === 127 ||
+        a === 0 ||
+        (a === 100 && b >= 64 && b <= 127) ||
+        (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168)
+    );
+}
+
+function parseIpv6Hextets(address) {
+    const halves = address.split('::');
+    if (halves.length > 2) return null;
+    const parsePart = part => {
+        if (!part) return [];
+        const tokens = part.split(':');
+        const out = [];
+        for (let i = 0; i < tokens.length; i += 1) {
+            const token = tokens[i];
+            if (!token) return null;
+            if (token.includes('.')) {
+                if (i !== tokens.length - 1) return null;
+                const v4 = token.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+                if (!v4) return null;
+                const octets = v4.slice(1).map(Number);
+                if (octets.some(o => o < 0 || o > 255)) return null;
+                out.push((octets[0] << 8) | octets[1], (octets[2] << 8) | octets[3]);
+            } else {
+                if (!/^[0-9a-f]{1,4}$/i.test(token)) return null;
+                out.push(parseInt(token, 16));
+            }
+        }
+        return out;
     };
+    const left = parsePart(halves[0]);
+    if (!left) return null;
+    if (halves.length === 1) {
+        return left.length === 8 ? left : null;
+    }
+    const right = parsePart(halves[1]);
+    if (!right) return null;
+    const missing = 8 - (left.length + right.length);
+    if (missing < 1) return null;
+    return [...left, ...new Array(missing).fill(0), ...right];
+}
+
+function usesMaitaskRuntimeFetch() {
+    return Boolean(
+        typeof Deno !== 'undefined' &&
+        Deno &&
+        Deno.core &&
+        Deno.core.ops &&
+        typeof Deno.core.ops.op_http_request === 'function'
+    );
+}
+
+function sanitizeErrorMessage(error) {
+    return String(error?.message || error || 'Request failed')
+        .replace(/[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/gi, '[redacted-url]');
+}
+
+async function readBoundedText(response, maxBytes) {
+    if (response?.body && typeof response.body.getReader === 'function') {
+        const reader = response.body.getReader();
+        const decoder = typeof TextDecoder === 'function' ? new TextDecoder() : null;
+        let out = '';
+        let totalBytes = 0;
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                if (!value) continue;
+                if (totalBytes + value.byteLength > maxBytes) {
+                    throw new Error(`HTML response exceeds ${maxBytes} byte limit`);
+                }
+                out += decoder ? decoder.decode(value, { stream: true }) : String.fromCharCode(...value);
+                totalBytes += value.byteLength;
+            }
+        } finally {
+            try {
+                await reader.cancel();
+            } catch {}
+        }
+        if (decoder) out += decoder.decode();
+        return out;
+    }
+    const text = await response.text();
+    if (typeof text === 'string' && text.length > maxBytes) {
+        throw new Error(`HTML response exceeds ${maxBytes} byte limit`);
+    }
+    return text || '';
+}
+
+async function fetchHtml(url, headers, timeoutMs, maxBytes) {
+    const requestHeaders = {
+        'User-Agent': 'Mozilla/5.0 (compatible; MaitaskWebScraper/1.0)',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        ...headers
+    };
+    const runtimeFetch = usesMaitaskRuntimeFetch();
+    const controller = runtimeFetch ? null : new AbortController();
+    const timer = runtimeFetch ? null : setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+        const fetchInit = {
+            method: 'GET',
+            headers: requestHeaders,
+            redirect: 'manual',
+            timeoutMs
+        };
+        if (runtimeFetch) {
+            fetchInit.maxResponseBytes = maxBytes;
+        } else {
+            fetchInit.signal = controller.signal;
+        }
+        const response = await fetch(url, fetchInit);
+        if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+            if (response?.body && typeof response.body.cancel === 'function') {
+                try { await response.body.cancel(); } catch {}
+            }
+            throw new Error('HTTP redirects are not allowed');
+        }
+        if (!response.ok) {
+            if (response?.body && typeof response.body.cancel === 'function') {
+                try { await response.body.cancel(); } catch {}
+            }
+            return {
+                status: response.status,
+                statusText: response.statusText,
+                ok: false,
+                body: ''
+            };
+        }
+
+        const body = await readBoundedText(response, maxBytes);
+
+        return {
+            status: response.status,
+            statusText: response.statusText,
+            ok: response.ok,
+            body
+        };
+    } catch (error) {
+        if (error && error.name === 'AbortError') {
+            throw new Error(`Request timed out after ${timeoutMs}ms`);
+        }
+        throw error;
+    } finally {
+        if (timer !== null) {
+            clearTimeout(timer);
+        }
+    }
 }
 
 function ensureFetch(packageName) {

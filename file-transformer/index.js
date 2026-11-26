@@ -39,8 +39,8 @@ async function execute(input, options = {}, context = {}) {
   }
 }
 
-function buildConfig(payload, options) {
-  const merged = { ...options, ...payload.options };
+function buildConfig(_payload, options) {
+  const merged = isPlainObject(options) ? options : {};
   return {
     csvDelimiter: readSingleChar(merged.csvDelimiter || merged.delimiter, ','),
     csvQuote: readSingleChar(merged.csvQuote || merged.quote, '"'),
@@ -107,7 +107,7 @@ function parseCsv(text, config) {
     const rawHeaders = config.csvHeaders || rows.shift();
     const headers = makeUniqueHeaders(rawHeaders);
     return rows.map(row => {
-      const item = {};
+      const item = Object.create(null);
       headers.forEach((header, index) => {
         item[header] = parseDelimitedScalar(row[index] ?? '', config);
       });
@@ -220,12 +220,19 @@ function escapeCsvCell(value, config) {
 }
 
 function makeUniqueHeaders(headers) {
-  const seen = {};
+  const seen = Object.create(null);
   return headers.map((header, index) => {
     const base = String(header || `column_${index + 1}`).trim() || `column_${index + 1}`;
-    const count = (seen[base] || 0) + 1;
+    if (!isSafePathKey(base)) {
+      throw new Error(`Unsafe key name in CSV header: ${base}`);
+    }
+    const count = (Object.hasOwn(seen, base) ? seen[base] : 0) + 1;
     seen[base] = count;
-    return count === 1 ? base : `${base}_${count}`;
+    const finalName = count === 1 ? base : `${base}_${count}`;
+    if (!isSafePathKey(finalName)) {
+      throw new Error(`Unsafe key name in CSV header: ${finalName}`);
+    }
+    return finalName;
   });
 }
 
@@ -324,7 +331,12 @@ function parseXml(text) {
 
   const elementChildren = root.children.filter(child => child.type !== 'text');
   if (elementChildren.length === 1) {
-    return { [elementChildren[0].name]: xmlNodeToValue(elementChildren[0]) };
+    if (!isSafePathKey(elementChildren[0].name)) {
+      throw new Error(`Unsafe key name in XML: ${elementChildren[0].name}`);
+    }
+    const out = Object.create(null);
+    out[elementChildren[0].name] = xmlNodeToValue(elementChildren[0]);
+    return out;
   }
   return { root: elementChildren.map(xmlNodeToValue) };
 }
@@ -341,12 +353,18 @@ function parseXmlTag(source) {
   if (!nameMatch) throw new Error(`Invalid XML tag: ${source}`);
 
   const name = nameMatch[1];
+  if (!isSafePathKey(name)) {
+    throw new Error(`Unsafe key name in XML: ${name}`);
+  }
   const attrSource = source.slice(name.length);
-  const attributes = {};
+  const attributes = Object.create(null);
   const regex = /([A-Za-z_][\w:.-]*)\s*=\s*("([^"]*)"|'([^']*)')/g;
   let match;
 
   while ((match = regex.exec(attrSource)) !== null) {
+    if (!isSafePathKey(match[1])) {
+      throw new Error(`Unsafe attribute name in XML: ${match[1]}`);
+    }
     attributes[match[1]] = decodeXml(match[3] !== undefined ? match[3] : match[4]);
   }
 
@@ -366,13 +384,16 @@ function xmlNodeToValue(node) {
     return text;
   }
 
-  const value = {};
+  const value = Object.create(null);
   if (hasAttributes) value._attributes = node.attributes;
   if (text) value._text = text;
 
   elementChildren.forEach(child => {
+    if (!isSafePathKey(child.name)) {
+      throw new Error(`Unsafe key name in XML: ${child.name}`);
+    }
     const childValue = xmlNodeToValue(child);
-    if (Object.prototype.hasOwnProperty.call(value, child.name)) {
+    if (Object.hasOwn(value, child.name)) {
       if (!Array.isArray(value[child.name])) value[child.name] = [value[child.name]];
       value[child.name].push(childValue);
     } else {
@@ -466,8 +487,11 @@ function parseYamlSequence(lines, index, indent) {
     }
 
     if (isYamlKeyValue(rest)) {
-      const item = {};
+      const item = Object.create(null);
       const pair = splitYamlKeyValue(rest);
+      if (!isSafePathKey(pair.key)) {
+        throw new Error(`Unsafe key name in YAML: ${pair.key}`);
+      }
       if (pair.value === '') {
         const nestedIndent = nextNestedIndent(lines, index, indent);
         const parsed = parseYamlBlock(lines, index, nestedIndent);
@@ -479,7 +503,14 @@ function parseYamlSequence(lines, index, indent) {
 
       if (index < lines.length && lines[index].indent > indent) {
         const parsed = parseYamlMapping(lines, index, lines[index].indent);
-        Object.assign(item, parsed[0]);
+        const nestedMap = parsed[0];
+        if (nestedMap && typeof nestedMap === 'object') {
+          for (const key of Object.keys(nestedMap)) {
+            if (Object.hasOwn(nestedMap, key) && isSafePathKey(key)) {
+              item[key] = nestedMap[key];
+            }
+          }
+        }
         index = parsed[1];
       }
 
@@ -493,7 +524,7 @@ function parseYamlSequence(lines, index, indent) {
 }
 
 function parseYamlMapping(lines, index, indent) {
-  const result = {};
+  const result = Object.create(null);
 
   while (index < lines.length) {
     const line = lines[index];
@@ -503,6 +534,9 @@ function parseYamlMapping(lines, index, indent) {
     }
 
     const pair = splitYamlKeyValue(line.text);
+    if (!isSafePathKey(pair.key)) {
+      throw new Error(`Unsafe key name in YAML: ${pair.key}`);
+    }
     index++;
 
     if (pair.value === '') {
@@ -645,12 +679,15 @@ function parseScalar(raw, tomlMode) {
 
   if (value.startsWith('{') && value.endsWith('}')) {
     const inner = value.slice(1, -1).trim();
-    const result = {};
+    const result = Object.create(null);
     if (!inner) return result;
     splitTopLevel(inner, ',').forEach(part => {
       const separator = tomlMode ? findTopLevelChar(part, '=') : findTopLevelChar(part, ':');
       if (separator === -1) throw new Error(`Invalid inline object entry: ${part}`);
       const key = unquoteString(part.slice(0, separator).trim());
+      if (!isSafePathKey(key)) {
+        throw new Error(`Unsafe key name in inline object: ${key}`);
+      }
       result[key] = parseScalar(part.slice(separator + 1), tomlMode);
     });
     return result;

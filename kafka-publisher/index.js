@@ -88,7 +88,7 @@ async function fetchJson(url, { method, headers, body, timeoutMs, sensitiveValue
   try {
     const response = await postKafkaJson(url, { method, headers, body, timeoutMs, signal: controller.signal });
 
-    const text = await response.text();
+    const text = await readBoundedKafkaText(response, 4 * 1024 * 1024);
     const data = tryParseJson(text);
 
     if (!response.ok) {
@@ -107,6 +107,36 @@ async function fetchJson(url, { method, headers, body, timeoutMs, sensitiveValue
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function readBoundedKafkaText(response, maxBytes) {
+  if (response?.body && typeof response.body.getReader === 'function') {
+    const reader = response.body.getReader();
+    const decoder = typeof TextDecoder === 'function' ? new TextDecoder() : null;
+    let out = '';
+    let total = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!value) continue;
+        if (total + value.byteLength > maxBytes) {
+          throw kafkaError('Kafka REST Proxy response exceeded maximum size limit');
+        }
+        out += decoder ? decoder.decode(value, { stream: true }) : String.fromCharCode(...value);
+        total += value.byteLength;
+      }
+    } finally {
+      try { await reader.cancel(); } catch {}
+    }
+    if (decoder) out += decoder.decode();
+    return out;
+  }
+  const text = await response.text();
+  if (typeof text === 'string' && text.length > maxBytes) {
+    throw kafkaError('Kafka REST Proxy response exceeded maximum size limit');
+  }
+  return text || '';
 }
 
 async function postKafkaJson(url, { method, headers, body, timeoutMs, signal }) {

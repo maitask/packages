@@ -94,6 +94,9 @@ function buildConfig(input, options, context) {
     if (messageType !== 'text' && !hasNonBlankString(content.fileUrl)) {
         throw new TelegramBotError(`fileUrl is required for ${messageType} messages`);
     }
+    const normalizedFileUrl = messageType === 'text'
+        ? content.fileUrl
+        : normalizeFileUrl(content.fileUrl);
 
     validateOperationalOptions(options);
     const replyMarkup =
@@ -107,7 +110,7 @@ function buildConfig(input, options, context) {
         chatId,
         messageType,
         text: content.text,
-        fileUrl: content.fileUrl,
+        fileUrl: normalizedFileUrl,
         caption: content.caption ?? content.text,
         parseMode: options.parseMode === undefined ? 'Markdown' : options.parseMode,
         replyToMessageId: options.replyToMessageId,
@@ -176,7 +179,118 @@ function normalizeBaseUrl(value) {
         );
     }
 
+    if (isBlockedTelegramBaseHost(parsed.hostname)) {
+        throw new TelegramBotError(
+            'baseUrl (base URL) host is not permitted'
+        );
+    }
+
     return parsed.toString().replace(/\/+$/, '');
+}
+
+function normalizeFileUrl(value) {
+    if (typeof value !== 'string' || value.trim().length === 0) {
+        throw new TelegramBotError('fileUrl must be a valid HTTP or HTTPS URL');
+    }
+    let parsed;
+    try {
+        parsed = new URL(value.trim());
+    } catch {
+        throw new TelegramBotError('fileUrl must be a valid HTTP or HTTPS URL');
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.host || parsed.username || parsed.password) {
+        throw new TelegramBotError('fileUrl must be a valid HTTP or HTTPS URL without embedded credentials');
+    }
+    if (isBlockedHost(parsed.hostname)) {
+        throw new TelegramBotError('fileUrl host is not permitted');
+    }
+    return parsed.toString();
+}
+
+function isBlockedTelegramBaseHost(hostname) {
+    const normalized = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
+    if (normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '::1') {
+        return false;
+    }
+    return isBlockedHost(normalized);
+}
+
+function isBlockedHost(hostname) {
+    const normalized = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
+    if (
+        !normalized ||
+        normalized === 'localhost' ||
+        normalized === 'local' ||
+        normalized === 'internal' ||
+        normalized === 'localdomain' ||
+        normalized.endsWith('.localhost') ||
+        normalized.endsWith('.local') ||
+        normalized.endsWith('.internal') ||
+        normalized.endsWith('.localdomain')
+    ) {
+        return true;
+    }
+    if (normalized.includes(':')) {
+        const clean = normalized.split('%')[0];
+        const hextets = parseIpv6Hextets(clean);
+        if (!hextets) return true;
+        const allZero = hextets.every(part => part === 0);
+        const isLoopback = hextets.slice(0, 7).every(part => part === 0) && hextets[7] === 1;
+        if (allZero || isLoopback) return true;
+        if ((hextets[0] & 0xffc0) === 0xfe80) return true;
+        if ((hextets[0] & 0xfe00) === 0xfc00) return true;
+        if (hextets.slice(0, 5).every(part => part === 0) && hextets[5] === 0xffff) return true;
+        return false;
+    }
+    const ipv4 = normalized.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (!ipv4) return false;
+    const [, a, b, c, d] = ipv4.map(Number);
+    if ([a, b, c, d].some(octet => octet < 0 || octet > 255)) return true;
+    return (
+        a === 10 ||
+        a === 127 ||
+        a === 0 ||
+        (a === 100 && b >= 64 && b <= 127) ||
+        (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168)
+    );
+}
+
+function parseIpv6Hextets(address) {
+    const halves = address.split('::');
+    if (halves.length > 2) return null;
+    const parsePart = part => {
+        if (!part) return [];
+        const tokens = part.split(':');
+        const out = [];
+        for (let i = 0; i < tokens.length; i += 1) {
+            const token = tokens[i];
+            if (!token) return null;
+            if (token.includes('.')) {
+                if (i !== tokens.length - 1) return null;
+                const v4 = token.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+                if (!v4) return null;
+                const octets = v4.slice(1).map(Number);
+                if (octets.some(o => o < 0 || o > 255)) return null;
+                out.push((octets[0] << 8) | octets[1], (octets[2] << 8) | octets[3]);
+            } else {
+                if (!/^[0-9a-f]{1,4}$/i.test(token)) return null;
+                out.push(parseInt(token, 16));
+            }
+        }
+        return out;
+    };
+    const left = parsePart(halves[0]);
+    if (!left) return null;
+    if (halves.length === 1) {
+        return left.length === 8 ? left : null;
+    }
+    const right = parsePart(halves[1]);
+    if (!right) return null;
+    const missing = 8 - (left.length + right.length);
+    if (missing < 1) return null;
+    return [...left, ...new Array(missing).fill(0), ...right];
 }
 
 function normalizeTimeout(value) {
@@ -473,7 +587,7 @@ async function telegramRequest(url, payload, timeoutMs) {
 
     try {
         const response = await postTelegramJson(url, payload, timeoutMs, controller.signal);
-        const responseText = await response.text();
+        const responseText = await readBoundedTelegramText(response, 1024 * 1024);
         let responseData;
 
         try {
@@ -683,6 +797,42 @@ function decodeRuntimeBodyUtf8(raw) {
 
 function isRuntimeTimeoutError(error) {
     return typeof error?.message === 'string' && /timed out|timeout/iu.test(error.message);
+}
+
+async function readBoundedTelegramText(response, maxBytes) {
+    if (response?.body && typeof response.body.getReader === 'function') {
+        const reader = response.body.getReader();
+        const decoder = typeof TextDecoder === 'function' ? new TextDecoder() : null;
+        let out = '';
+        let total = 0;
+        try {
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                if (!value) continue;
+                if (total + value.byteLength > maxBytes) {
+                    throw new TelegramBotError('Telegram API response exceeded maximum size limit', {
+                        status: response.status,
+                        retriable: false
+                    });
+                }
+                out += decoder ? decoder.decode(value, { stream: true }) : String.fromCharCode(...value);
+                total += value.byteLength;
+            }
+        } finally {
+            try { await reader.cancel(); } catch {}
+        }
+        if (decoder) out += decoder.decode();
+        return out;
+    }
+    const text = await response.text();
+    if (typeof text === 'string' && text.length > maxBytes) {
+        throw new TelegramBotError('Telegram API response exceeded maximum size limit', {
+            status: response.status,
+            retriable: false
+        });
+    }
+    return text || '';
 }
 
 async function postTelegramJson(url, payload, timeoutMs, signal) {

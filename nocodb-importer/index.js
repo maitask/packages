@@ -100,20 +100,19 @@ async function execute(input, options, context) {
 
 function buildConfig(input, options, context) {
     var trustedOptions = isPlainObject(options) ? options : {};
-    var inputOptions = (input && isPlainObject(input.options)) ? input.options : {};
     var defaults = (context && isPlainObject(context.defaults)) ? context.defaults : {};
     var secrets = (context && isPlainObject(context.secrets)) ? context.secrets : {};
 
+    var allowPrivateHosts = trustedOptions.allowPrivateHosts === true || defaults.allowPrivateHosts === true;
     var baseUrlRaw = trustedOptions.baseUrl || trustedOptions.base_url || defaults.baseUrl || defaults.base_url;
-    var baseUrl = validateNocoDbBaseUrl(baseUrlRaw);
+    var baseUrl = validateNocoDbBaseUrl(baseUrlRaw, allowPrivateHosts);
     var token =
         trustedOptions.token ||
         trustedOptions.apiToken ||
-        trustedOptions.api_key ||
         secrets.NOCODB_API_TOKEN ||
         secrets.NOCODB_TOKEN;
-    var baseId = trustedOptions.baseId || trustedOptions.projectId || trustedOptions.project || inputOptions.baseId || defaults.baseId;
-    var tableName = trustedOptions.tableName || trustedOptions.table || trustedOptions.name || inputOptions.tableName || defaults.tableName;
+    var baseId = trustedOptions.baseId || trustedOptions.projectId || trustedOptions.project || defaults.baseId;
+    var tableName = trustedOptions.tableName || trustedOptions.table || trustedOptions.name || defaults.tableName;
 
     if (!token) {
         throw new Error('NocoDB token is required (options.token or context.secrets.NOCODB_API_TOKEN)');
@@ -130,16 +129,16 @@ function buildConfig(input, options, context) {
         token: String(token),
         baseId: String(baseId),
         tableName: String(tableName),
-        delimiter: inputOptions.delimiter || trustedOptions.delimiter || defaults.delimiter || ',',
-        previewRows: Math.min(Math.max(Number(inputOptions.previewRows || trustedOptions.previewRows || defaults.previewRows || 5), 1), 100),
-        dryRun: Boolean(trustedOptions.dryRun ?? inputOptions.dryRun ?? defaults.dryRun),
-        inferTypes: (trustedOptions.inferTypes ?? inputOptions.inferTypes ?? defaults.inferTypes) !== false,
-        fallbackColumnType: inputOptions.defaultColumnType || trustedOptions.defaultColumnType || defaults.defaultColumnType || 'SingleLineText',
+        delimiter: trustedOptions.delimiter || defaults.delimiter || ',',
+        previewRows: Math.min(Math.max(Number(trustedOptions.previewRows || defaults.previewRows || 5), 1), 100),
+        dryRun: Boolean(trustedOptions.dryRun ?? defaults.dryRun),
+        inferTypes: (trustedOptions.inferTypes ?? defaults.inferTypes) !== false,
+        fallbackColumnType: trustedOptions.defaultColumnType || defaults.defaultColumnType || 'SingleLineText',
         timeoutMs: Math.min(Math.max(Number(trustedOptions.timeoutMs || defaults.timeoutMs || 30000), 1000), 120000)
     };
 }
 
-function validateNocoDbBaseUrl(rawUrl) {
+function validateNocoDbBaseUrl(rawUrl, allowPrivateHosts) {
     if (!rawUrl || typeof rawUrl !== 'string') {
         throw new Error('NocoDB baseUrl is required');
     }
@@ -154,6 +153,9 @@ function validateNocoDbBaseUrl(rawUrl) {
     }
     if (parsed.username || parsed.password || parsed.search || parsed.hash) {
         throw new Error('NocoDB baseUrl must not include credentials, query, or fragment');
+    }
+    if (!allowPrivateHosts && isBlockedHost(parsed.hostname)) {
+        throw new Error('NocoDB baseUrl host is not permitted');
     }
     return trimTrailingSlash(parsed.toString());
 }
@@ -356,12 +358,7 @@ function findTable(tables, tableName) {
 }
 
 async function request(method, url, options) {
-    if (typeof httpRequest === 'function') {
-        return httpRequest(method, url, options || {});
-    }
-    if (typeof httpGet === 'function' && method.toUpperCase() === 'GET') {
-        return httpGet(url, options || {});
-    }
+    var MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
     if (typeof fetch === 'function') {
         var timeoutMs = (options && options.timeoutMs) || 30000;
         var init = {
@@ -376,18 +373,23 @@ async function request(method, url, options) {
         } else if (options && options.body !== undefined) {
             init.body = options.body;
         }
-        var controller = new AbortController();
-        init.signal = controller.signal;
-        var timer = setTimeout(function () { controller.abort(); }, timeoutMs);
+        var runtimeFetch = usesMaitaskRuntimeFetch();
+        var controller = runtimeFetch ? null : new AbortController();
+        var timer = runtimeFetch ? null : setTimeout(function () { controller.abort(); }, timeoutMs);
+        if (runtimeFetch) {
+            init.maxResponseBytes = MAX_RESPONSE_BYTES;
+        } else {
+            init.signal = controller.signal;
+        }
         try {
             var res = await fetch(url, init);
             if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) {
+                if (res && res.body && typeof res.body.cancel === 'function') {
+                    try { await res.body.cancel(); } catch (_err) {}
+                }
                 throw new Error('NocoDB endpoint must not redirect');
             }
-            var text = await res.text();
-            if (text.length > 5 * 1024 * 1024) {
-                throw new Error('NocoDB response exceeds 5MB limit');
-            }
+            var text = await readBoundedText(res, MAX_RESPONSE_BYTES);
             var data = null;
             try {
                 data = text ? JSON.parse(text) : null;
@@ -401,8 +403,15 @@ async function request(method, url, options) {
                 body: text,
                 data: data
             };
+        } catch (err) {
+            if (err && err.name === 'AbortError') {
+                throw new Error('NocoDB request timed out after ' + timeoutMs + 'ms');
+            }
+            throw err;
         } finally {
-            clearTimeout(timer);
+            if (timer !== null) {
+                clearTimeout(timer);
+            }
         }
     }
     throw new Error('No HTTP client available');
@@ -460,17 +469,146 @@ function withJson(headers) {
     return merged;
 }
 
+function isSafeKey(key) {
+    return key !== '__proto__' && key !== 'constructor' && key !== 'prototype';
+}
+
 function mergeObjects(base, override) {
-    var result = {};
-    var baseKeys = Object.keys(base || {});
+    var result = Object.create(null);
+    var baseKeys = isPlainObject(base) ? Object.keys(base) : [];
     for (var i = 0; i < baseKeys.length; i++) {
-        result[baseKeys[i]] = base[baseKeys[i]];
+        if (Object.hasOwn(base, baseKeys[i]) && isSafeKey(baseKeys[i])) {
+            result[baseKeys[i]] = base[baseKeys[i]];
+        }
     }
-    var overrideKeys = Object.keys(override || {});
+    var overrideKeys = isPlainObject(override) ? Object.keys(override) : [];
     for (var j = 0; j < overrideKeys.length; j++) {
-        result[overrideKeys[j]] = override[overrideKeys[j]];
+        if (Object.hasOwn(override, overrideKeys[j]) && isSafeKey(overrideKeys[j])) {
+            result[overrideKeys[j]] = override[overrideKeys[j]];
+        }
     }
     return result;
+}
+
+function usesMaitaskRuntimeFetch() {
+    return Boolean(
+        typeof Deno !== 'undefined' &&
+        Deno &&
+        Deno.core &&
+        Deno.core.ops &&
+        typeof Deno.core.ops.op_http_request === 'function'
+    );
+}
+
+async function readBoundedText(response, maxBytes) {
+    if (response && response.body && typeof response.body.getReader === 'function') {
+        var reader = response.body.getReader();
+        var decoder = typeof TextDecoder === 'function' ? new TextDecoder() : null;
+        var out = '';
+        var total = 0;
+        try {
+            while (true) {
+                var chunk = await reader.read();
+                if (chunk.done) break;
+                if (!chunk.value) continue;
+                if (total + chunk.value.byteLength > maxBytes) {
+                    throw new Error('NocoDB response exceeds 5MB limit');
+                }
+                out += decoder ? decoder.decode(chunk.value, { stream: true }) : String.fromCharCode.apply(null, chunk.value);
+                total += chunk.value.byteLength;
+            }
+        } finally {
+            try { await reader.cancel(); } catch (_err) {}
+        }
+        if (decoder) out += decoder.decode();
+        return out;
+    }
+    var text = await response.text();
+    if (typeof text === 'string' && text.length > maxBytes) {
+        throw new Error('NocoDB response exceeds 5MB limit');
+    }
+    return text || '';
+}
+
+function isBlockedHost(hostname) {
+    var normalized = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
+    if (
+        !normalized ||
+        normalized === 'localhost' ||
+        normalized === 'local' ||
+        normalized === 'internal' ||
+        normalized === 'localdomain' ||
+        normalized.endsWith('.localhost') ||
+        normalized.endsWith('.local') ||
+        normalized.endsWith('.internal') ||
+        normalized.endsWith('.localdomain')
+    ) {
+        return true;
+    }
+    if (normalized.indexOf(':') !== -1) {
+        var clean = normalized.split('%')[0];
+        var hextets = parseIpv6Hextets(clean);
+        if (!hextets) return true;
+        var allZero = hextets.every(function (part) { return part === 0; });
+        var isLoopback = hextets.slice(0, 7).every(function (part) { return part === 0; }) && hextets[7] === 1;
+        if (allZero || isLoopback) return true;
+        if ((hextets[0] & 0xffc0) === 0xfe80) return true;
+        if ((hextets[0] & 0xfe00) === 0xfc00) return true;
+        if (hextets.slice(0, 5).every(function (part) { return part === 0; }) && hextets[5] === 0xffff) return true;
+        return false;
+    }
+    var ipv4 = normalized.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (!ipv4) return false;
+    var a = Number(ipv4[1]);
+    var b = Number(ipv4[2]);
+    var c = Number(ipv4[3]);
+    var d = Number(ipv4[4]);
+    if (a < 0 || a > 255 || b < 0 || b > 255 || c < 0 || c > 255 || d < 0 || d > 255) return true;
+    return (
+        a === 10 ||
+        a === 127 ||
+        a === 0 ||
+        (a === 100 && b >= 64 && b <= 127) ||
+        (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168)
+    );
+}
+
+function parseIpv6Hextets(address) {
+    var halves = address.split('::');
+    if (halves.length > 2) return null;
+    function parsePart(part) {
+        if (!part) return [];
+        var tokens = part.split(':');
+        var out = [];
+        for (var i = 0; i < tokens.length; i += 1) {
+            var token = tokens[i];
+            if (!token) return null;
+            if (token.indexOf('.') !== -1) {
+                if (i !== tokens.length - 1) return null;
+                var v4 = token.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+                if (!v4) return null;
+                var octets = [Number(v4[1]), Number(v4[2]), Number(v4[3]), Number(v4[4])];
+                if (octets.some(function (o) { return o < 0 || o > 255; })) return null;
+                out.push((octets[0] << 8) | octets[1], (octets[2] << 8) | octets[3]);
+            } else {
+                if (!/^[0-9a-f]{1,4}$/i.test(token)) return null;
+                out.push(parseInt(token, 16));
+            }
+        }
+        return out;
+    }
+    var left = parsePart(halves[0]);
+    if (!left) return null;
+    if (halves.length === 1) {
+        return left.length === 8 ? left : null;
+    }
+    var right = parsePart(halves[1]);
+    if (!right) return null;
+    var missing = 8 - (left.length + right.length);
+    if (missing < 1) return null;
+    return left.concat(new Array(missing).fill(0), right);
 }
 
 function isPlainObject(value) {

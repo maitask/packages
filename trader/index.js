@@ -19,7 +19,7 @@ const INPUT_FIELDS = new Set([
   'paperState', 'referencePrice', 'eventTime', 'order', 'exchange'
 ]);
 const OPTION_FIELDS = new Set([
-  'baseUrl', 'allowInsecureHttp', 'timeoutMs', 'maxResponseBytes',
+  'baseUrl', 'allowInsecureHttp', 'allowPrivateHosts', 'timeoutMs', 'maxResponseBytes',
   'allowLiveTrading', 'allowMainnetTrading', 'apiKeySecret', 'apiSecretSecret',
   'passphraseSecret', 'secrets'
 ]);
@@ -1061,9 +1061,11 @@ function createOperation(config, countAttempt) {
   const defaultOrigin = OFFICIAL_ORIGINS[key];
   if (!defaultOrigin) throw validationFailure();
   const allowInsecureHttp = optionalBoolean(config.options.allowInsecureHttp, false);
+  const allowPrivateHosts = optionalBoolean(config.options.allowPrivateHosts, false);
   const origin = normalizeBaseUrl(
     config.options.baseUrl === undefined ? defaultOrigin : config.options.baseUrl,
-    allowInsecureHttp
+    allowInsecureHttp,
+    allowPrivateHosts
   );
   return {
     origin,
@@ -1648,14 +1650,96 @@ function normalizeInterval(value) {
   return interval;
 }
 
-function normalizeBaseUrl(value, allowInsecure) {
+function normalizeBaseUrl(value, allowInsecure, allowPrivateHosts = false) {
   const text = requiredString(value, 2048);
   let url;
   try { url = new URL(text); } catch { throw validationFailure(); }
   if (url.username || url.password || url.search || url.hash || url.pathname !== '/') throw validationFailure();
-  if (url.protocol === 'https:') return url.origin;
+  const blockedPrivate = isBlockedHost(url.hostname);
+  if (url.protocol === 'https:') {
+    if (blockedPrivate && !allowPrivateHosts && !allowInsecure) throw policyFailure();
+    return url.origin;
+  }
   if (url.protocol !== 'http:' || !allowInsecure || !isPrivateFixtureHost(url.hostname)) throw policyFailure();
   return url.origin;
+}
+
+function isBlockedHost(hostname) {
+  const normalized = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
+  if (
+    !normalized ||
+    normalized === 'localhost' ||
+    normalized === 'local' ||
+    normalized === 'internal' ||
+    normalized === 'localdomain' ||
+    normalized.endsWith('.localhost') ||
+    normalized.endsWith('.local') ||
+    normalized.endsWith('.internal') ||
+    normalized.endsWith('.localdomain')
+  ) {
+    return true;
+  }
+  if (normalized.includes(':')) {
+    const clean = normalized.split('%')[0];
+    const hextets = parseIpv6Hextets(clean);
+    if (!hextets) return true;
+    const allZero = hextets.every(part => part === 0);
+    const isLoopback = hextets.slice(0, 7).every(part => part === 0) && hextets[7] === 1;
+    if (allZero || isLoopback) return true;
+    if ((hextets[0] & 0xffc0) === 0xfe80) return true;
+    if ((hextets[0] & 0xfe00) === 0xfc00) return true;
+    if (hextets.slice(0, 5).every(part => part === 0) && hextets[5] === 0xffff) return true;
+    return false;
+  }
+  const ipv4 = normalized.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!ipv4) return false;
+  const [, a, b, c, d] = ipv4.map(Number);
+  if ([a, b, c, d].some(octet => octet < 0 || octet > 255)) return true;
+  return (
+    a === 10 ||
+    a === 127 ||
+    a === 0 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168)
+  );
+}
+
+function parseIpv6Hextets(address) {
+  const halves = address.split('::');
+  if (halves.length > 2) return null;
+  const parsePart = part => {
+    if (!part) return [];
+    const tokens = part.split(':');
+    const out = [];
+    for (let i = 0; i < tokens.length; i += 1) {
+      const token = tokens[i];
+      if (!token) return null;
+      if (token.includes('.')) {
+        if (i !== tokens.length - 1) return null;
+        const v4 = token.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+        if (!v4) return null;
+        const octets = v4.slice(1).map(Number);
+        if (octets.some(o => o < 0 || o > 255)) return null;
+        out.push((octets[0] << 8) | octets[1], (octets[2] << 8) | octets[3]);
+      } else {
+        if (!/^[0-9a-f]{1,4}$/i.test(token)) return null;
+        out.push(parseInt(token, 16));
+      }
+    }
+    return out;
+  };
+  const left = parsePart(halves[0]);
+  if (!left) return null;
+  if (halves.length === 1) {
+    return left.length === 8 ? left : null;
+  }
+  const right = parsePart(halves[1]);
+  if (!right) return null;
+  const missing = 8 - (left.length + right.length);
+  if (missing < 1) return null;
+  return [...left, ...new Array(missing).fill(0), ...right];
 }
 
 function isPrivateFixtureHost(hostname) {

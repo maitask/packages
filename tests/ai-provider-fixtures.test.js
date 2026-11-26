@@ -46,7 +46,7 @@ test('openai uses a controlled chat completions endpoint', async t => {
 
   const result = await executeOpenAI(
     { model: 'gpt-fixture', text: 'hello openai', maxTokens: 64 },
-    { apiKey: 'fixture-openai', baseUrl: `${server.url}/openai/v1`, retries: 0 }
+    { apiKey: 'fixture-openai', baseUrl: `${server.url}/openai/v1`, allowPrivateHosts: true, retries: 0 }
   );
 
   assert.equal(result.success, true);
@@ -88,7 +88,7 @@ test('claude uses the Runtime base URL environment fallback', async t => {
 
   const result = await executeClaude(
     { model: 'claude-fixture', text: 'hello claude', maxTokens: 48 },
-    { apiKey: 'fixture-anthropic', retries: 0 },
+    { apiKey: 'fixture-anthropic', allowPrivateHosts: true, retries: 0 },
     { env: { ANTHROPIC_API_BASE_URL: `${server.url}/anthropic/v1` } }
   );
 
@@ -120,7 +120,7 @@ test('gemini aggregates a controlled streaming response', async t => {
 
   const result = await executeGemini(
     { model: 'gemini-fixture', text: 'hello gemini', stream: true },
-    { apiKey: 'fixture-google', baseUrl: `${server.url}/google/v1beta/models`, retries: 0 }
+    { apiKey: 'fixture-google', baseUrl: `${server.url}/google/v1beta/models`, allowPrivateHosts: true, retries: 0 }
   );
 
   assert.equal(result.success, true);
@@ -144,7 +144,7 @@ test('deepseek returns a structured retryable upstream failure', async t => {
 
   const result = await executeDeepSeek(
     { model: 'deepseek-chat', text: 'hello deepseek' },
-    { apiKey: 'fixture-deepseek', baseUrl: `${server.url}/deepseek`, retries: 0 }
+    { apiKey: 'fixture-deepseek', baseUrl: `${server.url}/deepseek`, allowPrivateHosts: true, retries: 0 }
   );
 
   assert.equal(attempts, 1);
@@ -185,7 +185,7 @@ test('ollama aggregates native NDJSON from a controlled endpoint', async t => {
 
   const result = await executeOllama(
     { model: 'ollama-fixture', text: 'hello ollama', stream: true },
-    { baseUrl: server.url, retries: 0 }
+    { baseUrl: server.url, allowPrivateHosts: true, retries: 0 }
   );
 
   assert.equal(result.success, true);

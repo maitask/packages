@@ -24,9 +24,14 @@ const BASE64_ALPHABET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz012
  * @param {Object} context - Execution context
  * @returns {Object} Parsed CSV data with validation
  */
+function isSafeKey(key) {
+    return key !== '__proto__' && key !== 'constructor' && key !== 'prototype';
+}
+
 function execute(input, options = {}, context = {}) {
     try {
-        const config = buildParsingConfig(options, input);
+        const safeOptions = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
+        const config = buildParsingConfig(safeOptions, input);
         const text = ensureTextPayload(input);
 
         if (!text) {
@@ -178,14 +183,23 @@ function processRowsAndHeaders(rawRows, config) {
 
     if (Array.isArray(config.headers)) {
         // Custom headers provided
-        headers = config.headers.slice();
+        headers = config.headers.map(h => String(h ?? ''));
+        for (const header of headers) {
+            if (!isSafeKey(header)) {
+                throw new Error(`Unsafe CSV column header: ${header}`);
+            }
+        }
         dataRows = rawRows;
     } else if (config.headers === true && rawRows.length > 0) {
         // Use first row as headers
         const headerRow = rawRows[0];
         headers = headerRow.map((header, index) => {
             const cleaned = header && typeof header === 'string' ? header.trim() : '';
-            return cleaned || `column_${index + 1}`;
+            const finalHeader = cleaned || `column_${index + 1}`;
+            if (!isSafeKey(finalHeader)) {
+                throw new Error(`Unsafe CSV column header: ${finalHeader}`);
+            }
+            return finalHeader;
         });
         dataRows = rawRows.slice(1);
     } else {
@@ -253,10 +267,11 @@ function isEmptyRow(row) {
  * Infer data types for columns
  */
 function inferColumnTypes(rows, headers) {
-    const types = {};
+    const types = Object.create(null);
 
     for (const header of headers) {
-        const values = rows.map(row => row[header]).filter(v => v !== '' && v != null);
+        if (!isSafeKey(header)) continue;
+        const values = rows.map(row => (row && Object.hasOwn(row, header) ? row[header] : undefined)).filter(v => v !== '' && v != null);
 
         if (values.length === 0) {
             types[header] = 'empty';
@@ -482,7 +497,7 @@ function bytesToUtf8(bytes) {
                 ((byte3 & 0x3F) << 6) |
                 (byte4 & 0x3F);
 
-            if (codePoint > 0x10000) {
+            if (codePoint >= 0x10000) {
                 const offset = codePoint - 0x10000;
                 result += String.fromCharCode((offset >> 10) + 0xD800, (offset & 0x3FF) + 0xDC00);
             } else {

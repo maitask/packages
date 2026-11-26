@@ -129,12 +129,17 @@ function extractHeaders(data, customHeaders, dataType) {
 /**
  * Structure data for Excel export
  */
+function isSafeKey(key) {
+    return key !== '__proto__' && key !== 'constructor' && key !== 'prototype';
+}
+
 function structureData(data, headers, dataType) {
     if (dataType === 'object_array') {
         return data.map(obj => {
-            const row = {};
+            const row = Object.create(null);
             headers.forEach(header => {
-                row[header] = obj[header] !== undefined ? obj[header] : null;
+                if (!isSafeKey(header)) return;
+                row[header] = obj && Object.hasOwn(obj, header) && obj[header] !== undefined ? obj[header] : null;
             });
             return row;
         });
@@ -142,8 +147,9 @@ function structureData(data, headers, dataType) {
 
     if (dataType === 'array_of_arrays') {
         return data.map(arr => {
-            const row = {};
+            const row = Object.create(null);
             headers.forEach((header, idx) => {
+                if (!isSafeKey(header)) return;
                 row[header] = arr[idx] !== undefined ? arr[idx] : null;
             });
             return row;
@@ -160,7 +166,7 @@ function structureData(data, headers, dataType) {
 function csvCell(value) {
     if (value == null) return '';
     let text = String(value);
-    if (/^[\t\r ]*[=+\-@]/.test(text) || text.startsWith('\t') || text.startsWith('\r')) {
+    if (/^[\t\r\n ]*[=+\-@]/.test(text) || text.startsWith('\t') || text.startsWith('\r')) {
         text = `'${text}`;
     }
     if (/[",\n\r]/.test(text)) {

@@ -48,13 +48,18 @@ test('hackernews-crawler crawls stories and comments from a fixture API', async 
   });
   t.after(() => server.close());
 
-  const result = await executeHackerNews({
-    storyType: 'top',
-    limit: 2,
-    includeComments: true,
-    commentDepth: 2,
-    apiBaseUrl: `${server.url}/v0`
-  });
+  const result = await executeHackerNews(
+    {
+      storyType: 'top',
+      limit: 2,
+      includeComments: true,
+      commentDepth: 2
+    },
+    {
+      apiBaseUrl: `${server.url}/v0`,
+      allowPrivateHosts: true
+    }
+  );
 
   assert.equal(result.success, true);
   assert.equal(result.data.totalStories, 2);
@@ -62,13 +67,18 @@ test('hackernews-crawler crawls stories and comments from a fixture API', async 
   assert.equal(result.data.stories[0].comments[0].text, 'Useful checklist');
   assert.equal(result.metadata.provider, 'hackernews');
 
-  const withoutComments = await executeHackerNews({
-    storyType: 'top',
-    limit: 1,
-    includeComments: true,
-    commentLimit: 0,
-    apiBaseUrl: `${server.url}/v0`
-  });
+  const withoutComments = await executeHackerNews(
+    {
+      storyType: 'top',
+      limit: 1,
+      includeComments: true,
+      commentLimit: 0
+    },
+    {
+      apiBaseUrl: `${server.url}/v0`,
+      allowPrivateHosts: true
+    }
+  );
 
   assert.equal(withoutComments.success, true);
   assert.equal(withoutComments.data.stories[0].comments, undefined);
@@ -96,12 +106,17 @@ test('web-search parses DuckDuckGo-compatible fixture results through baseUrl', 
   });
   t.after(() => server.close());
 
-  const result = await executeWebSearch({
-    query: 'maitask',
-    engine: 'duckduckgo',
-    limit: 1,
-    baseUrl: server.url
-  });
+  const result = await executeWebSearch(
+    {
+      query: 'maitask',
+      engine: 'duckduckgo',
+      limit: 1
+    },
+    {
+      baseUrl: server.url,
+      allowPrivateHosts: true
+    }
+  );
 
   assert.equal(result.success, true);
   assert.equal(result.data.totalResults, 1);
@@ -122,11 +137,16 @@ test('web-search reports upstream request failures as structured failures', asyn
   });
   t.after(() => server.close());
 
-  const result = await executeWebSearch({
-    query: 'maitask',
-    engine: 'duckduckgo',
-    baseUrl: server.url
-  });
+  const result = await executeWebSearch(
+    {
+      query: 'maitask',
+      engine: 'duckduckgo'
+    },
+    {
+      baseUrl: server.url,
+      allowPrivateHosts: true
+    }
+  );
 
   assert.equal(result.success, false);
   assert.equal(result.error.code, 'WEB_SEARCH_ERROR');
@@ -158,7 +178,7 @@ test('graphql-client executes queries against a fixture endpoint', async t => {
       variables: {},
       timeoutMs: 10000
     },
-    { allowInsecureHttp: true }
+    { allowInsecureHttp: true, allowPrivateHosts: true }
   );
 
   assert.equal(result.success, true);
@@ -206,6 +226,7 @@ test('web-scraper handles fixture pages and preserves partial success counts', a
   const result = await executeWebScraper(
     [{ url: `${server.url}/article` }, { url: `${server.url}/missing` }],
     {
+      allowPrivateHosts: true,
       selectors: {
         headline: 'h1',
         ctaHref: { selector: 'a.cta', attr: 'href' }
@@ -324,8 +345,7 @@ test('intelligence-briefing generates a fixture-backed AI briefing', async t => 
           limit: 2,
           includeComments: true,
           commentLimit: 1,
-          commentDepth: 1,
-          apiBaseUrl: `${server.url}/v0`
+          commentDepth: 1
         }
       ],
       analysis: {
@@ -344,6 +364,8 @@ test('intelligence-briefing generates a fixture-backed AI briefing', async t => 
     {
       apiKey: 'fixture-key',
       baseUrl: `${server.url}/v1`,
+      apiBaseUrl: `${server.url}/v0`,
+      allowPrivateHosts: true,
       model: 'fixture-intelligence'
     },
     { execution_id: 'fixture-intelligence' }
@@ -437,8 +459,7 @@ test('intelligence-briefing publishes formal Daily copy with source URLs', async
         {
           type: 'hackernews',
           storyTypes: ['top'],
-          limit: 2,
-          apiBaseUrl: `${server.url}/v0`
+          limit: 2
         }
       ],
       analysis: {
@@ -458,6 +479,8 @@ test('intelligence-briefing publishes formal Daily copy with source URLs', async
     {
       apiKey: 'fixture-key',
       baseUrl: `${server.url}/v1`,
+      apiBaseUrl: `${server.url}/v0`,
+      allowPrivateHosts: true,
       model: 'fixture-intelligence'
     }
   );
@@ -511,8 +534,7 @@ test('intelligence-briefing fails closed when the AI provider is unavailable', a
         {
           type: 'hackernews',
           storyTypes: ['top'],
-          limit: 1,
-          apiBaseUrl: `${server.url}/v0`
+          limit: 1
         }
       ],
       selection: { maxItems: 1, minScore: 1 }
@@ -520,6 +542,8 @@ test('intelligence-briefing fails closed when the AI provider is unavailable', a
     {
       apiKey: 'fixture-key',
       baseUrl: `${server.url}/v1`,
+      apiBaseUrl: `${server.url}/v0`,
+      allowPrivateHosts: true,
       model: 'fixture-intelligence',
       retries: 0
     }
@@ -591,23 +615,28 @@ test('intelligence-briefing uses Runtime fetch without abort timers', async t =>
     globalThis.clearTimeout = originalClearTimeout;
   });
 
-  const result = await executeIntelligenceBriefing({
-    sources: [
-      {
-        type: 'hackernews',
-        storyTypes: ['top'],
-        limit: 2,
-        apiBaseUrl: 'https://fixture.local/v0'
+  const result = await executeIntelligenceBriefing(
+    {
+      sources: [
+        {
+          type: 'hackernews',
+          storyTypes: ['top'],
+          limit: 2
+        }
+      ],
+      analysis: {
+        profile: 'forecast',
+        targetLanguage: 'en'
+      },
+      ai: {
+        provider: 'extractive'
       }
-    ],
-    analysis: {
-      profile: 'forecast',
-      targetLanguage: 'en'
     },
-    ai: {
-      provider: 'extractive'
+    {
+      apiBaseUrl: 'https://fixture.local/v0',
+      allowPrivateHosts: true
     }
-  });
+  );
 
   assert.equal(result.success, true);
   assert.equal(result.data.summary.total, 2);

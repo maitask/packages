@@ -77,12 +77,21 @@ execute;
  * Ensure input has old and new data
  */
 function ensureInputPair(input) {
-    if (!input) {
+    if (!input || typeof input !== 'object') {
         throw new Error('Input is required');
     }
 
-    const oldData = input.old || input.before || input.source;
-    const newData = input.new || input.after || input.target;
+    const pickFirstDefined = (obj, keys) => {
+        for (const key of keys) {
+            if (Object.hasOwn(obj, key) && obj[key] !== undefined) {
+                return obj[key];
+            }
+        }
+        return undefined;
+    };
+
+    const oldData = pickFirstDefined(input, ['old', 'before', 'source']);
+    const newData = pickFirstDefined(input, ['new', 'after', 'target']);
 
     if (oldData === undefined || newData === undefined) {
         throw new Error('Input must contain "old" and "new" data');
@@ -132,23 +141,25 @@ function diffJson(oldObj, newObj, options = {}) {
  * Compare two objects recursively
  */
 function compareObjects(oldObj, newObj, path, changes, summary) {
-    const oldKeys = new Set(Object.keys(oldObj || {}));
-    const newKeys = new Set(Object.keys(newObj || {}));
+    const oldKeys = Object.keys(oldObj || {});
+    const newKeys = Object.keys(newObj || {});
     const allKeys = new Set([...oldKeys, ...newKeys]);
 
     for (const key of allKeys) {
         const currentPath = path ? `${path}.${key}` : key;
-        const oldValue = oldObj?.[key];
-        const newValue = newObj?.[key];
+        const hasOld = oldObj != null && Object.hasOwn(oldObj, key);
+        const hasNew = newObj != null && Object.hasOwn(newObj, key);
+        const oldValue = hasOld ? oldObj[key] : undefined;
+        const newValue = hasNew ? newObj[key] : undefined;
 
-        if (!oldKeys.has(key)) {
+        if (!hasOld) {
             changes.push({
                 type: 'added',
                 path: currentPath,
                 value: newValue
             });
             summary.added++;
-        } else if (!newKeys.has(key)) {
+        } else if (!hasNew) {
             changes.push({
                 type: 'removed',
                 path: currentPath,
@@ -198,7 +209,7 @@ function areEqual(a, b) {
 
         if (keysA.length !== keysB.length) return false;
 
-        return keysA.every(key => areEqual(a[key], b[key]));
+        return keysA.every(key => Object.hasOwn(b, key) && areEqual(a[key], b[key]));
     }
 
     return false;
@@ -337,16 +348,35 @@ function computeLcs(arr1, arr2) {
 /**
  * Diff arrays
  */
+function canonicalStringify(value, seen = new WeakSet()) {
+    if (value === null || typeof value !== 'object') {
+        return JSON.stringify(value);
+    }
+    if (seen.has(value)) {
+        return '"[Circular]"';
+    }
+    seen.add(value);
+    if (Array.isArray(value)) {
+        const out = '[' + value.map(item => canonicalStringify(item, seen)).join(',') + ']';
+        seen.delete(value);
+        return out;
+    }
+    const keys = Object.keys(value).sort();
+    const entries = keys.map(key => JSON.stringify(key) + ':' + canonicalStringify(value[key], seen));
+    seen.delete(value);
+    return '{' + entries.join(',') + '}';
+}
+
 function diffArray(oldArr, newArr, options = {}) {
     const added = [];
     const removed = [];
     const unchanged = [];
 
-    const oldSet = new Set(oldArr.map(item => JSON.stringify(item)));
-    const newSet = new Set(newArr.map(item => JSON.stringify(item)));
+    const oldSet = new Set(oldArr.map(item => canonicalStringify(item)));
+    const newSet = new Set(newArr.map(item => canonicalStringify(item)));
 
     for (const item of oldArr) {
-        const serialized = JSON.stringify(item);
+        const serialized = canonicalStringify(item);
         if (newSet.has(serialized)) {
             unchanged.push(item);
         } else {
@@ -355,7 +385,7 @@ function diffArray(oldArr, newArr, options = {}) {
     }
 
     for (const item of newArr) {
-        const serialized = JSON.stringify(item);
+        const serialized = canonicalStringify(item);
         if (!oldSet.has(serialized)) {
             added.push(item);
         }

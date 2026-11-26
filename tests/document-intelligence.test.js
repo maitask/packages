@@ -64,6 +64,7 @@ test('document intelligence summarizes with sourced published copy', async t => 
     {
       task: 'summarize',
       language: 'en',
+      allowPrivateHosts: true,
       ai: { apiKey: 'fixture-key', baseUrl: `${server.url}/v1`, model: 'gpt-fixture' }
     }
   );

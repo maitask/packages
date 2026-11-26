@@ -23,8 +23,9 @@
  */
 function execute(input, options = {}, context = {}) {
     try {
+        const safeOptions = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
         const expression = ensureExpression(input);
-        const operation = options.operation || 'parse';
+        const operation = safeOptions.operation || 'parse';
 
         let result;
         switch (operation) {
@@ -32,7 +33,7 @@ function execute(input, options = {}, context = {}) {
                 result = parseCron(expression);
                 break;
             case 'next':
-                result = getNextRuns(expression, options.count || 5, options.from);
+                result = getNextRuns(expression, safeOptions.count || 5, safeOptions.from);
                 break;
             case 'validate':
                 result = validateCron(expression);
@@ -204,20 +205,42 @@ function normalizeCronPart(field, min, max) {
 }
 
 function parseField(field, min, max) {
-    if (field === '*') {
+    const trimmed = field.trim();
+    if (trimmed === '*') {
         return { type: 'all', values: null };
     }
     const isDow = min === 0 && max === 6;
     const effectiveMax = isDow ? 7 : max;
-    const rawValues = normalizeCronPart(field.trim(), min, effectiveMax);
+    const rawValues = normalizeCronPart(trimmed, min, effectiveMax);
     if (!rawValues) {
         return { type: 'all', values: null };
     }
     const values = isDow
         ? [...new Set(rawValues.map(v => (v === 7 ? 0 : v)))].sort((a, b) => a - b)
         : rawValues;
-    const type = field.includes('/') ? 'step' : field.includes(',') ? 'list' : field.includes('-') ? 'range' : 'value';
+    const type = trimmed.includes(',') ? 'list' : trimmed.includes('/') ? 'step' : trimmed.includes('-') ? 'range' : 'value';
+    if (type === 'step') {
+        const step = Number.parseInt(trimmed.split('/')[1], 10);
+        return { type, step, values };
+    }
     return { type, values };
+}
+
+function hasValidCalendarDay(parsed) {
+    if (!parsed.dayOfMonth.values || !parsed.month.values || parsed.dayOfWeek.values !== null) {
+        return true;
+    }
+    const maxDaysPerMonth = {
+        1: 31, 2: 29, 3: 31, 4: 30, 5: 31, 6: 30,
+        7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31
+    };
+    for (const month of parsed.month.values) {
+        const maxDay = maxDaysPerMonth[month] || 31;
+        if (parsed.dayOfMonth.values.some(dom => dom <= maxDay)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 /**
@@ -226,6 +249,9 @@ function parseField(field, min, max) {
 function getNextRuns(expression, count = 5, from) {
     const safeCount = Number.isFinite(Number(count)) ? Math.min(Math.max(Math.floor(Number(count)), 1), 500) : 5;
     const parsed = parseCron(expression);
+    if (!hasValidCalendarDay(parsed)) {
+        throw new Error('Cron schedule matches no valid calendar dates');
+    }
     const start = from !== undefined ? new Date(from) : new Date();
     if (Number.isNaN(start.getTime())) {
         throw new Error('Invalid reference timestamp for from');
@@ -240,7 +266,9 @@ function getNextRuns(expression, count = 5, from) {
     }
 
     let iterations = 0;
-    const maxIterations = parsed.hasSeconds ? Math.min(safeCount * 86400, 1000000) : safeCount * 366 * 24 * 60;
+    const maxIterations = parsed.hasSeconds
+        ? Math.min(safeCount * 86400, 200000)
+        : Math.min(safeCount * 366 * 24 * 60, 200000);
 
     while (runs.length < safeCount && iterations < maxIterations) {
         iterations++;
@@ -314,7 +342,7 @@ function describeCron(expression) {
         }
 
         if (field.type === 'step') {
-            return `every ${field.step} ${names.unit}`;
+            return field.step !== undefined ? `every ${field.step} ${names.unit}` : field.values.join(', ');
         }
 
         if (field.values.length === 2) {

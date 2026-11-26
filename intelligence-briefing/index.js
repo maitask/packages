@@ -81,24 +81,47 @@ if (typeof module !== 'undefined') {
 }
 execute;
 
+const MAX_JSON_BYTES = 5 * 1024 * 1024;
+const MAX_ERROR_BYTES = 16 * 1024;
+const MAX_ARTICLE_BYTES = 2 * 1024 * 1024;
+
 function buildConfig(input, options, context) {
   const root = isPlainObject(input) ? input : {};
   const opts = isPlainObject(options) ? options : {};
-  const source = mergeObjects(opts, root);
-  const analysisInput = mergeObjects(opts.analysis || {}, root.analysis || {});
+  const source = mergeObjects(opts, pickSafeInputConfig(root));
+  const analysisInput = mergeObjects(opts.analysis || {}, pickSafeAnalysisInput(root.analysis));
   const selectionInput = mergeObjects(opts.selection || {}, root.selection || {});
   const outputInput = mergeObjects(opts.output || {}, root.output || {});
   const enrichmentInput = mergeObjects(opts.enrichment || {}, root.enrichment || {});
   const dedupeInput = mergeObjects(opts.dedupe || {}, root.dedupe || {});
-  const aiInput = mergeObjects(
-    mergeObjects(opts.ai || {}, root.ai || {}),
-    mergeObjects(analysisInput.ai || {}, compactDefined({
-      apiKey: opts.apiKey || opts.api_key || root.apiKey || root.api_key,
-      baseUrl: opts.baseUrl || opts.base_url || root.baseUrl || root.base_url,
-      model: opts.model || root.model,
-      timeoutMs: firstDefined(opts.timeoutMs, opts.timeout_ms, root.timeoutMs, root.timeout_ms),
-      retries: firstDefined(opts.retries, root.retries)
+  const trustedAi = mergeObjects(
+    opts.ai || {},
+    mergeObjects(isPlainObject(opts.analysis?.ai) ? opts.analysis.ai : {}, compactDefined({
+      apiKey: opts.apiKey,
+      baseUrl: opts.baseUrl || opts.base_url,
+      endpoint: opts.endpoint,
+      model: opts.model,
+      timeoutMs: firstDefined(opts.timeoutMs, opts.timeout_ms),
+      retries: opts.retries,
+      allowPrivateHosts: opts.allowPrivateHosts,
+      allowInsecureHttp: opts.allowInsecureHttp
     }))
+  );
+  const safeInputAi = mergeObjects(
+    pickSafeAiBehavior(root.ai),
+    mergeObjects(pickSafeAiBehavior(root.analysis?.ai), compactDefined({
+      model: root.model,
+      timeoutMs: firstDefined(root.timeoutMs, root.timeout_ms),
+      retries: root.retries
+    }))
+  );
+  const aiInput = mergeObjects(safeInputAi, trustedAi);
+
+  const allowPrivateHosts = Boolean(opts.allowPrivateHosts === true || trustedAi.allowPrivateHosts === true);
+  const allowInsecureHttp = Boolean(
+    opts.allowInsecureHttp === true ||
+      trustedAi.allowInsecureHttp === true ||
+      allowPrivateHosts
   );
 
   const targetLanguage = stringValue(
@@ -114,21 +137,26 @@ function buildConfig(input, options, context) {
     aiInput.enabled === false ||
     ['none', 'disabled', 'extractive', 'rule_based', 'rules'].includes(aiProvider);
   const apiKey =
-    stringValue(aiInput.apiKey || aiInput.api_key) ||
+    stringValue(trustedAi.apiKey) ||
     stringValue(context?.secrets?.INTELLIGENCE_API_KEY) ||
     stringValue(context?.secrets?.OPENAI_API_KEY) ||
     stringValue(context?.env?.INTELLIGENCE_API_KEY) ||
     stringValue(context?.env?.OPENAI_API_KEY);
-  const baseUrl =
-    stringValue(aiInput.baseUrl || aiInput.base_url) ||
+  const rawBaseUrl =
+    stringValue(trustedAi.baseUrl) ||
     stringValue(context?.env?.INTELLIGENCE_BASE_URL) ||
     stringValue(context?.env?.OPENAI_BASE_URL) ||
     'https://api.openai.com/v1';
+  const rawEndpoint = stringValue(trustedAi.endpoint || '');
 
   const sources = normalizeSources(root, opts, context);
 
   return {
     sources,
+    security: {
+      allowPrivateHosts,
+      allowInsecureHttp
+    },
     analysis: {
       profile,
       targetLanguage,
@@ -208,8 +236,8 @@ function buildConfig(input, options, context) {
       enabled: !aiDisabled,
       provider: aiProvider,
       apiKey,
-      baseUrl: normalizeBaseUrl(baseUrl),
-      endpoint: stringValue(aiInput.endpoint || ''),
+      baseUrl: normalizeBaseUrl(rawBaseUrl, allowPrivateHosts, allowInsecureHttp),
+      endpoint: rawEndpoint ? normalizeBaseUrl(rawEndpoint, allowPrivateHosts, allowInsecureHttp) : '',
       model: stringValue(aiInput.model || 'gpt-4o-mini'),
       temperature: readNumber(aiInput.temperature, 0.2),
       maxTokens: boundedInt(aiInput.maxTokens ?? aiInput.max_tokens, 1800, 200, 12000),
@@ -226,20 +254,33 @@ function buildConfig(input, options, context) {
 }
 
 function normalizeSources(input, options, context) {
-  const explicit = input.sources || options.sources || input.source || options.source;
-  const list = Array.isArray(explicit) ? explicit : explicit ? [explicit] : [];
-  const normalized = list
-    .map(source => {
-      if (typeof source === 'string') return { type: source };
-      return isPlainObject(source) ? { ...source } : null;
-    })
-    .filter(Boolean)
-    .map(source => {
-      const type = stringValue(source.type || 'hackernews').toLowerCase();
-      if (type === 'hn') source.type = 'hackernews';
-      else source.type = type;
-      return source;
-    });
+  const fromOptions = options.sources || options.source;
+  const fromInput = input.sources || input.source;
+  const explicitList = [];
+  if (fromOptions) {
+    const list = Array.isArray(fromOptions) ? fromOptions : [fromOptions];
+    for (const item of list) {
+      if (typeof item === 'string') explicitList.push({ type: item });
+      else if (isPlainObject(item)) explicitList.push({ ...item });
+    }
+  } else if (fromInput) {
+    const list = Array.isArray(fromInput) ? fromInput : [fromInput];
+    for (const item of list) {
+      if (typeof item === 'string') explicitList.push({ type: item });
+      else if (isPlainObject(item)) {
+        const sanitized = stripUntrustedSourceNetworkFields(item);
+        if (options.apiBaseUrl || options.baseUrl) {
+          sanitized.apiBaseUrl = options.apiBaseUrl || options.baseUrl;
+        }
+        explicitList.push(sanitized);
+      }
+    }
+  }
+  const normalized = explicitList.map(source => {
+    const type = stringValue(source.type || 'hackernews').toLowerCase();
+    source.type = type === 'hn' ? 'hackernews' : type;
+    return source;
+  });
 
   const hasInlineStories = extractInlineStories(input).length > 0;
   if (!normalized.length && !hasInlineStories) {
@@ -251,8 +292,8 @@ function normalizeSources(input, options, context) {
       commentLimit: input.commentLimit ?? options.commentLimit ?? 5,
       commentDepth: input.commentDepth ?? options.commentDepth ?? 1,
       apiBaseUrl:
-        input.apiBaseUrl ||
         options.apiBaseUrl ||
+        options.baseUrl ||
         context?.env?.HACKERNEWS_API_BASE_URL ||
         'https://hacker-news.firebaseio.com/v0'
     });
@@ -271,7 +312,7 @@ async function collectStories(input, config) {
 
   const sourceResults = await mapWithConcurrency(config.sources, 4, async source => {
     if (source.type === 'hackernews') {
-      return await fetchHackerNewsSource(source);
+      return await fetchHackerNewsSource(source, config);
     } else if (source.type === 'items' || source.type === 'inline') {
       const sourceItems = extractInlineStories(source);
       const out = [];
@@ -362,10 +403,12 @@ function looksLikeStory(value) {
   return Boolean(value.id || value.url || value.href || value.link || value.score || value.commentCount);
 }
 
-async function fetchHackerNewsSource(source) {
+async function fetchHackerNewsSource(source, config) {
   ensureFetch();
   const apiBaseUrl = normalizeBaseUrl(
-    source.apiBaseUrl || source.api_base_url || source.baseUrl || 'https://hacker-news.firebaseio.com/v0'
+    source.apiBaseUrl || source.api_base_url || source.baseUrl || 'https://hacker-news.firebaseio.com/v0',
+    Boolean(config?.security?.allowPrivateHosts),
+    Boolean(config?.security?.allowInsecureHttp)
   );
   const storyTypes = normalizeStringArray(source.storyTypes || source.story_types || source.storyType || 'top');
   const limit = boundedInt(source.limit, 30, 1, 100);
@@ -580,6 +623,7 @@ async function postChatCompletion(endpoint, body, config) {
     endpoint,
     {
       method: 'POST',
+      redirect: 'manual',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${config.ai.apiKey}`
@@ -590,23 +634,28 @@ async function postChatCompletion(endpoint, body, config) {
     config.ai.retries
   );
 
-  const text = await response.text();
+  if (!response.ok) {
+    const errText = await readBoundedText(response, MAX_ERROR_BYTES, false);
+    let parsedErr = {};
+    try {
+      parsedErr = errText ? JSON.parse(errText) : {};
+    } catch {}
+    const host = requestHost(endpoint);
+    const message =
+      parsedErr?.error?.message ||
+      parsedErr?.message ||
+      (typeof parsedErr?.error === 'string' ? parsedErr.error : '') ||
+      truncate(errText, 180) ||
+      response.statusText;
+    throw new Error(`AI provider ${host} returned HTTP ${response.status}: ${message}`);
+  }
+
+  const text = await readBoundedText(response, MAX_JSON_BYTES, true);
   let parsed;
   try {
     parsed = text ? JSON.parse(text) : {};
   } catch (error) {
     throw new Error(`AI provider returned non-JSON response: ${truncate(text, 500)}`);
-  }
-
-  if (!response.ok) {
-    const host = requestHost(endpoint);
-    const message =
-      parsed?.error?.message ||
-      parsed?.message ||
-      (typeof parsed?.error === 'string' ? parsed.error : '') ||
-      truncate(text, 180) ||
-      response.statusText;
-    throw new Error(`AI provider ${host} returned HTTP ${response.status}: ${message}`);
   }
 
   const content = parsed?.choices?.[0]?.message?.content;
@@ -1062,19 +1111,8 @@ function assertSafeArticleUrl(rawUrl) {
   if (parsed.username || parsed.password) {
     throw new Error('Article URL must not include embedded credentials');
   }
-  const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
-  if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) {
+  if (isBlockedHost(parsed.hostname)) {
     throw new Error('Article URL host is not permitted');
-  }
-  if (host === '::1' || host === '::' || host.startsWith('fe80:') || host.startsWith('fc') || host.startsWith('fd')) {
-    throw new Error('Article URL host is not permitted');
-  }
-  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
-  if (ipv4) {
-    const [, a, b] = ipv4.map(Number);
-    if (a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) {
-      throw new Error('Article URL host is not permitted');
-    }
   }
   return parsed.toString();
 }
@@ -1089,29 +1127,38 @@ async function fetchArticleText(url, config) {
     config.retries
   );
   if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+    if (response?.body && typeof response.body.cancel === 'function') {
+      try { await response.body.cancel(); } catch {}
+    }
     throw new Error('Article URL redirects are not permitted');
   }
   if (!response.ok) {
+    if (response?.body && typeof response.body.cancel === 'function') {
+      try { await response.body.cancel(); } catch {}
+    }
     throw new Error(`Article fetch failed with status ${response.status}`);
   }
-  const body = await response.text();
-  if (body.length > 2 * 1024 * 1024) {
-    throw new Error('Article body exceeds 2MB size limit');
-  }
+  const body = await readBoundedText(response, MAX_ARTICLE_BYTES, true, 'Article body exceeds 2MB size limit');
   return truncate(cleanText(stripScriptsAndStyles(body)), config.maxArticleChars);
 }
 
 async function requestJson(url, timeoutMs, retries = 3) {
   const response = await requestWithRetry(
     url,
-    { method: 'GET', headers: { Accept: 'application/json' } },
+    { method: 'GET', redirect: 'manual', headers: { Accept: 'application/json' } },
     timeoutMs,
     retries
   );
+  if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+    if (response?.body && typeof response.body.cancel === 'function') {
+      try { await response.body.cancel(); } catch {}
+    }
+    throw new Error('HTTP redirects are not allowed');
+  }
   if (!response.ok) {
     let detail = '';
     try {
-      detail = truncate(await response.text(), 500);
+      detail = truncate(await readBoundedText(response, MAX_ERROR_BYTES, false), 500);
     } catch {
       detail = response.statusText || '';
     }
@@ -1120,7 +1167,11 @@ async function requestJson(url, timeoutMs, retries = 3) {
       `Request to ${requestHost(url)} failed with status ${response.status}${safeDetail ? `: ${safeDetail}` : ''}`
     );
   }
-  return await response.json();
+  if (!response?.body?.getReader && typeof response.text !== 'function' && typeof response.json === 'function') {
+    return await response.json();
+  }
+  const bodyText = await readBoundedText(response, MAX_JSON_BYTES, true);
+  return bodyText ? JSON.parse(bodyText) : null;
 }
 
 async function requestWithRetry(url, init, timeoutMs, retries) {
@@ -1129,12 +1180,24 @@ async function requestWithRetry(url, init, timeoutMs, retries) {
   while (true) {
     let retryAfterMs = null;
     try {
-      const response = await fetchWithTimeout(url, init, timeoutMs);
+      const response = await fetchWithTimeout(url, { ...init, redirect: 'manual' }, timeoutMs);
+      if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+        if (response?.body && typeof response.body.cancel === 'function') {
+          try { await response.body.cancel(); } catch {}
+        }
+        throw new Error('HTTP redirects are not allowed');
+      }
       if (response.ok || !isRetryStatus(response.status) || attempt >= maxRetries) {
         return response;
       }
       retryAfterMs = readRetryAfter(response.headers);
+      if (response?.body && typeof response.body.cancel === 'function') {
+        try { await response.body.cancel(); } catch {}
+      }
     } catch (error) {
+      if (error?.message === 'HTTP redirects are not allowed') {
+        throw error;
+      }
       const classified = classifyFetchError(url, timeoutMs, error);
       if (!classified.retryable || attempt >= maxRetries) {
         throw decorateAttemptError(classified, attempt, maxRetries);
@@ -1151,13 +1214,13 @@ async function requestWithRetry(url, init, timeoutMs, retries) {
 
 async function fetchWithTimeout(url, init, timeoutMs) {
   if (usesMaitaskRuntimeFetch()) {
-    return await fetch(url, { ...init, timeoutMs });
+    return await fetch(url, { ...init, redirect: 'manual', timeoutMs, maxResponseBytes: MAX_JSON_BYTES });
   }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    return await fetch(url, { ...init, signal: controller.signal, timeoutMs });
+    return await fetch(url, { ...init, redirect: 'manual', signal: controller.signal, timeoutMs });
   } catch (error) {
     throw classifyFetchError(url, timeoutMs, error);
   } finally {
@@ -1423,8 +1486,108 @@ function ensureFetch() {
   }
 }
 
+function isSafeKey(key) {
+  return key !== '__proto__' && key !== 'constructor' && key !== 'prototype';
+}
+
 function mergeObjects(base, override) {
-  return { ...(isPlainObject(base) ? base : {}), ...(isPlainObject(override) ? override : {}) };
+  const result = Object.create(null);
+  if (isPlainObject(base)) {
+    for (const key of Object.keys(base)) {
+      if (Object.hasOwn(base, key) && isSafeKey(key)) {
+        result[key] = base[key];
+      }
+    }
+  }
+  if (isPlainObject(override)) {
+    for (const key of Object.keys(override)) {
+      if (Object.hasOwn(override, key) && isSafeKey(key)) {
+        result[key] = override[key];
+      }
+    }
+  }
+  return result;
+}
+
+function pickSafeInputConfig(root) {
+  const out = Object.create(null);
+  if (!isPlainObject(root)) return out;
+  const blocked = new Set([
+    'apiKey',
+    'api_key',
+    'baseUrl',
+    'base_url',
+    'apiBaseUrl',
+    'api_base_url',
+    'endpoint',
+    'ai',
+    'allowPrivateHosts',
+    'allowInsecureHttp',
+    'sources',
+    'source'
+  ]);
+  for (const key of Object.keys(root)) {
+    if (Object.hasOwn(root, key) && isSafeKey(key) && !blocked.has(key)) {
+      out[key] = root[key];
+    }
+  }
+  return out;
+}
+
+function pickSafeAnalysisInput(analysis) {
+  const out = Object.create(null);
+  if (!isPlainObject(analysis)) return out;
+  for (const key of Object.keys(analysis)) {
+    if (Object.hasOwn(analysis, key) && isSafeKey(key) && key !== 'ai') {
+      out[key] = analysis[key];
+    }
+  }
+  return out;
+}
+
+function pickSafeAiBehavior(ai) {
+  const out = Object.create(null);
+  if (!isPlainObject(ai)) return out;
+  const allowed = new Set([
+    'enabled',
+    'provider',
+    'model',
+    'temperature',
+    'maxTokens',
+    'max_tokens',
+    'timeoutMs',
+    'timeout_ms',
+    'retries',
+    'retry_count',
+    'retryCount',
+    'jsonMode',
+    'json_mode'
+  ]);
+  for (const key of Object.keys(ai)) {
+    if (Object.hasOwn(ai, key) && isSafeKey(key) && allowed.has(key)) {
+      out[key] = ai[key];
+    }
+  }
+  return out;
+}
+
+function stripUntrustedSourceNetworkFields(source) {
+  const out = Object.create(null);
+  for (const key of Object.keys(source)) {
+    if (
+      Object.hasOwn(source, key) &&
+      isSafeKey(key) &&
+      key !== 'apiBaseUrl' &&
+      key !== 'api_base_url' &&
+      key !== 'baseUrl' &&
+      key !== 'base_url' &&
+      key !== 'allowPrivateHosts' &&
+      key !== 'allowInsecureHttp'
+    ) {
+      out[key] = source[key];
+    }
+  }
+  return out;
 }
 
 function isPlainObject(value) {
@@ -1469,9 +1632,148 @@ function normalizeStringArray(value) {
     .filter(Boolean);
 }
 
-function normalizeBaseUrl(value) {
+function normalizeBaseUrl(value, allowPrivateHosts = false, allowInsecureHttp = false) {
   const raw = stringValue(value);
-  return raw.replace(/\/+$/, '');
+  if (!raw) {
+    throw new Error('baseUrl must not be empty');
+  }
+  let parsed;
+  try {
+    parsed = new URL(raw);
+  } catch {
+    throw new Error('baseUrl must be a valid URL');
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error('baseUrl must not embed credentials');
+  }
+  if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && allowInsecureHttp)) {
+    throw new Error('baseUrl must use https unless allowInsecureHttp is enabled');
+  }
+  if (!allowPrivateHosts && isBlockedHost(parsed.hostname)) {
+    throw new Error('baseUrl must not point to a private or internal host');
+  }
+  return parsed.toString().replace(/\/+$/, '');
+}
+
+async function readBoundedText(response, maxBytes, throwOnLimit, limitMessage = null) {
+  if (response?.body && typeof response.body.getReader === 'function') {
+    const reader = response.body.getReader();
+    const decoder = typeof TextDecoder === 'function' ? new TextDecoder() : null;
+    let out = '';
+    let totalBytes = 0;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (!value) continue;
+        if (totalBytes + value.byteLength > maxBytes) {
+          if (throwOnLimit) {
+            throw new Error(limitMessage || `Response body exceeds ${maxBytes} byte limit`);
+          }
+          const remaining = maxBytes - totalBytes;
+          if (remaining > 0) {
+            const slice = value.subarray(0, remaining);
+            out += decoder ? decoder.decode(slice, { stream: true }) : String.fromCharCode(...slice);
+          }
+          break;
+        }
+        out += decoder ? decoder.decode(value, { stream: true }) : String.fromCharCode(...value);
+        totalBytes += value.byteLength;
+      }
+    } finally {
+      try {
+        await reader.cancel();
+      } catch {}
+    }
+    if (decoder) out += decoder.decode();
+    return out;
+  }
+  const text = await response.text();
+  if (typeof text === 'string' && text.length > maxBytes) {
+    if (throwOnLimit) {
+      throw new Error(limitMessage || `Response body exceeds ${maxBytes} byte limit`);
+    }
+    return text.slice(0, maxBytes);
+  }
+  return text || '';
+}
+
+function isBlockedHost(hostname) {
+  const normalized = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
+  if (
+    !normalized ||
+    normalized === 'localhost' ||
+    normalized === 'local' ||
+    normalized === 'internal' ||
+    normalized === 'localdomain' ||
+    normalized.endsWith('.localhost') ||
+    normalized.endsWith('.local') ||
+    normalized.endsWith('.internal') ||
+    normalized.endsWith('.localdomain')
+  ) {
+    return true;
+  }
+  if (normalized.includes(':')) {
+    const clean = normalized.split('%')[0];
+    const hextets = parseIpv6Hextets(clean);
+    if (!hextets) return true;
+    const allZero = hextets.every(part => part === 0);
+    const isLoopback = hextets.slice(0, 7).every(part => part === 0) && hextets[7] === 1;
+    if (allZero || isLoopback) return true;
+    if ((hextets[0] & 0xffc0) === 0xfe80) return true;
+    if ((hextets[0] & 0xfe00) === 0xfc00) return true;
+    if (hextets.slice(0, 5).every(part => part === 0) && hextets[5] === 0xffff) return true;
+    return false;
+  }
+  const ipv4 = normalized.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!ipv4) return false;
+  const [, a, b, c, d] = ipv4.map(Number);
+  if ([a, b, c, d].some(octet => octet < 0 || octet > 255)) return true;
+  return (
+    a === 10 ||
+    a === 127 ||
+    a === 0 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168)
+  );
+}
+
+function parseIpv6Hextets(address) {
+  const halves = address.split('::');
+  if (halves.length > 2) return null;
+  const parsePart = part => {
+    if (!part) return [];
+    const tokens = part.split(':');
+    const out = [];
+    for (let i = 0; i < tokens.length; i += 1) {
+      const token = tokens[i];
+      if (!token) return null;
+      if (token.includes('.')) {
+        if (i !== tokens.length - 1) return null;
+        const v4 = token.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+        if (!v4) return null;
+        const octets = v4.slice(1).map(Number);
+        if (octets.some(o => o < 0 || o > 255)) return null;
+        out.push((octets[0] << 8) | octets[1], (octets[2] << 8) | octets[3]);
+      } else {
+        if (!/^[0-9a-f]{1,4}$/i.test(token)) return null;
+        out.push(parseInt(token, 16));
+      }
+    }
+    return out;
+  };
+  const left = parsePart(halves[0]);
+  if (!left) return null;
+  if (halves.length === 1) {
+    return left.length === 8 ? left : null;
+  }
+  const right = parsePart(halves[1]);
+  if (!right) return null;
+  const missing = 8 - (left.length + right.length);
+  if (missing < 1) return null;
+  return [...left, ...new Array(missing).fill(0), ...right];
 }
 
 function normalizeTime(value) {

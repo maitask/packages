@@ -78,7 +78,7 @@ test('workflow composer rejects packages outside the catalog', async t => {
 
   const result = await execute(
     { description: 'Search and summarize', language: 'en', catalog },
-    { apiKey: 'fixture-key', baseUrl: `${server.url}/v1` }
+    { apiKey: 'fixture-key', baseUrl: `${server.url}/v1`, allowPrivateHosts: true }
   );
   assert.equal(result.success, false);
   assert.equal(result.error.code, 'WORKFLOW_DRAFT_INVALID');
@@ -134,7 +134,7 @@ test('workflow composer returns a reviewable graph from catalog packages', async
 
   const result = await execute(
     { description: 'Search recent sources and send a sourced briefing', language: 'en', catalog },
-    { apiKey: 'fixture-key', baseUrl: `${server.url}/v1`, model: 'gpt-fixture' }
+    { apiKey: 'fixture-key', baseUrl: `${server.url}/v1`, allowPrivateHosts: true, model: 'gpt-fixture' }
   );
 
   assert.equal(result.success, true);
