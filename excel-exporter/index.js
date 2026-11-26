@@ -10,7 +10,7 @@
  * - Multiple sheet support
  * - Auto-fit column widths
  *
- * @version 0.1.0
+ * @version 0.1.1
  * @author Maitask Team
  * @license MIT
  */
@@ -72,6 +72,7 @@ function execute(input, options = {}, context = {}) {
                 type: 'ExcelExportError'
             },
             metadata: {
+                package: '@maitask/excel-exporter',
                 exportedAt: new Date().toISOString(),
                 version: '0.1.1'
             }
@@ -158,7 +159,10 @@ function structureData(data, headers, dataType) {
 
 function csvCell(value) {
     if (value == null) return '';
-    const text = String(value);
+    let text = String(value);
+    if (/^[\t\r ]*[=+\-@]/.test(text) || text.startsWith('\t') || text.startsWith('\r')) {
+        text = `'${text}`;
+    }
     if (/[",\n\r]/.test(text)) {
         return `"${text.replace(/"/g, '""')}"`;
     }

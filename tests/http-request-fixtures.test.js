@@ -72,6 +72,8 @@ function assertFailure(result, code) {
   assert.doesNotMatch(JSON.stringify(result), SECRET_PATTERN);
 }
 
+const { version: HTTP_REQUEST_VERSION } = require('../http-request/package.json');
+
 function responseData(result) {
   assert.equal(result.success, true);
   assert.equal(result.data.items.length, 1);
@@ -113,7 +115,7 @@ test('http-request sends normalized query values and caller headers', async t =>
     url: '/resource?existing=1&search=formal+contract&page=2&active=true&tag=runtime&tag=packages',
     accept: 'application/json',
     trace: 'trace-1',
-    userAgent: '@maitask/http-request/2.0.0'
+    userAgent: `@maitask/http-request/${HTTP_REQUEST_VERSION}`
   });
   assert.deepEqual(responseData(result).body, { ok: true });
   assert.equal(result.metadata.executionId, 'execution-1');

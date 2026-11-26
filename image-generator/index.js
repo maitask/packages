@@ -2,7 +2,7 @@
  * @maitask/image-generator
  * Image generation via OpenAI or Stability AI APIs
  *
- * @version 0.1.0
+ * @version 0.1.1
  * @license MIT
  */
 
@@ -10,11 +10,15 @@ const OPENAI_URL = 'https://api.openai.com/v1/images/generations';
 const STABILITY_URL = 'https://api.stability.ai/v1/generation/stable-diffusion-xl-1024-v1-0/text-to-image';
 
 async function execute(input, options = {}, context = {}) {
+  let activeApiKey = '';
   try {
     const payload = asObject(input);
     const prompt = readRequiredString(payload.prompt, 'prompt');
     const provider = normalizeProvider(payload.provider || options.provider || 'openai');
-    const apiKey = readRequiredString(payload.apiKey || options.apiKey, 'apiKey');
+    const secrets = (context && typeof context === 'object' && context.secrets) || {};
+    const contextKey = provider === 'stability' ? secrets.STABILITY_API_KEY : secrets.OPENAI_API_KEY;
+    const apiKey = readRequiredString(options.apiKey || options.api_key || payload.apiKey || contextKey, 'apiKey');
+    activeApiKey = apiKey;
     const timeoutMs = readTimeout(payload.timeoutMs ?? options.timeoutMs);
 
     const generated =
@@ -30,12 +34,13 @@ async function execute(input, options = {}, context = {}) {
         ...generated
       },
       metadata: {
+        package: '@maitask/image-generator',
         timestamp: new Date().toISOString(),
         version: '0.1.1'
       }
     };
   } catch (error) {
-    return buildError(error, 'IMAGE_GENERATOR_ERROR', 'ImageGeneratorError');
+    return buildError(error, 'IMAGE_GENERATOR_ERROR', 'ImageGeneratorError', activeApiKey);
   }
 }
 
@@ -125,8 +130,13 @@ async function fetchJson(url, { method, headers, body, timeoutMs }) {
       method,
       headers,
       body: JSON.stringify(body),
+      redirect: 'manual',
+      timeoutMs,
       signal: controller.signal
     });
+    if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+      throw new Error('Image generation endpoint must not redirect');
+    }
 
     const text = await response.text();
     const data = tryParseJson(text);
@@ -191,15 +201,18 @@ function readTimeout(value) {
   return Math.min(timeout, 120000);
 }
 
-function buildError(error, code, type) {
+function buildError(error, code, type, secret = '') {
+  const rawMessage = error?.message || 'Unknown error';
+  const safeMessage = secret ? String(rawMessage).split(secret).join('[redacted]') : rawMessage;
   return {
     success: false,
     error: {
-      message: error?.message || 'Unknown error',
+      message: safeMessage,
       code,
       type
     },
     metadata: {
+      package: '@maitask/image-generator',
       timestamp: new Date().toISOString(),
       version: '0.1.1'
     }

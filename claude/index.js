@@ -100,9 +100,23 @@ function buildConfig(input, options, context) {
 }
 
 function buildRequestBody(input, cfg) {
-  const messages = normalizeMessages(input);
+  const rawMessages = normalizeMessages(input);
+  const msgSystemParts = [];
+  const messages = [];
+  for (const message of rawMessages) {
+    if (String(message.role || '').toLowerCase() === 'system') {
+      if (typeof message.content === 'string' && message.content.trim()) {
+        msgSystemParts.push(message.content.trim());
+      } else if (Array.isArray(message.content)) {
+        const text = extractClaudeText(message.content).trim();
+        if (text) msgSystemParts.push(text);
+      }
+      continue;
+    }
+    messages.push(message);
+  }
   if (!messages.length) {
-    throw new Error('messages or text/prompt is required');
+    throw new Error('At least one user or assistant message is required');
   }
 
   const body = {
@@ -112,7 +126,34 @@ function buildRequestBody(input, cfg) {
     stream: cfg.stream
   };
 
-  if (input.system !== undefined) body.system = input.system;
+  if (Array.isArray(input.system)) {
+    const blocks = [];
+    for (const entry of input.system) {
+      if (typeof entry === 'string') {
+        const text = entry.trim();
+        if (text) blocks.push({ type: 'text', text });
+      } else if (entry && typeof entry === 'object') {
+        blocks.push(entry);
+      }
+    }
+    for (const part of msgSystemParts) {
+      blocks.push({ type: 'text', text: part });
+    }
+    if (blocks.length > 0) {
+      body.system = blocks;
+    }
+  } else {
+    const systemParts = [];
+    if (typeof input.system === 'string' && input.system.trim()) {
+      systemParts.push(input.system.trim());
+    }
+    for (const part of msgSystemParts) {
+      systemParts.push(part);
+    }
+    if (systemParts.length > 0) {
+      body.system = systemParts.join('\n\n');
+    }
+  }
   if (input.temperature !== undefined) body.temperature = readNumber(input.temperature, undefined);
   if (input.top_p !== undefined) body.top_p = readNumber(input.top_p, undefined);
   if (input.top_k !== undefined) body.top_k = readNumber(input.top_k, undefined);
@@ -247,7 +288,13 @@ function resolveRetryDelay(attempt, retryAfterHeader) {
 
 async function parseSSE(response, onEvent) {
   if (!response.body || typeof response.body.getReader !== 'function') {
-    throw new Error('Streaming response body is unavailable');
+    const rawText = typeof response.text === 'function' ? await response.text() : '';
+    if (!rawText) return;
+    for (const frame of rawText.split(/\r?\n\r?\n/)) {
+      const event = parseSSEEvent(frame);
+      if (event) onEvent(event);
+    }
+    return;
   }
 
   const reader = response.body.getReader();
@@ -345,6 +392,7 @@ async function buildApiError(code, fallbackMessage, response, cfg) {
 }
 
 function buildSuccess(data, cfg) {
+  const usage = normalizeUsage(data?.usage);
   return {
     success: true,
     data,
@@ -353,8 +401,35 @@ function buildSuccess(data, cfg) {
       version: PACKAGE_VERSION,
       provider: 'anthropic',
       model: cfg.model,
+      usage,
       timestamp: new Date().toISOString()
     }
+  };
+}
+
+function normalizeUsage(usage) {
+  if (!usage || typeof usage !== 'object') {
+    return {
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0
+    };
+  }
+  const promptTokens = Number(usage.inputTokens ?? usage.input_tokens ?? usage.promptTokens ?? usage.prompt_tokens ?? 0);
+  const completionTokens = Number(
+    usage.outputTokens ?? usage.output_tokens ?? usage.completionTokens ?? usage.completion_tokens ?? 0
+  );
+  const totalTokens = Number(usage.totalTokens ?? usage.total_tokens ?? promptTokens + completionTokens);
+  return {
+    prompt_tokens: promptTokens,
+    completion_tokens: completionTokens,
+    total_tokens: totalTokens,
+    promptTokens,
+    completionTokens,
+    totalTokens
   };
 }
 

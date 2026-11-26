@@ -10,7 +10,7 @@
  * - Dry run mode for preview
  * - Type inference and column mapping
  *
- * @version 0.1.0
+ * @version 0.1.1
  * @author Maitask Team
  * @license MIT
  */
@@ -23,8 +23,9 @@
  * @returns {Object} Import result with row counts and table info
  */
 async function execute(input, options, context) {
+    var config = null;
     try {
-        var config = buildConfig(input, options, context);
+        config = buildConfig(input, options, context);
         var csvContent = extractCsvContent(input);
         if (!csvContent) {
             throw new Error('Input CSV content is required');
@@ -83,9 +84,9 @@ async function execute(input, options, context) {
         return {
             success: false,
             error: {
-                message: error.message || 'NocoDB import failed',
+                message: redactSecrets(error && error.message ? error.message : 'NocoDB import failed', collectSecrets(config, options, context)),
                 code: 'NOCODB_IMPORT_ERROR',
-                type: error.name || 'NocoDBImportError'
+                type: (error && error.name) || 'NocoDBImportError'
             },
             metadata: {
                 package: '@maitask/nocodb-importer',
@@ -98,24 +99,24 @@ async function execute(input, options, context) {
 }
 
 function buildConfig(input, options, context) {
-    var source = isPlainObject(options) ? options : {};
-    if (input && isPlainObject(input.options)) {
-        source = mergeObjects(source, input.options);
-    }
-    if (context && isPlainObject(context.defaults)) {
-        source = mergeObjects(context.defaults, source);
-    }
+    var trustedOptions = isPlainObject(options) ? options : {};
+    var inputOptions = (input && isPlainObject(input.options)) ? input.options : {};
+    var defaults = (context && isPlainObject(context.defaults)) ? context.defaults : {};
+    var secrets = (context && isPlainObject(context.secrets)) ? context.secrets : {};
 
-    var baseUrl = source.baseUrl || source.base_url;
-    var token = source.token || source.apiToken || source.api_key;
-    var baseId = source.baseId || source.projectId || source.project;
-    var tableName = source.tableName || source.table || source.name;
+    var baseUrlRaw = trustedOptions.baseUrl || trustedOptions.base_url || defaults.baseUrl || defaults.base_url;
+    var baseUrl = validateNocoDbBaseUrl(baseUrlRaw);
+    var token =
+        trustedOptions.token ||
+        trustedOptions.apiToken ||
+        trustedOptions.api_key ||
+        secrets.NOCODB_API_TOKEN ||
+        secrets.NOCODB_TOKEN;
+    var baseId = trustedOptions.baseId || trustedOptions.projectId || trustedOptions.project || inputOptions.baseId || defaults.baseId;
+    var tableName = trustedOptions.tableName || trustedOptions.table || trustedOptions.name || inputOptions.tableName || defaults.tableName;
 
-    if (!baseUrl) {
-        throw new Error('NocoDB baseUrl is required');
-    }
     if (!token) {
-        throw new Error('NocoDB token is required');
+        throw new Error('NocoDB token is required (options.token or context.secrets.NOCODB_API_TOKEN)');
     }
     if (!baseId) {
         throw new Error('NocoDB baseId is required');
@@ -125,16 +126,36 @@ function buildConfig(input, options, context) {
     }
 
     return {
-        baseUrl: trimTrailingSlash(baseUrl),
-        token: token,
-        baseId: baseId,
-        tableName: tableName,
-        delimiter: source.delimiter || ',',
-        previewRows: source.previewRows || 5,
-        dryRun: Boolean(source.dryRun),
-        inferTypes: source.inferTypes !== false,
-        fallbackColumnType: source.defaultColumnType || 'SingleLineText'
+        baseUrl: baseUrl,
+        token: String(token),
+        baseId: String(baseId),
+        tableName: String(tableName),
+        delimiter: inputOptions.delimiter || trustedOptions.delimiter || defaults.delimiter || ',',
+        previewRows: Math.min(Math.max(Number(inputOptions.previewRows || trustedOptions.previewRows || defaults.previewRows || 5), 1), 100),
+        dryRun: Boolean(trustedOptions.dryRun ?? inputOptions.dryRun ?? defaults.dryRun),
+        inferTypes: (trustedOptions.inferTypes ?? inputOptions.inferTypes ?? defaults.inferTypes) !== false,
+        fallbackColumnType: inputOptions.defaultColumnType || trustedOptions.defaultColumnType || defaults.defaultColumnType || 'SingleLineText',
+        timeoutMs: Math.min(Math.max(Number(trustedOptions.timeoutMs || defaults.timeoutMs || 30000), 1000), 120000)
     };
+}
+
+function validateNocoDbBaseUrl(rawUrl) {
+    if (!rawUrl || typeof rawUrl !== 'string') {
+        throw new Error('NocoDB baseUrl is required');
+    }
+    var parsed;
+    try {
+        parsed = new URL(rawUrl.trim());
+    } catch (_err) {
+        throw new Error('NocoDB baseUrl must be a valid URL');
+    }
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        throw new Error('NocoDB baseUrl must use http or https');
+    }
+    if (parsed.username || parsed.password || parsed.search || parsed.hash) {
+        throw new Error('NocoDB baseUrl must not include credentials, query, or fragment');
+    }
+    return trimTrailingSlash(parsed.toString());
 }
 
 function extractCsvContent(input) {
@@ -209,8 +230,17 @@ function parseCsv(content, delimiter, inferTypes) {
         var row = rows[r];
         var record = {};
         for (var c = 0; c < columns.length; c++) {
+            var columnName = columns[c];
+            if (columnName === '__proto__' || columnName === 'constructor' || columnName === 'prototype') {
+                throw new Error('Unsafe CSV column header: ' + columnName);
+            }
             var cell = row[c] !== undefined ? row[c] : '';
-            record[columns[c]] = inferTypes ? inferValue(cell) : cell;
+            Object.defineProperty(record, columnName, {
+                value: inferTypes ? inferValue(cell) : cell,
+                enumerable: true,
+                writable: true,
+                configurable: true
+            });
         }
         objects.push(record);
     }
@@ -239,8 +269,8 @@ async function ensureTable(config, columns, headers) {
 
 async function listTables(config, headers) {
     var url = config.baseUrl + '/api/v2/meta/bases/' + encodeURIComponent(config.baseId) + '/tables';
-    var response = await request('GET', url, { headers: headers });
-    validateResponse(response, url);
+    var response = await request('GET', url, { headers: headers, timeoutMs: config.timeoutMs });
+    validateResponse(response);
     if (response.data && Array.isArray(response.data.list)) {
         return response.data.list;
     }
@@ -258,8 +288,8 @@ async function createTable(config, columnDefinitions, headers) {
         columns: columnDefinitions
     };
 
-    var response = await request('POST', url, { headers: withJson(headers), json: payload });
-    validateResponse(response, url);
+    var response = await request('POST', url, { headers: withJson(headers), json: payload, timeoutMs: config.timeoutMs });
+    validateResponse(response);
 }
 
 async function importRows(config, tableMeta, rows, headers) {
@@ -277,12 +307,12 @@ async function importRows(config, tableMeta, rows, headers) {
 
     for (var i = 0; i < bulkEndpoints.length; i++) {
         try {
-            var response = await request('POST', bulkEndpoints[i], { headers: withJson(headers), json: body });
+            var response = await request('POST', bulkEndpoints[i], { headers: withJson(headers), json: body, timeoutMs: config.timeoutMs });
             if (response.status && response.status >= 400) {
-                lastError = 'HTTP ' + response.status + ' at ' + bulkEndpoints[i];
+                lastError = 'HTTP ' + response.status + ' from NocoDB bulk endpoint';
                 continue;
             }
-            return response.data || { status: response.status, endpoint: bulkEndpoints[i] };
+            return response.data || { status: response.status, endpoint: safeEndpointPath(bulkEndpoints[i]) };
         } catch (err) {
             lastError = err.message;
         }
@@ -333,39 +363,91 @@ async function request(method, url, options) {
         return httpGet(url, options || {});
     }
     if (typeof fetch === 'function') {
-        var init = { method: method, headers: (options && options.headers) || {} };
+        var timeoutMs = (options && options.timeoutMs) || 30000;
+        var init = {
+            method: method,
+            headers: mergeObjects({}, (options && options.headers) || {}),
+            redirect: 'manual',
+            timeoutMs: timeoutMs
+        };
         if (options && options.json !== undefined) {
             init.headers['Content-Type'] = 'application/json';
             init.body = JSON.stringify(options.json);
         } else if (options && options.body !== undefined) {
             init.body = options.body;
         }
-        var res = await fetch(url, init);
-        var text = await res.text();
-        var data = null;
+        var controller = new AbortController();
+        init.signal = controller.signal;
+        var timer = setTimeout(function () { controller.abort(); }, timeoutMs);
         try {
-            data = text ? JSON.parse(text) : null;
-        } catch (err) {
-            data = text;
+            var res = await fetch(url, init);
+            if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) {
+                throw new Error('NocoDB endpoint must not redirect');
+            }
+            var text = await res.text();
+            if (text.length > 5 * 1024 * 1024) {
+                throw new Error('NocoDB response exceeds 5MB limit');
+            }
+            var data = null;
+            try {
+                data = text ? JSON.parse(text) : null;
+            } catch (_err) {
+                data = text;
+            }
+            return {
+                ok: res.ok,
+                status: res.status,
+                statusText: res.statusText,
+                body: text,
+                data: data
+            };
+        } finally {
+            clearTimeout(timer);
         }
-        return {
-            ok: res.ok,
-            status: res.status,
-            statusText: res.statusText,
-            body: text,
-            data: data
-        };
     }
     throw new Error('No HTTP client available');
 }
 
-function validateResponse(response, url) {
+function validateResponse(response) {
     if (!response) {
-        throw new Error('Empty response from ' + url);
+        throw new Error('Empty response from NocoDB endpoint');
     }
     if (response.status && response.status >= 400) {
-        throw new Error('Request to ' + url + ' failed with status ' + response.status);
+        throw new Error('NocoDB request failed with status ' + response.status);
     }
+}
+
+function safeEndpointPath(url) {
+    try {
+        return new URL(url).pathname;
+    } catch (_err) {
+        return '/nocodb';
+    }
+}
+
+function collectSecrets(config, options, context) {
+    var list = [];
+    if (config && config.token) list.push(String(config.token));
+    if (options && typeof options === 'object') {
+        if (options.token) list.push(String(options.token));
+        if (options.apiToken) list.push(String(options.apiToken));
+        if (options.api_key) list.push(String(options.api_key));
+    }
+    if (context && context.secrets && typeof context.secrets === 'object') {
+        if (context.secrets.NOCODB_API_TOKEN) list.push(String(context.secrets.NOCODB_API_TOKEN));
+        if (context.secrets.NOCODB_TOKEN) list.push(String(context.secrets.NOCODB_TOKEN));
+    }
+    return list;
+}
+
+function redactSecrets(message, secrets) {
+    var text = String(message || 'NocoDB import failed');
+    for (var i = 0; i < (secrets || []).length; i++) {
+        if (secrets[i]) {
+            text = text.split(secrets[i]).join('[redacted]');
+        }
+    }
+    return text.replace(/[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/gi, '[redacted-url]');
 }
 
 function withJson(headers) {

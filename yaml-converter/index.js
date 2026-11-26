@@ -9,7 +9,7 @@
  * - Indentation control
  * - Type preservation
  *
- * @version 0.1.0
+ * @version 0.1.1
  * @author Maitask Team
  * @license MIT
  */
@@ -193,14 +193,17 @@ function parseYamlLines(lines, start, parentIndent) {
             const colonIndex = trimmed.indexOf(':');
             const key = trimmed.slice(0, colonIndex).trim();
             const value = trimmed.slice(colonIndex + 1).trim();
+            if (key === '__proto__' || key === 'constructor' || key === 'prototype') {
+                throw new Error(`Unsafe YAML mapping key: ${key}`);
+            }
 
             if (!value || value === '') {
                 const nested = parseYamlLines(lines, i + 1, indent);
-                current[key] = nested.value;
+                Object.defineProperty(current, key, { value: nested.value, enumerable: true, writable: true, configurable: true });
                 i = nested.nextLine;
             } else {
                 const parsed = parseValue(value);
-                current[key] = parsed.value;
+                Object.defineProperty(current, key, { value: parsed.value, enumerable: true, writable: true, configurable: true });
                 i++;
             }
         } else {

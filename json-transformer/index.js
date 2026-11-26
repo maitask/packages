@@ -9,7 +9,7 @@
  * - Array operations
  * - Deep object manipulation
  *
- * @version 0.1.0
+ * @version 0.1.1
  * @author Maitask Team
  * @license MIT
  */
@@ -386,19 +386,30 @@ function extractFromObject(obj, fields) {
 /**
  * Set nested value using dot notation
  */
+function isSafePathKey(key) {
+    return key !== '__proto__' && key !== 'constructor' && key !== 'prototype';
+}
+
 function setNestedValue(obj, path, value) {
     const parts = path.split('.');
     let current = obj;
 
     for (let i = 0; i < parts.length - 1; i++) {
         const part = parts[i];
-        if (!(part in current)) {
-            current[part] = {};
+        if (!isSafePathKey(part)) {
+            throw new Error(`Unsafe property key: ${part}`);
+        }
+        if (!Object.hasOwn(current, part) || typeof current[part] !== 'object' || current[part] === null) {
+            Object.defineProperty(current, part, { value: {}, enumerable: true, writable: true, configurable: true });
         }
         current = current[part];
     }
 
-    current[parts[parts.length - 1]] = value;
+    const lastPart = parts[parts.length - 1];
+    if (!isSafePathKey(lastPart)) {
+        throw new Error(`Unsafe property key: ${lastPart}`);
+    }
+    Object.defineProperty(current, lastPart, { value, enumerable: true, writable: true, configurable: true });
 }
 
 /**

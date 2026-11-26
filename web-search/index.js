@@ -507,26 +507,16 @@ function isValidUrl(url) {
 }
 
 function isAdResult(url, title) {
-    // Check for promotional, sponsored or ad labels in title/text
-    var adIndicators = [
-        'ad', 'sponsored', 'promoted', 'advertisement',
-        'paid', 'partner', 'shop', 'buy', 'price', 'coupon'
-    ];
-
-    var lowerTitle = title.toLowerCase();
-    for (var i = 0; i < adIndicators.length; i++) {
-        if (lowerTitle.indexOf(adIndicators[i]) !== -1) {
-            return true;
-        }
+    if (/\b(?:ad|ads|sponsored|promoted|advertisement|paid partner|coupon)\b/i.test(String(title || ''))) {
+        return true;
     }
 
-    // Check if URL indicates an ad/tracking domain
     var adDomains = [
         'doubleclick.net', 'googlesyndication.com', 'googleadservices.com',
-        'amazon-adsystem.com', 'facebook.com/tr', 'track', 'click'
+        'amazon-adsystem.com', 'facebook.com/tr', '/track?', '/click?'
     ];
 
-    var lowerUrl = url.toLowerCase();
+    var lowerUrl = String(url || '').toLowerCase();
     for (var j = 0; j < adDomains.length; j++) {
         if (lowerUrl.indexOf(adDomains[j]) !== -1) {
             return true;

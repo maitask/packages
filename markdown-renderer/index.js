@@ -1,26 +1,12 @@
 /**
  * @maitask/markdown-renderer
- * Markdown to HTML converter with template support
+ * Markdown to HTML converter with safe links, code-block preservation, and template support.
  *
- * Features:
- * - Convert Markdown to HTML
- * - Template rendering
- * - Code blocks with language class emission
- * - Table support
- * - Lists and nested structures
- *
- * @version 0.1.0
+ * @version 0.1.1
  * @author Maitask Team
  * @license MIT
  */
 
-/**
- * Main execution function
- * @param {Object} input - Input markdown content
- * @param {Object} options - Rendering options
- * @param {Object} context - Execution context
- * @returns {Object} Rendered HTML
- */
 function execute(input, options = {}, context = {}) {
     try {
         const markdown = ensureMarkdown(input);
@@ -65,14 +51,11 @@ function execute(input, options = {}, context = {}) {
     }
 }
 
-if (typeof module !== "undefined") {
-  module.exports = { execute };
+if (typeof module !== 'undefined') {
+    module.exports = { execute };
 }
 execute;
 
-/**
- * Ensure input is markdown string
- */
 function ensureMarkdown(input) {
     if (typeof input === 'string') {
         return input;
@@ -89,24 +72,44 @@ function ensureMarkdown(input) {
     throw new Error('Invalid input: string or {text} expected');
 }
 
-/**
- * Render markdown to HTML
- */
 function renderHtml(markdown, options = {}) {
-    let html = markdown;
+    const codeTokens = [];
+    const reserveToken = htmlSnippet => {
+        const idx = codeTokens.length;
+        codeTokens.push(htmlSnippet);
+        return `@@MAITASK_CODE_${idx}@@`;
+    };
 
-    html = processCodeBlocks(html);
-    html = processInlineCode(html);
+    let html = String(markdown).replace(/\r\n/g, '\n');
+
+    html = html.replace(/```([A-Za-z0-9_-]+)?\n([\s\S]*?)```/g, (_match, lang, code) => {
+        const escaped = escapeHtml(code.trimEnd());
+        const safeLang = lang ? escapeHtmlAttr(lang) : '';
+        const language = safeLang ? ` class="language-${safeLang}"` : '';
+        return reserveToken(`<pre><code${language}>${escaped}</code></pre>`);
+    });
+
+    html = html.replace(/`([^`\n]+)`/g, (_match, code) => reserveToken(`<code>${escapeHtml(code)}</code>`));
+
+    if (options.sanitize !== false) {
+        html = escapeHtml(html);
+    }
+
+    html = processImages(html);
+    html = processLinks(html);
     html = processHeadings(html);
     html = processBold(html);
     html = processItalic(html);
-    html = processLinks(html);
-    html = processImages(html);
     html = processBlockquotes(html);
     html = processHorizontalRules(html);
     html = processLists(html);
     html = processTables(html);
     html = processParagraphs(html);
+
+    html = html.replace(/@@MAITASK_CODE_(\d+)@@/g, (_match, rawIndex) => {
+        const idx = Number(rawIndex);
+        return Number.isInteger(idx) && idx >= 0 && idx < codeTokens.length ? codeTokens[idx] : '';
+    });
 
     if (options.template) {
         html = applyTemplate(html, options.template, options.templateVars || {});
@@ -115,19 +118,16 @@ function renderHtml(markdown, options = {}) {
     return html;
 }
 
-/**
- * Render markdown to plain text
- */
 function renderPlain(markdown) {
-    let text = markdown;
+    let text = String(markdown);
 
     text = text.replace(/```[\s\S]*?```/g, '');
     text = text.replace(/`([^`]+)`/g, '$1');
     text = text.replace(/#{1,6}\s+/g, '');
     text = text.replace(/\*\*([^*]+)\*\*/g, '$1');
     text = text.replace(/\*([^*]+)\*/g, '$1');
-    text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
     text = text.replace(/!\[([^\]]*)\]\([^)]+\)/g, '$1');
+    text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
     text = text.replace(/^>\s+/gm, '');
     text = text.replace(/^[-*+]\s+/gm, '');
     text = text.replace(/^\d+\.\s+/gm, '');
@@ -135,68 +135,59 @@ function renderPlain(markdown) {
     return text.trim();
 }
 
-/**
- * Process code blocks
- */
-function processCodeBlocks(text) {
-    return text.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
-        const escaped = escapeHtml(code.trim());
-        const language = lang ? ` class="language-${lang}"` : '';
-        return `<pre><code${language}>${escaped}</code></pre>`;
-    });
+function sanitizeSafeUrl(rawUrl, allowDataImage = false) {
+    const trimmed = String(rawUrl || '').trim().replace(/[\u0000-\u0020\u007f]/g, '');
+    if (!trimmed) return '#';
+    if (trimmed.startsWith('#') || (trimmed.startsWith('/') && !trimmed.startsWith('//'))) {
+        return trimmed;
+    }
+    if (allowDataImage && /^data:image\/(?:png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+/=]+$/i.test(trimmed)) {
+        return trimmed;
+    }
+    try {
+        const parsed = new URL(trimmed);
+        if (parsed.protocol === 'http:' || parsed.protocol === 'https:' || parsed.protocol === 'mailto:') {
+            return parsed.toString();
+        }
+    } catch {
+        // Reject unparseable or dangerous schemes (e.g. javascript:, vbscript:, data:text/html)
+    }
+    return '#';
 }
 
-/**
- * Process inline code
- */
-function processInlineCode(text) {
-    return text.replace(/`([^`]+)`/g, '<code>$1</code>');
-}
-
-/**
- * Process headings
- */
 function processHeadings(text) {
-    return text.replace(/^(#{1,6})\s+(.+)$/gm, (match, hashes, content) => {
+    return text.replace(/^(#{1,6})\s+(.+)$/gm, (_match, hashes, content) => {
         const level = hashes.length;
-        const id = content.toLowerCase().replace(/[^\w]+/g, '-');
-        return `<h${level} id="${id}">${content}</h${level}>`;
+        const id = content.toLowerCase().replace(/[^\w]+/g, '-').replace(/^-|-$/g, '');
+        return `<h${level} id="${escapeHtmlAttr(id)}">${content}</h${level}>`;
     });
 }
 
-/**
- * Process bold text
- */
 function processBold(text) {
     return text.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
                .replace(/__([^_]+)__/g, '<strong>$1</strong>');
 }
 
-/**
- * Process italic text
- */
 function processItalic(text) {
     return text.replace(/\*([^*]+)\*/g, '<em>$1</em>')
-               .replace(/_([^_]+)_/g, '<em>$1</em>');
+               .replace(/\b_([^_]+)_\b/g, '<em>$1</em>');
 }
 
-/**
- * Process links
- */
 function processLinks(text) {
-    return text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>');
+    return text.replace(/\[([^\]]+)\]\(((?:[^()\s]+|\([^()\s]*\))+)\)/g, (_match, label, href) => {
+        const safeHref = escapeHtmlAttr(sanitizeSafeUrl(unescapeHtmlBasic(href), false));
+        return `<a href="${safeHref}">${label}</a>`;
+    });
 }
 
-/**
- * Process images
- */
 function processImages(text) {
-    return text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" />');
+    return text.replace(/!\[([^\]]*)\]\(((?:[^()\s]+|\([^()\s]*\))+)\)/g, (_match, alt, src) => {
+        const safeSrc = escapeHtmlAttr(sanitizeSafeUrl(unescapeHtmlBasic(src), true));
+        const safeAlt = escapeHtmlAttr(alt);
+        return `<img src="${safeSrc}" alt="${safeAlt}" />`;
+    });
 }
 
-/**
- * Process blockquotes
- */
 function processBlockquotes(text) {
     const lines = text.split('\n');
     const result = [];
@@ -204,9 +195,9 @@ function processBlockquotes(text) {
     let blockquoteLines = [];
 
     for (const line of lines) {
-        if (line.trim().startsWith('>')) {
+        if (/^(&gt;|>)/.test(line.trim())) {
             inBlockquote = true;
-            blockquoteLines.push(line.replace(/^>\s?/, ''));
+            blockquoteLines.push(line.replace(/^(?:&gt;|>)\s?/, ''));
         } else {
             if (inBlockquote) {
                 result.push(`<blockquote>${blockquoteLines.join('\n')}</blockquote>`);
@@ -224,16 +215,10 @@ function processBlockquotes(text) {
     return result.join('\n');
 }
 
-/**
- * Process horizontal rules
- */
 function processHorizontalRules(text) {
     return text.replace(/^([-*_])\1{2,}$/gm, '<hr />');
 }
 
-/**
- * Process lists
- */
 function processLists(text) {
     const lines = text.split('\n');
     const result = [];
@@ -283,17 +268,11 @@ function processLists(text) {
     return result.join('\n');
 }
 
-/**
- * Close list and return HTML
- */
 function closeList(type, items) {
     const itemsHtml = items.map(item => `  <li>${item}</li>`).join('\n');
     return `<${type}>\n${itemsHtml}\n</${type}>`;
 }
 
-/**
- * Process tables
- */
 function processTables(text) {
     const lines = text.split('\n');
     const result = [];
@@ -301,7 +280,7 @@ function processTables(text) {
     let tableLines = [];
 
     for (const line of lines) {
-        if (line.includes('|')) {
+        if (line.includes('|') && !/^@@MAITASK_CODE_\d+@@$/.test(line.trim())) {
             inTable = true;
             tableLines.push(line);
         } else {
@@ -321,9 +300,6 @@ function processTables(text) {
     return result.join('\n');
 }
 
-/**
- * Render table from lines
- */
 function renderTable(lines) {
     if (lines.length < 2) return lines.join('\n');
 
@@ -358,9 +334,6 @@ function renderTable(lines) {
     return html;
 }
 
-/**
- * Process paragraphs
- */
 function processParagraphs(text) {
     const lines = text.split('\n');
     const result = [];
@@ -368,14 +341,15 @@ function processParagraphs(text) {
     let paragraphLines = [];
 
     for (const line of lines) {
-        if (line.trim() === '') {
+        const trimmed = line.trim();
+        if (trimmed === '') {
             if (inParagraph) {
                 result.push(`<p>${paragraphLines.join(' ')}</p>`);
                 paragraphLines = [];
                 inParagraph = false;
             }
             result.push('');
-        } else if (line.trim().startsWith('<')) {
+        } else if (trimmed.startsWith('<') || /^@@MAITASK_CODE_\d+@@$/.test(trimmed)) {
             if (inParagraph) {
                 result.push(`<p>${paragraphLines.join(' ')}</p>`);
                 paragraphLines = [];
@@ -384,7 +358,7 @@ function processParagraphs(text) {
             result.push(line);
         } else {
             inParagraph = true;
-            paragraphLines.push(line.trim());
+            paragraphLines.push(trimmed);
         }
     }
 
@@ -395,33 +369,43 @@ function processParagraphs(text) {
     return result.join('\n');
 }
 
-/**
- * Apply HTML template
- */
 function applyTemplate(content, template, vars) {
-    let html = template;
-
-    html = html.replace(/\{\{content\}\}/g, content);
-
-    for (const [key, value] of Object.entries(vars)) {
-        const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
-        html = html.replace(regex, value);
-    }
-
-    return html;
+    const safeVars = vars && typeof vars === 'object' ? vars : {};
+    return String(template).replace(/\{\{([^}]+)\}\}/g, (match, rawKey) => {
+        const key = rawKey.trim();
+        if (key === 'content') return content;
+        if (Object.hasOwn(safeVars, key) && key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
+            return escapeHtml(String(safeVars[key]));
+        }
+        return match;
+    });
 }
 
-/**
- * Escape HTML entities
- */
+function unescapeHtmlBasic(text) {
+    return String(text)
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'");
+}
+
+function escapeHtmlAttr(text) {
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
 function escapeHtml(text) {
     const map = {
         '&': '&amp;',
         '<': '&lt;',
         '>': '&gt;',
         '"': '&quot;',
-        "'": '&#039;'
+        "'": '&#39;'
     };
-
-    return text.replace(/[&<>"']/g, m => map[m]);
+    return String(text).replace(/[&<>"']/g, char => map[char]);
 }

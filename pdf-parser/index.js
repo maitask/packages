@@ -1,9 +1,9 @@
 /**
  * @maitask/pdf-parser
- * Extract Info metadata and uncompressed text operators from PDF bytes.
+ * Extract Info metadata, uncompressed text streams, and FlateDecode compressed text streams from PDF bytes.
  *
- * Encrypted files fail closed. FlateDecode and other filtered streams are
- * counted and skipped; this extractor does not inflate compressed content.
+ * Encrypted files fail closed. FlateDecode streams are decompressed in pure JavaScript;
+ * unsupported non-Flate compressed filters remain skipped and counted cleanly.
  */
 
 const PACKAGE_NAME = '@maitask/pdf-parser';
@@ -32,7 +32,8 @@ function execute(input, options = {}, context = {}) {
     }
 
     const streams = inspectStreams(source);
-    const text = truncateText(extractUncompressedText(source), config.maxTextLength);
+    const extracted = extractStreamTexts(source, config.maxTextLength);
+    const text = truncateText(extracted.text, config.maxTextLength);
     const info = extractInfoDictionary(source);
 
     return {
@@ -41,12 +42,13 @@ function execute(input, options = {}, context = {}) {
         text,
         pages: countPages(source),
         uncompressedStreams: streams.uncompressed,
-        compressedStreamsSkipped: streams.compressed,
+        decompressedStreams: extracted.decompressedStreams,
+        compressedStreamsSkipped: extracted.unsupportedStreams,
         metadata: info
       },
       metadata: {
         package: PACKAGE_NAME,
-        extractor: 'uncompressed-pdf',
+        extractor: extracted.decompressedStreams > 0 ? 'flate-and-uncompressed-pdf' : 'uncompressed-pdf',
         timestamp: new Date().toISOString(),
         version: PACKAGE_VERSION
       }
@@ -136,20 +138,208 @@ function inspectStreams(source) {
   return { uncompressed, compressed };
 }
 
-function extractUncompressedText(source) {
+function extractStreamTexts(source, maxBytes = 2_000_000) {
   const texts = [];
-  const pattern = /<<([\s\S]*?)>>\s*stream\r?\n?([\s\S]*?)endstream/g;
+  let decompressedStreams = 0;
+  let unsupportedStreams = 0;
+  const pattern = /<<([\s\S]*?)>>\s*stream\r?\n?([\s\S]*?)\r?\n?endstream/g;
   let match;
   while ((match = pattern.exec(source))) {
-    if (/\/Filter\b/.test(match[1])) continue;
-    const extracted = extractTextOperators(match[2]);
-    if (extracted) texts.push(extracted);
+    const dict = match[1];
+    const body = match[2];
+    const hasFilter = /\/Filter\b/.test(dict);
+    if (!hasFilter) {
+      const extracted = extractTextOperators(body);
+      if (extracted) texts.push(extracted);
+      continue;
+    }
+    const isFlateOnly =
+      /\/Filter\s*(?:\[\s*)?\/FlateDecode\b/.test(dict) &&
+      !/\/(ASCIIHexDecode|ASCII85Decode|LZWDecode|RunLengthDecode|CCITTFaxDecode|JBIG2Decode|DCTDecode|JPXDecode)\b/.test(dict);
+    if (!isFlateOnly) {
+      unsupportedStreams += 1;
+      continue;
+    }
+    try {
+      const inflatedBytes = inflateZlib(stringToBytes(body), Math.min(maxBytes * 4, 8_000_000));
+      decompressedStreams += 1;
+      const inflatedText = bytesToLatin1(inflatedBytes);
+      const extracted = extractTextOperators(inflatedText);
+      if (extracted) texts.push(extracted);
+    } catch {
+      unsupportedStreams += 1;
+    }
   }
   if (texts.length === 0) {
     const fallback = extractTextOperators(source);
     if (fallback) texts.push(fallback);
   }
-  return texts.join('\n').trim();
+  return {
+    text: texts.join('\n').trim(),
+    decompressedStreams,
+    unsupportedStreams
+  };
+}
+
+function inflateZlib(bytes, maxOutBytes) {
+  if (!bytes || bytes.length < 6) {
+    throw new Error('Truncated zlib stream');
+  }
+  const cmf = bytes[0];
+  const flg = bytes[1];
+  if ((cmf & 0x0f) !== 8 || ((cmf << 8) | flg) % 31 !== 0) {
+    throw new Error('Invalid zlib header');
+  }
+  let pos = 2;
+  if (flg & 0x20) pos += 4;
+  return inflateRaw(bytes, pos, maxOutBytes);
+}
+
+function inflateRaw(bytes, startPos, maxOutBytes) {
+  let bytePos = startPos;
+  let bitBuf = 0;
+  let bitCount = 0;
+  const out = [];
+
+  const readBits = n => {
+    while (bitCount < n) {
+      if (bytePos >= bytes.length) throw new Error('Unexpected end of deflate stream');
+      bitBuf |= (bytes[bytePos++] & 0xff) << bitCount;
+      bitCount += 8;
+    }
+    const val = bitBuf & ((1 << n) - 1);
+    bitBuf >>>= n;
+    bitCount -= n;
+    return val;
+  };
+
+  const buildTree = lengths => {
+    const maxLen = Math.max(...lengths, 0);
+    const blCount = new Array(maxLen + 1).fill(0);
+    for (const len of lengths) if (len > 0) blCount[len]++;
+    const nextCode = new Array(maxLen + 1).fill(0);
+    let code = 0;
+    for (let bits = 1; bits <= maxLen; bits++) {
+      code = (code + blCount[bits - 1]) << 1;
+      nextCode[bits] = code;
+    }
+    const table = new Map();
+    for (let sym = 0; sym < lengths.length; sym++) {
+      const len = lengths[sym];
+      if (len > 0) {
+        const c = nextCode[len]++;
+        table.set(`${len}:${c}`, sym);
+      }
+    }
+    return { table, maxLen };
+  };
+
+  const decodeSym = tree => {
+    let code = 0;
+    for (let len = 1; len <= tree.maxLen; len++) {
+      code = (code << 1) | readBits(1);
+      const sym = tree.table.get(`${len}:${code}`);
+      if (sym !== undefined) return sym;
+    }
+    throw new Error('Invalid Huffman symbol in deflate stream');
+  };
+
+  const FIXED_LIT = (() => {
+    const lens = new Array(288);
+    for (let i = 0; i <= 143; i++) lens[i] = 8;
+    for (let i = 144; i <= 255; i++) lens[i] = 9;
+    for (let i = 256; i <= 279; i++) lens[i] = 7;
+    for (let i = 280; i <= 287; i++) lens[i] = 8;
+    return buildTree(lens);
+  })();
+  const FIXED_DIST = buildTree(new Array(32).fill(5));
+  const LEN_BASE = [3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258];
+  const LEN_EXTRA = [0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+  const DIST_BASE = [1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577];
+  const DIST_EXTRA = [0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+  const CL_ORDER = [16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];
+
+  let bfinal = 0;
+  do {
+    bfinal = readBits(1);
+    const btype = readBits(2);
+    if (btype === 0) {
+      bitBuf = 0;
+      bitCount = 0;
+      if (bytePos + 4 > bytes.length) throw new Error('Truncated stored block');
+      const len = bytes[bytePos] | (bytes[bytePos + 1] << 8);
+      const nlen = bytes[bytePos + 2] | (bytes[bytePos + 3] << 8);
+      bytePos += 4;
+      if ((len ^ 0xffff) !== nlen || bytePos + len > bytes.length) {
+        throw new Error('Corrupt stored deflate block');
+      }
+      if (out.length + len > maxOutBytes) throw new Error('Decompressed PDF stream exceeds limit');
+      for (let i = 0; i < len; i++) out.push(bytes[bytePos++]);
+      continue;
+    }
+
+    let litTree = FIXED_LIT;
+    let distTree = FIXED_DIST;
+    if (btype === 2) {
+      const hlit = readBits(5) + 257;
+      const hdist = readBits(5) + 1;
+      const hclen = readBits(4) + 4;
+      const clLens = new Array(19).fill(0);
+      for (let i = 0; i < hclen; i++) clLens[CL_ORDER[i]] = readBits(3);
+      const clTree = buildTree(clLens);
+      const lengths = [];
+      while (lengths.length < hlit + hdist) {
+        const sym = decodeSym(clTree);
+        if (sym < 16) {
+          lengths.push(sym);
+        } else {
+          const repeat = sym === 16 ? 3 + readBits(2) : sym === 17 ? 3 + readBits(3) : 11 + readBits(7);
+          if (sym === 16 && lengths.length === 0) {
+            throw new Error('Corrupt deflate stream: repeat previous length on empty table');
+          }
+          if (lengths.length + repeat > hlit + hdist) {
+            throw new Error('Corrupt deflate stream: code length repeat exceeds symbol table');
+          }
+          const val = sym === 16 ? lengths[lengths.length - 1] : 0;
+          for (let r = 0; r < repeat; r++) lengths.push(val);
+        }
+      }
+      litTree = buildTree(lengths.slice(0, hlit));
+      distTree = buildTree(lengths.slice(hlit));
+    } else if (btype !== 1) {
+      throw new Error('Unsupported deflate block type');
+    }
+
+    while (true) {
+      const sym = decodeSym(litTree);
+      if (sym < 256) {
+        if (out.length >= maxOutBytes) throw new Error('Decompressed PDF stream exceeds limit');
+        out.push(sym);
+      } else if (sym === 256) {
+        break;
+      } else {
+        const lenIdx = sym - 257;
+        if (lenIdx < 0 || lenIdx >= LEN_BASE.length) {
+          throw new Error('Corrupt deflate stream: invalid length symbol');
+        }
+        const length = LEN_BASE[lenIdx] + readBits(LEN_EXTRA[lenIdx]);
+        const distIdx = decodeSym(distTree);
+        if (distIdx < 0 || distIdx >= DIST_BASE.length) {
+          throw new Error('Corrupt deflate stream: invalid distance symbol');
+        }
+        const distance = DIST_BASE[distIdx] + readBits(DIST_EXTRA[distIdx]);
+        if (distance <= 0 || distance > out.length) {
+          throw new Error('Corrupt deflate stream: invalid back-reference distance');
+        }
+        if (out.length + length > maxOutBytes) throw new Error('Decompressed PDF stream exceeds limit');
+        for (let i = 0; i < length; i++) {
+          out.push(out[out.length - distance]);
+        }
+      }
+    }
+  } while (!bfinal);
+
+  return out;
 }
 
 function extractTextOperators(content) {

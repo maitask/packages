@@ -8,7 +8,7 @@
  * - Markdown files with metadata extraction
  * - Log files with structured output
  *
- * @version 0.1.0
+ * @version 0.1.1
  * @author Maitask Team
  * @license MIT
  */
@@ -60,6 +60,7 @@ function execute(input, options = {}, context = {}) {
                 preview: nonEmptyLines.slice(0, 3).map(line => line.substring(0, 100))
             },
             metadata: {
+                package: '@maitask/text-parser',
                 path: input?.path || null,
                 size: input?.size || null,
                 extension: input?.extension || detectExtension(input?.path),
@@ -106,6 +107,7 @@ function createEmptyResponse(input) {
             preview: []
         },
         metadata: {
+            package: '@maitask/text-parser',
             path: input?.path || null,
             encoding: 'utf-8',
             mimeType: 'text/plain',

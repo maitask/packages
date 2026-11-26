@@ -2,7 +2,7 @@
  * @maitask/slack-notifier
  * Send a message through a Slack Incoming Webhook.
  *
- * @version 0.1.0
+ * @version 0.1.1
  * @license MIT
  */
 
@@ -479,13 +479,7 @@ async function sendSlackMessage(config, payload) {
   const startedAt = Date.now();
 
   try {
-    const response = await fetch(config.webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      redirect: 'error',
-      signal: controller.signal
-    });
+    const response = await postSlackJson(config.webhookUrl, payload, config.timeoutMs, controller.signal);
     const body = await response.text();
     const responseTimeMs = Date.now() - startedAt;
 
@@ -506,6 +500,71 @@ async function sendSlackMessage(config, payload) {
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+async function postSlackJson(url, payload, timeoutMs, signal) {
+  const headers = { 'Content-Type': 'application/json' };
+  const body = JSON.stringify(payload);
+  if (hasRuntimeHttpOp()) {
+    let raw;
+    try {
+      raw = await globalThis.Deno.core.ops.op_http_request(String(url), {
+        method: 'POST',
+        headers,
+        body,
+        redirect: 'manual',
+        timeoutMs,
+        maxResponseBytes: 1024 * 1024
+      });
+    } catch (error) {
+      if (isRuntimeTimeoutError(error)) {
+        throw slackError('Slack request timed out', {
+          retriable: true,
+          details: { timeoutMs }
+        });
+      }
+      throw slackError('Slack request failed', { retriable: true });
+    }
+    const status = Number(raw?.status) || 0;
+    if (status >= 300 && status < 400) {
+      throw slackError('Slack request failed', { retriable: true });
+    }
+    const responseHeaders = new Map(
+      Object.entries(raw?.headers && typeof raw.headers === 'object' ? raw.headers : {}).map(
+        ([k, v]) => [String(k).toLowerCase(), String(v)]
+      )
+    );
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      headers: { get: name => responseHeaders.get(String(name).toLowerCase()) ?? null },
+      text: async () => decodeRuntimeBodyUtf8(raw)
+    };
+  }
+  return fetch(url, {
+    method: 'POST',
+    headers,
+    body,
+    redirect: 'error',
+    signal
+  });
+}
+
+function hasRuntimeHttpOp() {
+  return typeof globalThis.Deno?.core?.ops?.op_http_request === 'function';
+}
+
+function decodeRuntimeBodyUtf8(raw) {
+  if (typeof raw?.body === 'string') return raw.body;
+  if (typeof raw?.bodyBase64 !== 'string' || !raw.bodyBase64) return '';
+  const binary = atob(raw.bodyBase64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+function isRuntimeTimeoutError(error) {
+  return typeof error?.message === 'string' && /timed out|timeout/i.test(error.message);
 }
 
 function providerError(response, body, webhookUrl) {
@@ -619,7 +678,7 @@ function maskWebhookUrl(webhookUrl) {
 }
 
 function ensureFetch() {
-  if (typeof fetch !== 'function') {
+  if (!hasRuntimeHttpOp() && typeof fetch !== 'function') {
     throw slackError('Global fetch API is unavailable; Node.js 18 or newer is required');
   }
 }

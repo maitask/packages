@@ -2,7 +2,7 @@
  * @maitask/xml-parser
  * XML to JSON parser with XPath support.
  *
- * @version 0.1.0
+ * @version 0.1.1
  * @author Maitask Team
  * @license MIT
  */

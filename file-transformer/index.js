@@ -2,7 +2,7 @@
  * @maitask/file-transformer
  * Structured data transformation between JSON/CSV/XML/YAML/TOML.
  *
- * @version 0.1.0
+ * @version 0.1.1
  * @license MIT
  */
 
@@ -29,6 +29,7 @@ async function execute(input, options = {}, context = {}) {
       success: true,
       data: resultData,
       metadata: {
+        package: '@maitask/file-transformer',
         timestamp: new Date().toISOString(),
         version: '0.1.1'
       }
@@ -815,10 +816,17 @@ function splitTomlPath(path) {
   return splitTopLevel(path, '.').map(part => unquoteString(part.trim()));
 }
 
+function isSafePathKey(part) {
+  return part !== '__proto__' && part !== 'constructor' && part !== 'prototype';
+}
+
 function ensurePath(root, path) {
   let current = root;
   path.forEach(part => {
-    if (!isPlainObject(current[part])) current[part] = {};
+    if (!isSafePathKey(part)) {
+      throw new Error(`Unsafe key name in TOML path: ${part}`);
+    }
+    if (!Object.hasOwn(current, part) || !isPlainObject(current[part])) current[part] = {};
     current = current[part];
   });
   return current;
@@ -826,14 +834,22 @@ function ensurePath(root, path) {
 
 function setPath(root, path, value) {
   const last = path[path.length - 1];
+  if (!isSafePathKey(last)) {
+    throw new Error(`Unsafe key name in TOML path: ${last}`);
+  }
   const parent = ensurePath(root, path.slice(0, -1));
-  parent[last] = value;
+  Object.defineProperty(parent, last, { value, enumerable: true, writable: true, configurable: true });
 }
 
 function pushTomlArrayTable(root, path) {
   const last = path[path.length - 1];
+  if (!isSafePathKey(last)) {
+    throw new Error(`Unsafe key name in TOML path: ${last}`);
+  }
   const parent = ensurePath(root, path.slice(0, -1));
-  if (!Array.isArray(parent[last])) parent[last] = [];
+  if (!Object.hasOwn(parent, last) || !Array.isArray(parent[last])) {
+    Object.defineProperty(parent, last, { value: [], enumerable: true, writable: true, configurable: true });
+  }
   const item = {};
   parent[last].push(item);
   return item;

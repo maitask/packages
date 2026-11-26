@@ -1445,7 +1445,7 @@ function applySlippage(price, side, bps) {
 }
 
 function okxInstrumentId(symbol, market) {
-  const quotes = ['USDT', 'USDC', 'BTC', 'ETH'];
+  const quotes = ['FDUSD', 'USDT', 'USDC', 'TUSD', 'USDP', 'BTC', 'ETH', 'BNB', 'DAI', 'EUR', 'GBP', 'AUD', 'BRL', 'TRY'];
   const quote = quotes.find(candidate => symbol.endsWith(candidate));
   if (!quote || symbol.length === quote.length) throw validationFailure();
   const pair = `${symbol.slice(0, -quote.length)}-${quote}`;

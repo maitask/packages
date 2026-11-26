@@ -9,7 +9,7 @@
  * - File size analysis
  * - Basic EXIF data (JPEG)
  *
- * @version 0.1.0
+ * @version 0.1.1
  * @author Maitask Team
  * @license MIT
  */
@@ -183,8 +183,8 @@ function detectFormat(bytes) {
  * Extract PNG dimensions
  */
 function extractPngDimensions(bytes) {
-    const width = (bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19];
-    const height = (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23];
+    const width = ((bytes[16] << 24) | (bytes[17] << 16) | (bytes[18] << 8) | bytes[19]) >>> 0;
+    const height = ((bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) | bytes[23]) >>> 0;
 
     return { width, height };
 }
@@ -216,19 +216,30 @@ function extractPngColorInfo(bytes) {
 function extractJpegDimensions(bytes) {
     let i = 2;
 
-    while (i < bytes.length - 8) {
-        if (bytes[i] !== 0xFF) break;
+    while (i + 1 < bytes.length) {
+        while (i < bytes.length && bytes[i] === 0xFF) i++;
+        if (i >= bytes.length) break;
+        const marker = bytes[i];
+        i += 1;
 
-        const marker = bytes[i + 1];
+        if (marker === 0x00 || marker === 0x01 || (marker >= 0xD0 && marker <= 0xD9)) {
+            if (marker === 0xD9) break;
+            continue;
+        }
+        if (i + 1 >= bytes.length) break;
+        const segmentLength = (bytes[i] << 8) | bytes[i + 1];
+        if (segmentLength < 2 || i + segmentLength > bytes.length) break;
 
-        if (marker === 0xC0 || marker === 0xC2) {
-            const height = (bytes[i + 5] << 8) | bytes[i + 6];
-            const width = (bytes[i + 7] << 8) | bytes[i + 8];
+        const isSof =
+            (marker >= 0xC0 && marker <= 0xCF) &&
+            marker !== 0xC4 && marker !== 0xC8 && marker !== 0xCC;
+        if (isSof && segmentLength >= 7 && i + 6 < bytes.length) {
+            const height = (bytes[i + 3] << 8) | bytes[i + 4];
+            const width = (bytes[i + 5] << 8) | bytes[i + 6];
             return { width, height };
         }
 
-        const segmentLength = (bytes[i + 2] << 8) | bytes[i + 3];
-        i += 2 + segmentLength;
+        i += segmentLength;
     }
 
     return null;
@@ -286,16 +297,23 @@ function extractBmpColorInfo(bytes) {
  * Extract WebP dimensions
  */
 function extractWebPDimensions(bytes) {
-    if (bytes[12] === 0x56 && bytes[13] === 0x50 && bytes[14] === 0x38) {
-        if (bytes[15] === 0x20) {
-            const width = ((bytes[26] | (bytes[27] << 8) | (bytes[28] << 16)) & 0x3FFF) + 1;
-            const height = ((bytes[29] | (bytes[30] << 8) | (bytes[31] << 16)) & 0x3FFF) + 1;
+    if (bytes.length >= 30 && bytes[12] === 0x56 && bytes[13] === 0x50 && bytes[14] === 0x38) {
+        if (bytes[15] === 0x20 && bytes.length >= 30) {
+            const width = (bytes[26] | (bytes[27] << 8)) & 0x3FFF;
+            const height = (bytes[28] | (bytes[29] << 8)) & 0x3FFF;
             return { width, height };
         }
 
-        if (bytes[15] === 0x4C) {
-            const width = ((bytes[21] | (bytes[22] << 8) | (bytes[23] << 16)) & 0x3FFF) + 1;
-            const height = ((bytes[24] | (bytes[25] << 8) | (bytes[26] << 16)) & 0x3FFF) + 1;
+        if (bytes[15] === 0x4C && bytes.length >= 25) {
+            const bits = bytes[21] | (bytes[22] << 8) | (bytes[23] << 16) | (bytes[24] << 24);
+            const width = (bits & 0x3FFF) + 1;
+            const height = ((bits >> 14) & 0x3FFF) + 1;
+            return { width, height };
+        }
+
+        if (bytes[15] === 0x58 && bytes.length >= 30) {
+            const width = (bytes[24] | (bytes[25] << 8) | (bytes[26] << 16)) + 1;
+            const height = (bytes[27] | (bytes[28] << 8) | (bytes[29] << 16)) + 1;
             return { width, height };
         }
     }

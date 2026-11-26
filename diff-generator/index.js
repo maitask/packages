@@ -9,7 +9,7 @@
  * - Patch generation and application
  * - Change highlighting
  *
- * @version 0.1.0
+ * @version 0.1.1
  * @author Maitask Team
  * @license MIT
  */
@@ -277,13 +277,33 @@ function computeLcsDiff(oldLines, newLines) {
  * Compute Longest Common Subsequence
  */
 function computeLcs(arr1, arr2) {
-    const m = arr1.length;
-    const n = arr2.length;
+    let prefixLen = 0;
+    const minLen = Math.min(arr1.length, arr2.length);
+    while (prefixLen < minLen && arr1[prefixLen] === arr2[prefixLen]) {
+        prefixLen++;
+    }
+    let suffixLen = 0;
+    while (
+        suffixLen < minLen - prefixLen &&
+        arr1[arr1.length - 1 - suffixLen] === arr2[arr2.length - 1 - suffixLen]
+    ) {
+        suffixLen++;
+    }
+
+    const mid1 = arr1.slice(prefixLen, arr1.length - suffixLen);
+    const mid2 = arr2.slice(prefixLen, arr2.length - suffixLen);
+    const m = mid1.length;
+    const n = mid2.length;
+
+    if (m * n > 1000000) {
+        throw new Error(`Diff input middle region is too large (${m}x${n} cells exceeds 1,000,000 limit)`);
+    }
+
     const dp = Array(m + 1).fill(null).map(() => Array(n + 1).fill(0));
 
     for (let i = 1; i <= m; i++) {
         for (let j = 1; j <= n; j++) {
-            if (arr1[i - 1] === arr2[j - 1]) {
+            if (mid1[i - 1] === mid2[j - 1]) {
                 dp[i][j] = dp[i - 1][j - 1] + 1;
             } else {
                 dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
@@ -291,12 +311,12 @@ function computeLcs(arr1, arr2) {
         }
     }
 
-    const lcs = [];
+    const midLcs = [];
     let i = m, j = n;
 
     while (i > 0 && j > 0) {
-        if (arr1[i - 1] === arr2[j - 1]) {
-            lcs.unshift(arr1[i - 1]);
+        if (mid1[i - 1] === mid2[j - 1]) {
+            midLcs.push(mid1[i - 1]);
             i--;
             j--;
         } else if (dp[i - 1][j] > dp[i][j - 1]) {
@@ -305,8 +325,13 @@ function computeLcs(arr1, arr2) {
             j--;
         }
     }
+    midLcs.reverse();
 
-    return lcs;
+    return [
+        ...arr1.slice(0, prefixLen),
+        ...midLcs,
+        ...arr1.slice(arr1.length - suffixLen)
+    ];
 }
 
 /**

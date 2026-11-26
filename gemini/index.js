@@ -83,9 +83,16 @@ async function execute(input = {}, options = {}, context = {}) {
 
 function buildConfig(input, options, context) {
   const apiKey =
-    options.apiKey || options.api_key || input.apiKey || input.api_key || context?.secrets?.GOOGLE_API_KEY;
+    options.apiKey ||
+    options.api_key ||
+    input.apiKey ||
+    input.api_key ||
+    context?.secrets?.GEMINI_API_KEY ||
+    context?.secrets?.GOOGLE_API_KEY;
   if (!apiKey) {
-    throw new Error('Google API key is required. Provide via options.apiKey or context.secrets.GOOGLE_API_KEY');
+    throw new Error(
+      'Google API key is required. Provide via options.apiKey or context.secrets.GEMINI_API_KEY'
+    );
   }
 
   return {
@@ -102,7 +109,8 @@ function buildConfig(input, options, context) {
 }
 
 function buildRequestBody(input, cfg) {
-  const contents = normalizeContents(input);
+  const systemParts = [];
+  const contents = normalizeContents(input, systemParts);
   if (!contents.length) {
     throw new Error('contents or text/prompt/messages is required');
   }
@@ -129,12 +137,16 @@ function buildRequestBody(input, cfg) {
 
   if (input.systemInstruction) {
     body.systemInstruction = normalizeSystemInstruction(input.systemInstruction);
+  } else if (typeof input.system === 'string' && input.system.trim()) {
+    body.systemInstruction = normalizeSystemInstruction(input.system.trim());
+  } else if (systemParts.length > 0) {
+    body.systemInstruction = { parts: systemParts };
   }
 
   return body;
 }
 
-function normalizeContents(input) {
+function normalizeContents(input, systemParts = []) {
   if (Array.isArray(input.contents) && input.contents.length > 0) {
     return input.contents;
   }
@@ -148,9 +160,14 @@ function normalizeContents(input) {
     return input.messages
       .map((message) => {
         if (!message || typeof message !== 'object') return null;
-        const role = String(message.role || 'user').toLowerCase() === 'assistant' ? 'model' : 'user';
+        const rawRole = String(message.role || 'user').toLowerCase();
         const parts = normalizeParts(message.content);
         if (!parts.length) return null;
+        if (rawRole === 'system') {
+          systemParts.push(...parts);
+          return null;
+        }
+        const role = rawRole === 'assistant' || rawRole === 'model' ? 'model' : 'user';
         return { role, parts };
       })
       .filter(Boolean);
@@ -283,7 +300,13 @@ function resolveRetryDelay(attempt, retryAfterHeader) {
 
 async function parseSSE(response, onEvent) {
   if (!response.body || typeof response.body.getReader !== 'function') {
-    throw new Error('Streaming response body is unavailable');
+    const rawText = typeof response.text === 'function' ? await response.text() : '';
+    if (!rawText) return;
+    for (const frame of rawText.split(/\r?\n\r?\n/)) {
+      const event = parseSSEEvent(frame);
+      if (event) onEvent(event);
+    }
+    return;
   }
 
   const reader = response.body.getReader();
@@ -381,6 +404,7 @@ async function buildApiError(code, fallbackMessage, response, cfg) {
 }
 
 function buildSuccess(data, cfg) {
+  const usage = normalizeUsage(data?.usage);
   return {
     success: true,
     data,
@@ -389,8 +413,33 @@ function buildSuccess(data, cfg) {
       version: PACKAGE_VERSION,
       provider: 'google',
       model: cfg.model,
+      usage,
       timestamp: new Date().toISOString()
     }
+  };
+}
+
+function normalizeUsage(usage) {
+  if (!usage || typeof usage !== 'object') {
+    return {
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0
+    };
+  }
+  const promptTokens = Number(usage.promptTokens ?? usage.prompt_tokens ?? 0);
+  const completionTokens = Number(usage.completionTokens ?? usage.completion_tokens ?? 0);
+  const totalTokens = Number(usage.totalTokens ?? usage.total_tokens ?? promptTokens + completionTokens);
+  return {
+    prompt_tokens: promptTokens,
+    completion_tokens: completionTokens,
+    total_tokens: totalTokens,
+    promptTokens,
+    completionTokens,
+    totalTokens
   };
 }
 

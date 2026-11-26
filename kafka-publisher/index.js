@@ -2,7 +2,7 @@
  * @maitask/kafka-publisher
  * Publish messages to Kafka using REST proxy endpoints
  *
- * @version 0.1.0
+ * @version 0.1.1
  * @license MIT
  */
 
@@ -86,13 +86,7 @@ async function fetchJson(url, { method, headers, body, timeoutMs, sensitiveValue
   }, timeoutMs);
 
   try {
-    const response = await fetch(url, {
-      method,
-      headers,
-      body: JSON.stringify(body),
-      signal: controller.signal,
-      redirect: 'error'
-    });
+    const response = await postKafkaJson(url, { method, headers, body, timeoutMs, signal: controller.signal });
 
     const text = await response.text();
     const data = tryParseJson(text);
@@ -113,6 +107,57 @@ async function fetchJson(url, { method, headers, body, timeoutMs, sensitiveValue
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function postKafkaJson(url, { method, headers, body, timeoutMs, signal }) {
+  const serializedBody = JSON.stringify(body);
+  if (typeof globalThis.Deno?.core?.ops?.op_http_request === 'function') {
+    let raw;
+    try {
+      raw = await globalThis.Deno.core.ops.op_http_request(String(url), {
+        method,
+        headers,
+        body: serializedBody,
+        redirect: 'manual',
+        timeoutMs,
+        maxResponseBytes: 4 * 1024 * 1024
+      });
+    } catch (error) {
+      if (isRuntimeTimeoutError(error)) {
+        throw kafkaError(`Request timed out after ${timeoutMs}ms`);
+      }
+      throw kafkaError('Kafka request failed');
+    }
+    const status = Number(raw?.status) || 0;
+    if (status >= 300 && status < 400) {
+      throw kafkaError('Kafka REST Proxy redirect is not allowed');
+    }
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      text: async () => decodeRuntimeBodyUtf8(raw)
+    };
+  }
+  return fetch(url, {
+    method,
+    headers,
+    body: serializedBody,
+    signal,
+    redirect: 'error'
+  });
+}
+
+function decodeRuntimeBodyUtf8(raw) {
+  if (typeof raw?.body === 'string') return raw.body;
+  if (typeof raw?.bodyBase64 !== 'string' || !raw.bodyBase64) return '';
+  const binary = atob(raw.bodyBase64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new TextDecoder().decode(bytes);
+}
+
+function isRuntimeTimeoutError(error) {
+  return typeof error?.message === 'string' && /timed out|timeout/i.test(error.message);
 }
 
 function joinUrl(base, suffix) {

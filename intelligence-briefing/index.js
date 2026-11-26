@@ -13,9 +13,10 @@ const CONTRACT_VERSION = '2026-06-27';
 
 async function execute(input = {}, options = {}, context = {}) {
   const startedAt = Date.now();
+  let config = null;
 
   try {
-    const config = buildConfig(input, options, context);
+    config = buildConfig(input, options, context);
     const collection = await collectStories(input, config);
     const selected = selectStories(collection.stories, config);
     const enriched = await enrichStories(selected, config);
@@ -59,6 +60,7 @@ async function execute(input = {}, options = {}, context = {}) {
         target_language: config.analysis.targetLanguage,
         ai_provider: config.ai.enabled ? config.ai.provider : 'extractive',
         model: config.ai.enabled ? config.ai.model : null,
+        usage: normalizeUsage(briefing?.provider?.usage),
         product: config.output.product || null,
         briefing_title: briefing.title,
         briefing_summary: briefing.summary,
@@ -70,7 +72,7 @@ async function execute(input = {}, options = {}, context = {}) {
       citations
     };
   } catch (error) {
-    return buildFailure(error, startedAt, context);
+    return buildFailure(error, startedAt, context, config);
   }
 }
 
@@ -114,14 +116,12 @@ function buildConfig(input, options, context) {
   const apiKey =
     stringValue(aiInput.apiKey || aiInput.api_key) ||
     stringValue(context?.secrets?.INTELLIGENCE_API_KEY) ||
-    stringValue(context?.secrets?.DEXPS_API_KEY) ||
     stringValue(context?.secrets?.OPENAI_API_KEY) ||
     stringValue(context?.env?.INTELLIGENCE_API_KEY) ||
-    stringValue(context?.env?.DEXPS_API_KEY) ||
     stringValue(context?.env?.OPENAI_API_KEY);
   const baseUrl =
     stringValue(aiInput.baseUrl || aiInput.base_url) ||
-    stringValue(context?.env?.DEXPS_BASE_URL) ||
+    stringValue(context?.env?.INTELLIGENCE_BASE_URL) ||
     stringValue(context?.env?.OPENAI_BASE_URL) ||
     'https://api.openai.com/v1';
 
@@ -516,7 +516,7 @@ async function enrichStories(stories, config) {
         copy.articleText = await fetchArticleText(story.url, config.enrichment);
         fetched += 1;
       } catch (error) {
-        copy.articleError = error.message || String(error);
+        copy.articleError = redactErrorText(error?.message || String(error), config);
       }
     }
     enriched.push(copy);
@@ -535,7 +535,7 @@ async function generateBriefing(stories, config) {
 
   if (!config.ai.apiKey) {
     throw new Error(
-      'AI API key is required. Provide options.apiKey, options.ai.apiKey, context.secrets.INTELLIGENCE_API_KEY, context.secrets.DEXPS_API_KEY, or context.secrets.OPENAI_API_KEY'
+      'AI API key is required. Provide options.apiKey, options.ai.apiKey, context.secrets.INTELLIGENCE_API_KEY, or context.secrets.OPENAI_API_KEY'
     );
   }
 
@@ -795,7 +795,12 @@ function emptyBriefing(config) {
 
 function finalizePublishedMessage(briefing, stories, config) {
   let message = stripPublicationNoise(stringValue(briefing.message));
-  if (!message || looksLikeTemplateCopy(message) || config.output.product === 'hacker_news_daily') {
+  const preserveUnparsedProse = briefing?.provider?.parsed === false && Boolean(message);
+  if (
+    !message ||
+    (!preserveUnparsedProse &&
+      (looksLikeTemplateCopy(message) || config.output.product === 'hacker_news_daily'))
+  ) {
     message = composeFormalDaily(briefing, stories, config);
   }
   message = ensureSources(message, stories, config);
@@ -1025,18 +1030,74 @@ function normalizeSeenEntries(raw) {
     .filter(Boolean);
 }
 
+function normalizeUsage(usage) {
+  if (!usage || typeof usage !== 'object') {
+    return {
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0
+    };
+  }
+  const promptTokens = Number(usage.prompt_tokens ?? usage.promptTokens ?? 0);
+  const completionTokens = Number(usage.completion_tokens ?? usage.completionTokens ?? 0);
+  const totalTokens = Number(usage.total_tokens ?? usage.totalTokens ?? promptTokens + completionTokens);
+  return {
+    prompt_tokens: promptTokens,
+    completion_tokens: completionTokens,
+    total_tokens: totalTokens,
+    promptTokens,
+    completionTokens,
+    totalTokens
+  };
+}
+
+function assertSafeArticleUrl(rawUrl) {
+  const parsed = new URL(String(rawUrl || '').trim());
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('Article URL must use http or https');
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error('Article URL must not include embedded credentials');
+  }
+  const host = parsed.hostname.toLowerCase().replace(/^\[|\]$/g, '');
+  if (!host || host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) {
+    throw new Error('Article URL host is not permitted');
+  }
+  if (host === '::1' || host === '::' || host.startsWith('fe80:') || host.startsWith('fc') || host.startsWith('fd')) {
+    throw new Error('Article URL host is not permitted');
+  }
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const [, a, b] = ipv4.map(Number);
+    if (a === 10 || a === 127 || a === 0 || (a === 169 && b === 254) || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) {
+      throw new Error('Article URL host is not permitted');
+    }
+  }
+  return parsed.toString();
+}
+
 async function fetchArticleText(url, config) {
   ensureFetch();
+  const safeUrl = assertSafeArticleUrl(url);
   const response = await requestWithRetry(
-    url,
-    { method: 'GET', headers: { Accept: 'text/html,text/plain' } },
+    safeUrl,
+    { method: 'GET', redirect: 'manual', headers: { Accept: 'text/html,text/plain' } },
     config.timeoutMs,
     config.retries
   );
+  if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+    throw new Error('Article URL redirects are not permitted');
+  }
   if (!response.ok) {
     throw new Error(`Article fetch failed with status ${response.status}`);
   }
   const body = await response.text();
+  if (body.length > 2 * 1024 * 1024) {
+    throw new Error('Article body exceeds 2MB size limit');
+  }
   return truncate(cleanText(stripScriptsAndStyles(body)), config.maxArticleChars);
 }
 
@@ -1054,7 +1115,10 @@ async function requestJson(url, timeoutMs, retries = 3) {
     } catch {
       detail = response.statusText || '';
     }
-    throw new Error(`Request to ${url} failed with status ${response.status}${detail ? `: ${detail}` : ''}`);
+    const safeDetail = redactErrorText(detail, null);
+    throw new Error(
+      `Request to ${requestHost(url)} failed with status ${response.status}${safeDetail ? `: ${safeDetail}` : ''}`
+    );
   }
   return await response.json();
 }
@@ -1305,7 +1369,27 @@ function labelsFor(language) {
   };
 }
 
-function buildFailure(error, startedAt, context) {
+function redactErrorText(message, config, context) {
+  let safe = String(message || '');
+  const candidates = [
+    config?.ai?.apiKey,
+    context?.secrets?.INTELLIGENCE_API_KEY,
+    context?.secrets?.OPENAI_API_KEY,
+    context?.env?.INTELLIGENCE_API_KEY,
+    context?.env?.OPENAI_API_KEY
+  ].filter(v => typeof v === 'string' && v.length > 0);
+  for (const secret of candidates) {
+    safe = safe.split(secret).join('[redacted]');
+  }
+  return safe.replace(/[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/gi, '[redacted-url]');
+}
+
+function buildFailure(error, startedAt, context, config = null) {
+  const safeMessage = redactErrorText(
+    error?.message || 'Intelligence briefing failed',
+    config,
+    context
+  );
   return {
     success: false,
     data: {
@@ -1317,7 +1401,7 @@ function buildFailure(error, startedAt, context) {
       }
     },
     error: {
-      message: error?.message || 'Intelligence briefing failed',
+      message: safeMessage,
       code: 'INTELLIGENCE_BRIEFING_ERROR',
       type: error?.name || 'IntelligenceBriefingError'
     },

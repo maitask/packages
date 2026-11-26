@@ -10,7 +10,7 @@
  * - Sorting and limiting capabilities
  * - Preprocessing (deduplication, flattening, cleanup)
  *
- * @version 0.1.0
+ * @version 0.1.1
  * @author Maitask Team
  * @license MIT
  */
@@ -28,6 +28,7 @@ function execute(input, options, context) {
         var operation = (resolvedOptions.operation || 'transform').toLowerCase();
         var data = normalizeInput(input);
         var metadata = {
+            package: '@maitask/file-processor',
             operation: operation,
             inputCount: data.length,
             steps: [],
@@ -92,6 +93,7 @@ function execute(input, options, context) {
                 type: error.name || 'FileProcessorError'
             },
             metadata: {
+                package: '@maitask/file-processor',
                 executedAt: new Date().toISOString(),
                 version: '0.1.1'
             }
@@ -99,17 +101,8 @@ function execute(input, options, context) {
     }
 }
 
-function normalizeOptions(options, input, context) {
+function normalizeOptions(options, _input, context) {
     var merged = isPlainObject(options) ? deepClone(options) : {};
-
-    if (input && typeof input === 'object') {
-        if (isPlainObject(input.__options)) {
-            merged = deepMerge(merged, input.__options);
-        }
-        if (isPlainObject(input.options)) {
-            merged = deepMerge(merged, input.options);
-        }
-    }
 
     if (context && typeof context === 'object') {
         if (isPlainObject(context.defaultOptions)) {
@@ -287,8 +280,16 @@ function applyTransform(data, rules) {
             var record = {};
             for (var i = 0; i < keys.length; i++) {
                 var targetKey = keys[i];
+                if (!isSafeKey(targetKey)) {
+                    throw new Error('Unsafe transform key: ' + targetKey);
+                }
                 var descriptor = rules[targetKey];
-                record[targetKey] = resolveRuleValue(item, descriptor, targetKey);
+                Object.defineProperty(record, targetKey, {
+                    value: resolveRuleValue(item, descriptor, targetKey),
+                    enumerable: true,
+                    writable: true,
+                    configurable: true
+                });
             }
             return record;
         });
@@ -308,19 +309,33 @@ function buildTransformedRecord(item, fields, defaults) {
         if (!target) {
             continue;
         }
+        if (!isSafeKey(target)) {
+            throw new Error('Unsafe transform target field: ' + target);
+        }
         var value = resolveRuleValue(item, spec, target);
-        if ((value === undefined || value === null || value === '') && spec.hasOwnProperty('default')) {
+        if ((value === undefined || value === null || value === '') && Object.prototype.hasOwnProperty.call(spec, 'default')) {
             value = spec.default;
         }
-        output[target] = value;
+        Object.defineProperty(output, target, {
+            value: value,
+            enumerable: true,
+            writable: true,
+            configurable: true
+        });
     }
 
     if (isPlainObject(defaults)) {
         var defaultKeys = Object.keys(defaults);
         for (var j = 0; j < defaultKeys.length; j++) {
             var key = defaultKeys[j];
-            if (!output.hasOwnProperty(key)) {
-                output[key] = defaults[key];
+            if (!isSafeKey(key)) continue;
+            if (!Object.prototype.hasOwnProperty.call(output, key)) {
+                Object.defineProperty(output, key, {
+                    value: defaults[key],
+                    enumerable: true,
+                    writable: true,
+                    configurable: true
+                });
             }
         }
     }
@@ -1054,12 +1069,17 @@ function getByPath(obj, path) {
     var segments = path.split('.');
     var current = obj;
     for (var i = 0; i < segments.length; i++) {
-        if (current === null || current === undefined) {
+        var seg = segments[i];
+        if (current === null || current === undefined || !isSafeKey(seg) || !Object.prototype.hasOwnProperty.call(current, seg)) {
             return undefined;
         }
-        current = current[segments[i]];
+        current = current[seg];
     }
     return current;
+}
+
+function isSafeKey(key) {
+    return key !== '__proto__' && key !== 'constructor' && key !== 'prototype';
 }
 
 function setByPath(obj, path, value) {
@@ -1070,12 +1090,19 @@ function setByPath(obj, path, value) {
     var current = obj;
     for (var i = 0; i < segments.length - 1; i++) {
         var key = segments[i];
-        if (!current[key] || typeof current[key] !== 'object') {
-            current[key] = {};
+        if (!isSafeKey(key)) {
+            throw new Error('Unsafe path key: ' + key);
+        }
+        if (!Object.prototype.hasOwnProperty.call(current, key) || !current[key] || typeof current[key] !== 'object') {
+            Object.defineProperty(current, key, { value: {}, enumerable: true, writable: true, configurable: true });
         }
         current = current[key];
     }
-    current[segments[segments.length - 1]] = value;
+    var lastKey = segments[segments.length - 1];
+    if (!isSafeKey(lastKey)) {
+        throw new Error('Unsafe path key: ' + lastKey);
+    }
+    Object.defineProperty(current, lastKey, { value: value, enumerable: true, writable: true, configurable: true });
 }
 
 function deepClone(value) {
@@ -1086,7 +1113,9 @@ function deepClone(value) {
         var clone = {};
         var keys = Object.keys(value);
         for (var i = 0; i < keys.length; i++) {
-            clone[keys[i]] = deepClone(value[keys[i]]);
+            var key = keys[i];
+            if (!isSafeKey(key)) continue;
+            Object.defineProperty(clone, key, { value: deepClone(value[key]), enumerable: true, writable: true, configurable: true });
         }
         return clone;
     }
@@ -1102,16 +1131,15 @@ function deepMerge(target, source) {
     var keys = Object.keys(source);
     for (var i = 0; i < keys.length; i++) {
         var key = keys[i];
+        if (!isSafeKey(key)) continue;
         var sourceValue = source[key];
         if (isPlainObject(sourceValue)) {
-            if (!output[key]) {
-                output[key] = {};
-            }
-            output[key] = deepMerge(output[key], sourceValue);
+            var baseTarget = Object.prototype.hasOwnProperty.call(output, key) ? output[key] : {};
+            Object.defineProperty(output, key, { value: deepMerge(baseTarget, sourceValue), enumerable: true, writable: true, configurable: true });
         } else if (Array.isArray(sourceValue)) {
-            output[key] = sourceValue.slice();
+            Object.defineProperty(output, key, { value: sourceValue.slice(), enumerable: true, writable: true, configurable: true });
         } else {
-            output[key] = sourceValue;
+            Object.defineProperty(output, key, { value: sourceValue, enumerable: true, writable: true, configurable: true });
         }
     }
 
@@ -1121,7 +1149,9 @@ function deepMerge(target, source) {
 function mergeObjects(target, source) {
     var keys = Object.keys(source);
     for (var i = 0; i < keys.length; i++) {
-        target[keys[i]] = source[keys[i]];
+        var key = keys[i];
+        if (!isSafeKey(key)) continue;
+        Object.defineProperty(target, key, { value: source[key], enumerable: true, writable: true, configurable: true });
     }
 }
 

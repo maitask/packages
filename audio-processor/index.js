@@ -2,7 +2,7 @@
  * @maitask/audio-processor
  * Speech-to-text, translation, audio analysis, and speech synthesis.
  *
- * @version 0.1.1
+ * @version 0.1.2
  * @license MIT
  */
 
@@ -24,15 +24,13 @@ const PACKAGE_VERSION = '0.1.2';
  * @returns {Object}
  */
 async function execute(input = {}, options = {}, context = {}) {
+  let activeApiKey = '';
   try {
-    const apiKey = options.apiKey || options.api_key;
-    if (!apiKey) {
-      throw new Error('API key is required. Provide via options.apiKey');
-    }
-
     const task = input.task || options.task || 'transcribe';
     const provider =
       input.provider || options.provider || (task === 'generate' ? 'openai' : 'whisper');
+    const apiKey = resolveProviderApiKey(provider, options, context);
+    activeApiKey = apiKey;
 
     let result;
     if (task === 'generate') {
@@ -57,6 +55,7 @@ async function execute(input = {}, options = {}, context = {}) {
       success: true,
       data: result,
       metadata: {
+        package: '@maitask/audio-processor',
         provider,
         task,
         timestamp: new Date().toISOString(),
@@ -64,14 +63,18 @@ async function execute(input = {}, options = {}, context = {}) {
       }
     };
   } catch (error) {
+    const rawMsg = error?.message || 'Audio processing failed';
+    let safeMsg = activeApiKey ? rawMsg.split(activeApiKey).join('[redacted]') : rawMsg;
+    safeMsg = safeMsg.replace(/[a-z][a-z0-9+.-]*:\/\/[^\s"'<>]+/gi, '[redacted-url]');
     return {
       success: false,
       error: {
-        message: error.message,
+        message: safeMsg,
         code: 'AUDIO_PROCESSOR_ERROR',
-        type: error.constructor.name
+        type: error?.constructor?.name || 'Error'
       },
       metadata: {
+        package: '@maitask/audio-processor',
         timestamp: new Date().toISOString(),
         version: PACKAGE_VERSION
       }
@@ -79,10 +82,22 @@ async function execute(input = {}, options = {}, context = {}) {
   }
 }
 
+function resolveProviderApiKey(provider, options = {}, context = {}) {
+  const secrets = (context && typeof context === 'object' && context.secrets) || {};
+  const fromSecrets = provider === 'gemini'
+    ? secrets.GEMINI_API_KEY || secrets.GOOGLE_API_KEY
+    : secrets.OPENAI_API_KEY;
+  const apiKey = options.apiKey || options.api_key || fromSecrets;
+  if (!apiKey || typeof apiKey !== 'string') {
+    throw new Error('API key is required via options.apiKey or context.secrets');
+  }
+  return apiKey;
+}
+
 async function processWithWhisper(input, options, apiKey) {
   const model = input.model || options.model || 'whisper-1';
   const task = input.task || options.task || 'transcribe';
-  const audioBytes = await readAudioBytes(input);
+  const audioBytes = await readAudioBytes(input, options);
   const fields = [['model', model]];
 
   if (input.language) fields.push(['language', input.language]);
@@ -105,17 +120,22 @@ async function processWithWhisper(input, options, apiKey) {
       ? 'https://api.openai.com/v1/audio/translations'
       : 'https://api.openai.com/v1/audio/transcriptions';
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': `multipart/form-data; boundary=${encoded.boundary}`
+  const useRuntimeBase64 = typeof globalThis.Deno?.core?.ops?.op_http_request === 'function';
+  const response = await performFetch(
+    endpoint,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': `multipart/form-data; boundary=${encoded.boundary}`
+      },
+      ...(useRuntimeBase64 ? { bodyBase64: encoded.bodyBase64 } : { body: encoded.bytes })
     },
-    bodyBase64: encoded.bodyBase64
-  });
+    options
+  );
 
   if (!response.ok) {
-    const errorText = await response.text();
+    const errorText = await readBoundedErrorText(response);
     throw new Error(`Whisper API Error (${response.status}): ${errorText}`);
   }
 
@@ -131,8 +151,8 @@ async function processWithWhisper(input, options, apiKey) {
 }
 
 async function processWithGemini(input, options, apiKey) {
-  const model = input.model || options.model || 'gemini-2.5-pro';
-  const task = input.task || 'analyze';
+  const model = String(input.model || options.model || 'gemini-2.5-pro').trim();
+  const task = input.task || options.task || 'analyze';
 
   let prompt;
   if (input.prompt) {
@@ -156,7 +176,7 @@ async function processWithGemini(input, options, apiKey) {
 
   let audioData = input.audioData;
   if (input.audioUrl && !audioData) {
-    const audioBytes = await readAudioBytes(input);
+    const audioBytes = await readAudioBytes(input, options);
     audioData = bytesToBase64(audioBytes);
   }
 
@@ -176,18 +196,22 @@ async function processWithGemini(input, options, apiKey) {
     ]
   };
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': apiKey
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
+  const response = await performFetch(
+    endpoint,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': apiKey
+      },
+      body: JSON.stringify(requestBody)
     },
-    body: JSON.stringify(requestBody)
-  });
+    options
+  );
 
   if (!response.ok) {
-    const errorText = await response.text();
+    const errorText = await readBoundedErrorText(response);
     throw new Error(`Gemini API Error (${response.status}): ${errorText}`);
   }
 
@@ -220,17 +244,21 @@ async function generateAudioWithOpenAI(input, options, apiKey) {
     requestBody.instruction = input.instruction || options.instruction;
   }
 
-  const response = await fetch('https://api.openai.com/v1/audio/speech', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`
+  const response = await performFetch(
+    'https://api.openai.com/v1/audio/speech',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(requestBody)
     },
-    body: JSON.stringify(requestBody)
-  });
+    options
+  );
 
   if (!response.ok) {
-    const errorText = await response.text();
+    const errorText = await readBoundedErrorText(response);
     throw new Error(`OpenAI TTS API Error (${response.status}): ${errorText}`);
   }
 
@@ -243,13 +271,32 @@ async function generateAudioWithOpenAI(input, options, apiKey) {
   };
 }
 
-async function readAudioBytes(input) {
+async function readAudioBytes(input, options = {}) {
   if (input.audioUrl) {
-    const audioResponse = await fetch(input.audioUrl);
+    const parsed = new URL(String(input.audioUrl).trim());
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      throw new Error('audioUrl must use http or https');
+    }
+    if (parsed.username || parsed.password) {
+      throw new Error('audioUrl must not embed credentials');
+    }
+    if (options.allowPrivateHosts !== true && isBlockedAudioHost(parsed.hostname)) {
+      throw new Error('audioUrl host is not permitted');
+    }
+    const audioResponse = await performFetch(
+      parsed.toString(),
+      {},
+      options,
+      'audioUrl redirects are not allowed'
+    );
     if (!audioResponse.ok) {
       throw new Error(`Failed to fetch audio (${audioResponse.status})`);
     }
-    return new Uint8Array(await audioResponse.arrayBuffer());
+    const bytes = new Uint8Array(await audioResponse.arrayBuffer());
+    if (bytes.byteLength > 25 * 1024 * 1024) {
+      throw new Error('Audio payload exceeds 25MB limit');
+    }
+    return bytes;
   }
 
   if (input.audioData) {
@@ -259,19 +306,164 @@ async function readAudioBytes(input) {
   throw new Error('Either audioUrl or audioData is required');
 }
 
+function resolveTimeoutMs(options = {}) {
+  const n = Number(options?.timeoutMs);
+  if (!Number.isFinite(n) || n <= 0) return 30000;
+  return Math.min(Math.max(Math.trunc(n), 1000), 120000);
+}
+
+async function performFetch(url, init = {}, options = {}, redirectErrorMessage = 'HTTP redirects are not allowed') {
+  const timeoutMs = resolveTimeoutMs(options);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      ...init,
+      redirect: 'manual',
+      timeoutMs,
+      signal: controller.signal
+    });
+    if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+      throw new Error(redirectErrorMessage);
+    }
+    return response;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function readBoundedErrorText(response, maxBytes = 16384) {
+  if (response?.body && typeof response.body.getReader === 'function') {
+    const reader = response.body.getReader();
+    const decoder = typeof TextDecoder === 'function' ? new TextDecoder() : null;
+    let out = '';
+    let total = 0;
+    try {
+      while (total < maxBytes) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) {
+          const remaining = maxBytes - total;
+          const slice = value.byteLength > remaining ? value.subarray(0, remaining) : value;
+          out += decoder ? decoder.decode(slice, { stream: true }) : String.fromCharCode(...slice);
+          total += value.byteLength;
+          if (total >= maxBytes) break;
+        }
+      }
+    } finally {
+      try {
+        await reader.cancel();
+      } catch {}
+    }
+    if (decoder) out += decoder.decode();
+    return out;
+  }
+  if (typeof response?.text === 'function') {
+    const text = await response.text();
+    return typeof text === 'string' ? text.slice(0, maxBytes) : '';
+  }
+  return '';
+}
+
+function isBlockedAudioHost(hostname) {
+  const host = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
+  if (
+    !host ||
+    host === 'localhost' ||
+    host === 'local' ||
+    host === 'internal' ||
+    host === 'localdomain' ||
+    host.endsWith('.localhost') ||
+    host.endsWith('.local') ||
+    host.endsWith('.internal') ||
+    host.endsWith('.localdomain')
+  ) {
+    return true;
+  }
+  if (host.includes(':')) {
+    const clean = host.split('%')[0];
+    const hextets = parseIpv6Hextets(clean);
+    if (!hextets) return true;
+    const allZero = hextets.every(part => part === 0);
+    const isLoopback = hextets.slice(0, 7).every(part => part === 0) && hextets[7] === 1;
+    if (allZero || isLoopback) return true;
+    if ((hextets[0] & 0xffc0) === 0xfe80) return true; // fe80::/10
+    if ((hextets[0] & 0xfe00) === 0xfc00) return true; // fc00::/7
+    if (hextets.slice(0, 5).every(part => part === 0) && hextets[5] === 0xffff) return true; // ::ffff:0:0/96
+    return false;
+  }
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (!ipv4) return false;
+  const [, a, b, c, d] = ipv4.map(Number);
+  if ([a, b, c, d].some(octet => octet < 0 || octet > 255)) return true;
+  return (
+    a === 10 ||
+    a === 127 ||
+    a === 0 ||
+    (a === 100 && b >= 64 && b <= 127) ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168)
+  );
+}
+
+function parseIpv6Hextets(address) {
+  const halves = address.split('::');
+  if (halves.length > 2) return null;
+  const parsePart = part => {
+    if (!part) return [];
+    const tokens = part.split(':');
+    const out = [];
+    for (let i = 0; i < tokens.length; i += 1) {
+      const token = tokens[i];
+      if (!token) return null;
+      if (token.includes('.')) {
+        if (i !== tokens.length - 1) return null;
+        const v4 = token.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+        if (!v4) return null;
+        const octets = v4.slice(1).map(Number);
+        if (octets.some(o => o < 0 || o > 255)) return null;
+        out.push((octets[0] << 8) | octets[1], (octets[2] << 8) | octets[3]);
+      } else {
+        if (!/^[0-9a-f]{1,4}$/i.test(token)) return null;
+        out.push(parseInt(token, 16));
+      }
+    }
+    return out;
+  };
+  const left = parsePart(halves[0]);
+  if (!left) return null;
+  if (halves.length === 1) {
+    return left.length === 8 ? left : null;
+  }
+  const right = parsePart(halves[1]);
+  if (!right) return null;
+  const missing = 8 - (left.length + right.length);
+  if (missing < 1) return null;
+  return [...left, ...new Array(missing).fill(0), ...right];
+}
+
+function sanitizeHeaderParam(value) {
+  return String(value || '').replace(/[\r\n"\\]/g, '_');
+}
+
 function encodeMultipart(fields, file) {
   const boundary = `maitask-${Date.now().toString(16)}${Math.random().toString(16).slice(2)}`;
   const chunks = [];
   const pushText = value => chunks.push(utf8Encode(value));
 
   for (const [name, value] of fields) {
+    const safeName = sanitizeHeaderParam(name);
     pushText(
-      `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`
+      `--${boundary}\r\nContent-Disposition: form-data; name="${safeName}"\r\n\r\n${value}\r\n`
     );
   }
 
+  const safeField = sanitizeHeaderParam(file.name);
+  const safeFilename = sanitizeHeaderParam(file.filename);
+  const safeContentType = String(file.contentType || 'application/octet-stream').replace(/[\r\n]/g, '');
   pushText(
-    `--${boundary}\r\nContent-Disposition: form-data; name="${file.name}"; filename="${file.filename}"\r\nContent-Type: ${file.contentType}\r\n\r\n`
+    `--${boundary}\r\nContent-Disposition: form-data; name="${safeField}"; filename="${safeFilename}"\r\nContent-Type: ${safeContentType}\r\n\r\n`
   );
   chunks.push(file.bytes);
   pushText(`\r\n--${boundary}--\r\n`);
@@ -285,7 +477,7 @@ function encodeMultipart(fields, file) {
     offset += chunk.byteLength;
   }
 
-  return { boundary, bodyBase64: bytesToBase64(bytes) };
+  return { boundary, bytes, bodyBase64: bytesToBase64(bytes) };
 }
 
 function utf8Encode(value) {

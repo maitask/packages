@@ -17,7 +17,7 @@ async function execute(input = {}, options = {}, context = {}) {
   try {
     ensureFetch();
 
-    const cfg = buildConfig(input, options);
+    const cfg = buildConfig(input, options, context);
     const endpoint = cfg.openAICompat ? `${cfg.baseUrl}/v1/chat/completions` : `${cfg.baseUrl}/api/chat`;
     const requestBody = buildRequestBody(input, cfg);
 
@@ -94,8 +94,18 @@ async function execute(input = {}, options = {}, context = {}) {
   }
 }
 
-function buildConfig(input, options) {
-  const baseUrl = String(options.baseUrl || options.base_url || input.baseUrl || DEFAULT_BASE_URL).replace(/\/$/, '');
+function buildConfig(input, options, context = {}) {
+  const rawBaseUrl = options.baseUrl || options.base_url || context?.env?.OLLAMA_BASE_URL || input.baseUrl || DEFAULT_BASE_URL;
+  let parsedBase;
+  try {
+    parsedBase = new URL(String(rawBaseUrl));
+  } catch {
+    throw new Error('baseUrl must be an absolute HTTP or HTTPS URL');
+  }
+  if (parsedBase.protocol !== 'http:' && parsedBase.protocol !== 'https:') {
+    throw new Error('baseUrl must be an absolute HTTP or HTTPS URL');
+  }
+  const baseUrl = parsedBase.toString().replace(/\/$/, '');
 
   return {
     baseUrl,
@@ -234,7 +244,18 @@ async function parseOpenAICompatStream(response) {
 
 async function parseNDJSON(response, onItem) {
   if (!response.body || typeof response.body.getReader !== 'function') {
-    throw new Error('Streaming response body is unavailable');
+    const rawText = typeof response.text === 'function' ? await response.text() : '';
+    if (!rawText) return;
+    for (const line of rawText.split(/\r?\n/)) {
+      const text = line.trim();
+      if (!text) continue;
+      try {
+        onItem(JSON.parse(text));
+      } catch {
+        // Ignore malformed line and continue
+      }
+    }
+    return;
   }
 
   const reader = response.body.getReader();
@@ -272,7 +293,13 @@ async function parseNDJSON(response, onItem) {
 
 async function parseSSE(response, onEvent) {
   if (!response.body || typeof response.body.getReader !== 'function') {
-    throw new Error('Streaming response body is unavailable');
+    const rawText = typeof response.text === 'function' ? await response.text() : '';
+    if (!rawText) return;
+    for (const frame of rawText.split(/\r?\n\r?\n/)) {
+      const event = parseSSEEvent(frame);
+      if (event) onEvent(event);
+    }
+    return;
   }
 
   const reader = response.body.getReader();
@@ -421,6 +448,7 @@ async function buildApiError(code, fallbackMessage, response, cfg) {
 }
 
 function buildSuccess(data, cfg) {
+  const usage = normalizeUsage(data?.usage);
   return {
     success: true,
     data,
@@ -430,8 +458,33 @@ function buildSuccess(data, cfg) {
       provider: 'ollama',
       model: cfg.model,
       endpoint: cfg.openAICompat ? 'openai-compat' : 'native',
+      usage,
       timestamp: new Date().toISOString()
     }
+  };
+}
+
+function normalizeUsage(usage) {
+  if (!usage || typeof usage !== 'object') {
+    return {
+      prompt_tokens: 0,
+      completion_tokens: 0,
+      total_tokens: 0,
+      promptTokens: 0,
+      completionTokens: 0,
+      totalTokens: 0
+    };
+  }
+  const promptTokens = Number(usage.promptTokens ?? usage.prompt_tokens ?? 0);
+  const completionTokens = Number(usage.completionTokens ?? usage.completion_tokens ?? 0);
+  const totalTokens = Number(usage.totalTokens ?? usage.total_tokens ?? promptTokens + completionTokens);
+  return {
+    prompt_tokens: promptTokens,
+    completion_tokens: completionTokens,
+    total_tokens: totalTokens,
+    promptTokens,
+    completionTokens,
+    totalTokens
   };
 }
 

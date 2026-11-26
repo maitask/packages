@@ -122,19 +122,25 @@ function buildConfig(input, options, context) {
         commentDepth = 10;
     }
 
+    var rawTimeout = Number(source.timeoutMs);
+    var timeoutMs = Number.isFinite(rawTimeout) && rawTimeout > 0
+        ? Math.min(Math.max(Math.trunc(rawTimeout), 1000), 120000)
+        : 30000;
+
     return {
         storyType: storyType,
         apiBaseUrl: normalizeBaseUrl(source.apiBaseUrl || source.baseUrl || 'https://hacker-news.firebaseio.com/v0'),
         limit: limit,
         includeComments: Boolean(source.includeComments),
         commentLimit: commentLimit,
-        commentDepth: commentDepth
+        commentDepth: commentDepth,
+        timeoutMs: timeoutMs
     };
 }
 
 async function fetchStoryIds(config) {
     var endpoint = config.apiBaseUrl + '/' + config.storyType + 'stories.json';
-    var response = await requestJson(endpoint, { headers: { Accept: 'application/json' } });
+    var response = await requestJson(endpoint, { headers: { Accept: 'application/json' }, timeoutMs: config.timeoutMs });
     if (!Array.isArray(response)) {
         throw new Error('Unexpected response when fetching story identifiers');
     }
@@ -143,7 +149,7 @@ async function fetchStoryIds(config) {
 
 async function fetchItem(id, config) {
     var endpoint = config.apiBaseUrl + '/item/' + encodeURIComponent(String(id)) + '.json';
-    return await requestJson(endpoint, { headers: { Accept: 'application/json' } });
+    return await requestJson(endpoint, { headers: { Accept: 'application/json' }, timeoutMs: config.timeoutMs });
 }
 
 async function fetchComments(ids, limit, depth, config) {
@@ -218,14 +224,32 @@ async function requestJson(url, requestOptions) {
     }
 
     if (typeof fetch === 'function') {
-        var res = await fetch(url, {
-            method: 'GET',
-            headers: (requestOptions && requestOptions.headers) || { Accept: 'application/json' }
-        });
-        if (!res.ok) {
-            throw new Error('Request to ' + url + ' failed with status ' + res.status);
+        var timeoutMs = (requestOptions && requestOptions.timeoutMs) || 30000;
+        var controller = new AbortController();
+        var timer = setTimeout(function () { controller.abort(); }, timeoutMs);
+        try {
+            var res = await fetch(url, {
+                method: 'GET',
+                headers: (requestOptions && requestOptions.headers) || { Accept: 'application/json' },
+                redirect: 'manual',
+                timeoutMs: timeoutMs,
+                signal: controller.signal
+            });
+            if (res.type === 'opaqueredirect' || (res.status >= 300 && res.status < 400)) {
+                throw new Error('Hacker News API redirects are not allowed');
+            }
+            if (!res.ok) {
+                throw new Error('Hacker News API request failed with status ' + res.status);
+            }
+            return await res.json();
+        } catch (err) {
+            if (err && err.name === 'AbortError') {
+                throw new Error('Hacker News API request timed out after ' + timeoutMs + 'ms');
+            }
+            throw err;
+        } finally {
+            clearTimeout(timer);
         }
-        return await res.json();
     }
 
     throw new Error('No HTTP client available to perform request');
@@ -233,11 +257,11 @@ async function requestJson(url, requestOptions) {
 
 function validateHttpResponse(response, url) {
     if (!response) {
-        throw new Error('Empty HTTP response from ' + url);
+        throw new Error('Empty HTTP response from Hacker News API');
     }
     if (response.status && response.status >= 400) {
         var message = response.statusText || 'HTTP ' + response.status;
-        throw new Error(message + ' when calling ' + url);
+        throw new Error(message + ' when calling Hacker News API');
     }
 }
 
@@ -248,7 +272,7 @@ function parseJson(body, url) {
     try {
         return JSON.parse(body);
     } catch (err) {
-        throw new Error('Failed to parse JSON response from ' + url);
+        throw new Error('Failed to parse JSON response from Hacker News API');
     }
 }
 
@@ -274,7 +298,19 @@ function normalizeBaseUrl(value) {
     if (!text) {
         throw new Error('apiBaseUrl must not be empty');
     }
-    return text.replace(/\/+$/, '');
+    var parsed;
+    try {
+        parsed = new URL(text);
+    } catch (_err) {
+        throw new Error('apiBaseUrl must be a valid URL');
+    }
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        throw new Error('apiBaseUrl must use http or https');
+    }
+    if (parsed.username || parsed.password) {
+        throw new Error('apiBaseUrl must not embed credentials');
+    }
+    return parsed.toString().replace(/\/+$/, '');
 }
 
 if (typeof module !== "undefined") {

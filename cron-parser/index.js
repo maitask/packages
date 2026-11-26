@@ -9,7 +9,7 @@
  * - Support ranges, lists, steps
  * - Human-readable descriptions
  *
- * @version 0.1.0
+ * @version 0.1.1
  * @author Maitask Team
  * @license MIT
  */
@@ -46,10 +46,13 @@ function execute(input, options = {}, context = {}) {
 
         return {
             success: true,
-            expression,
-            operation,
-            result,
+            data: {
+                expression,
+                operation,
+                result
+            },
             metadata: {
+                package: '@maitask/cron-parser',
                 timestamp: new Date().toISOString(),
                 version: '0.1.1'
             }
@@ -63,6 +66,7 @@ function execute(input, options = {}, context = {}) {
                 type: error.constructor.name
             },
             metadata: {
+                package: '@maitask/cron-parser',
                 timestamp: new Date().toISOString(),
                 version: '0.1.1'
             }
@@ -121,92 +125,134 @@ function parseCron(expression) {
 /**
  * Parse single cron field
  */
-function parseField(field, min, max) {
+function normalizeCronPart(field, min, max) {
     if (field === '*') {
-        return { type: 'all', values: null };
-    }
-
-    if (field.includes('/')) {
-        const [range, step] = field.split('/');
-        const stepNum = parseInt(step);
-
-        if (isNaN(stepNum) || stepNum < 1) {
-            throw new Error(`Invalid step: ${step}`);
-        }
-
-        const values = [];
-        const start = range === '*' ? min : parseInt(range);
-        for (let i = start; i <= max; i += stepNum) {
-            values.push(i);
-        }
-
-        return { type: 'step', values, step: stepNum };
+        return null;
     }
 
     if (field.includes(',')) {
-        const values = field.split(',').map(v => {
-            const num = parseInt(v);
-            if (isNaN(num) || num < min || num > max) {
-                throw new Error(`Invalid value: ${v}`);
+        const valueSet = new Set();
+        for (const item of field.split(',')) {
+            const sub = normalizeCronPart(item.trim(), min, max);
+            if (!sub) {
+                for (let i = min; i <= max; i++) valueSet.add(i);
+            } else {
+                for (const val of sub) valueSet.add(val);
             }
-            return num;
-        });
+        }
+        return [...valueSet].sort((a, b) => a - b);
+    }
 
-        return { type: 'list', values };
+    if (field.includes('/')) {
+        const slashParts = field.split('/');
+        if (slashParts.length !== 2) {
+            throw new Error(`Invalid step syntax: ${field}`);
+        }
+        const [range, step] = slashParts;
+        const stepNum = Number.parseInt(step, 10);
+        if (!/^\d+$/.test(step) || !Number.isFinite(stepNum) || stepNum < 1) {
+            throw new Error(`Invalid step: ${step}`);
+        }
+
+        let start = min;
+        let end = max;
+        if (range !== '*') {
+            if (range.includes('-')) {
+                const rangeParts = range.split('-');
+                if (rangeParts.length !== 2) throw new Error(`Invalid step range: ${field}`);
+                start = Number.parseInt(rangeParts[0], 10);
+                end = Number.parseInt(rangeParts[1], 10);
+            } else {
+                start = Number.parseInt(range, 10);
+            }
+        }
+        if (Number.isNaN(start) || Number.isNaN(end) || start < min || end > max || start > end) {
+            throw new Error(`Invalid range in step: ${field}`);
+        }
+        const values = [];
+        for (let i = start; i <= end; i += stepNum) {
+            values.push(i);
+        }
+        return values;
     }
 
     if (field.includes('-')) {
-        const [start, end] = field.split('-').map(v => parseInt(v));
-
-        if (isNaN(start) || isNaN(end) || start < min || end > max || start > end) {
+        const rangeParts = field.split('-');
+        if (rangeParts.length !== 2) {
             throw new Error(`Invalid range: ${field}`);
         }
-
+        const start = Number.parseInt(rangeParts[0], 10);
+        const end = Number.parseInt(rangeParts[1], 10);
+        if (Number.isNaN(start) || Number.isNaN(end) || start < min || end > max || start > end) {
+            throw new Error(`Invalid range: ${field}`);
+        }
         const values = [];
         for (let i = start; i <= end; i++) {
             values.push(i);
         }
-
-        return { type: 'range', values };
+        return values;
     }
 
-    const value = parseInt(field);
-    if (isNaN(value) || value < min || value > max) {
+    if (!/^\d+$/.test(field)) {
+        throw new Error(`Invalid value: ${field}`);
+    }
+    const value = Number.parseInt(field, 10);
+    if (value < min || value > max) {
         throw new Error(`Invalid value: ${field} (expected ${min}-${max})`);
     }
+    return [value];
+}
 
-    return { type: 'value', values: [value] };
+function parseField(field, min, max) {
+    if (field === '*') {
+        return { type: 'all', values: null };
+    }
+    const isDow = min === 0 && max === 6;
+    const effectiveMax = isDow ? 7 : max;
+    const rawValues = normalizeCronPart(field.trim(), min, effectiveMax);
+    if (!rawValues) {
+        return { type: 'all', values: null };
+    }
+    const values = isDow
+        ? [...new Set(rawValues.map(v => (v === 7 ? 0 : v)))].sort((a, b) => a - b)
+        : rawValues;
+    const type = field.includes('/') ? 'step' : field.includes(',') ? 'list' : field.includes('-') ? 'range' : 'value';
+    return { type, values };
 }
 
 /**
- * Get next N execution times
+ * Get next N execution times (UTC)
  */
 function getNextRuns(expression, count = 5, from) {
+    const safeCount = Number.isFinite(Number(count)) ? Math.min(Math.max(Math.floor(Number(count)), 1), 500) : 5;
     const parsed = parseCron(expression);
-    const start = from ? new Date(from) : new Date();
+    const start = from !== undefined ? new Date(from) : new Date();
+    if (Number.isNaN(start.getTime())) {
+        throw new Error('Invalid reference timestamp for from');
+    }
     const runs = [];
 
-    let current = new Date(start);
-    current.setMilliseconds(0);
+    let current = new Date(start.getTime());
+    current.setUTCMilliseconds(0);
 
     if (!parsed.hasSeconds) {
-        current.setSeconds(0);
+        current.setUTCSeconds(0);
     }
 
     let iterations = 0;
-    const maxIterations = count * 366 * 24 * 60;
+    const maxIterations = parsed.hasSeconds ? Math.min(safeCount * 86400, 1000000) : safeCount * 366 * 24 * 60;
 
-    while (runs.length < count && iterations < maxIterations) {
+    while (runs.length < safeCount && iterations < maxIterations) {
         iterations++;
 
         if (matchesCron(current, parsed)) {
-            runs.push(new Date(current));
+            runs.push(new Date(current.getTime()));
         }
 
         if (parsed.hasSeconds) {
-            current.setSeconds(current.getSeconds() + 1);
+            current.setUTCSeconds(current.getUTCSeconds() + 1);
         } else {
-            current.setMinutes(current.getMinutes() + 1);
+            current.setUTCMinutes(current.getUTCMinutes() + 1);
         }
     }
 
@@ -214,7 +260,7 @@ function getNextRuns(expression, count = 5, from) {
 }
 
 /**
- * Check if date matches cron expression
+ * Check if UTC date matches cron expression
  */
 function matchesCron(date, parsed) {
     const matches = (field, value) => {
@@ -222,12 +268,17 @@ function matchesCron(date, parsed) {
         return field.values.includes(value);
     };
 
-    return matches(parsed.seconds, date.getSeconds()) &&
-           matches(parsed.minutes, date.getMinutes()) &&
-           matches(parsed.hours, date.getHours()) &&
-           matches(parsed.dayOfMonth, date.getDate()) &&
-           matches(parsed.month, date.getMonth() + 1) &&
-           matches(parsed.dayOfWeek, date.getDay());
+    const domRestricted = parsed.dayOfMonth.values !== null;
+    const dowRestricted = parsed.dayOfWeek.values !== null;
+    const dayMatch = domRestricted && dowRestricted
+        ? (matches(parsed.dayOfMonth, date.getUTCDate()) || matches(parsed.dayOfWeek, date.getUTCDay()))
+        : (matches(parsed.dayOfMonth, date.getUTCDate()) && matches(parsed.dayOfWeek, date.getUTCDay()));
+
+    return matches(parsed.seconds, date.getUTCSeconds()) &&
+           matches(parsed.minutes, date.getUTCMinutes()) &&
+           matches(parsed.hours, date.getUTCHours()) &&
+           dayMatch &&
+           matches(parsed.month, date.getUTCMonth() + 1);
 }
 
 /**

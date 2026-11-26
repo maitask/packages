@@ -247,7 +247,13 @@ function resolveRetryDelay(attempt, retryAfterHeader) {
 
 async function parseSSE(response, onEvent) {
   if (!response.body || typeof response.body.getReader !== 'function') {
-    throw new Error('Streaming response body is unavailable');
+    const rawText = typeof response.text === 'function' ? await response.text() : '';
+    if (!rawText) return;
+    for (const frame of rawText.split(/\r?\n\r?\n/)) {
+      const event = parseSSEEvent(frame);
+      if (event) onEvent(event);
+    }
+    return;
   }
 
   const reader = response.body.getReader();

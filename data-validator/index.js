@@ -10,7 +10,7 @@
  * - Flexible validation modes
  * - Detailed error reporting
  *
- * @version 0.1.0
+ * @version 0.1.1
  * @author Maitask Team
  * @license MIT
  */
@@ -25,7 +25,12 @@
 async function execute(input = {}, options = {}, context = {}) {
     try {
         const config = buildConfig(input, options, context);
-        const data = (input && input.data) || input || [];
+        const data =
+            input && Object.hasOwn(input, 'data') && input.data !== undefined
+                ? input.data
+                : input !== undefined
+                    ? input
+                    : [];
 
         if (!Array.isArray(data) && typeof data !== 'object') {
             throw new Error('Input data must be an array or object');
@@ -105,16 +110,25 @@ async function execute(input = {}, options = {}, context = {}) {
 }
 
 function buildConfig(input, options, context) {
-    const source = mergeObjects(options || {}, (input && input.config) || {});
+    const trustedOptions = options && typeof options === 'object' && !Array.isArray(options) ? options : {};
+    const rawInputConfig = input && typeof input.config === 'object' && !Array.isArray(input.config) ? input.config : {};
+    const safeInputConfig = {};
+    for (const key of Object.keys(rawInputConfig)) {
+        if (key === 'schema_url' || key === 'schemaUrl' || key === 'validation_mode' || key === 'validationMode' || !isSafeKey(key)) {
+            continue;
+        }
+        safeInputConfig[key] = rawInputConfig[key];
+    }
+    const source = mergeObjects(safeInputConfig, trustedOptions);
 
     return {
         schema: source.schema,
-        schema_url: source.schema_url,
-        validation_mode: normalizeValidationMode(source.validation_mode),
-        required_fields: source.required_fields || [],
-        data_types: source.data_types || {},
-        custom_rules: source.custom_rules || [],
-        stop_on_first_error: source.stop_on_first_error || false
+        schema_url: trustedOptions.schema_url,
+        validation_mode: normalizeValidationMode(trustedOptions.validation_mode),
+        required_fields: Array.isArray(source.required_fields) ? source.required_fields : [],
+        data_types: source.data_types && typeof source.data_types === 'object' && !Array.isArray(source.data_types) ? source.data_types : {},
+        custom_rules: Array.isArray(source.custom_rules) ? source.custom_rules : [],
+        stop_on_first_error: Boolean(source.stop_on_first_error)
     };
 }
 
@@ -127,18 +141,126 @@ function normalizeValidationMode(value) {
 }
 
 async function fetchSchemaFromUrl(url) {
-    const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-            'Accept': 'application/json'
-        }
-    });
-
-    if (!response.ok) {
-        throw new Error(`Failed to fetch schema from ${url}: ${response.status}`);
+    let parsed;
+    try {
+        parsed = new URL(String(url || '').trim());
+    } catch {
+        throw new Error('schema_url must be a valid HTTP/HTTPS URL');
+    }
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+        throw new Error('schema_url must use http or https protocol');
+    }
+    if (parsed.username || parsed.password) {
+        throw new Error('schema_url must not contain embedded credentials');
+    }
+    if (isBlockedHost(parsed.hostname)) {
+        throw new Error('schema_url host is not permitted');
     }
 
-    return await response.json();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    try {
+        const response = await fetch(parsed.toString(), {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json'
+            },
+            redirect: 'manual',
+            timeoutMs: 10000,
+            signal: controller.signal
+        });
+        if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+            throw new Error('schema_url redirects are not allowed');
+        }
+        if (!response.ok) {
+            throw new Error(`Failed to fetch schema from ${parsed.origin}${parsed.pathname}: ${response.status}`);
+        }
+        const text = await response.text();
+        if (text.length > 1024 * 1024) {
+            throw new Error('schema_url response exceeds 1MB limit');
+        }
+        return JSON.parse(text);
+    } finally {
+        clearTimeout(timer);
+    }
+}
+
+function isBlockedHost(hostname) {
+    const normalized = String(hostname || '').trim().toLowerCase().replace(/^\[|\]$/g, '').replace(/\.+$/, '');
+    if (
+        !normalized ||
+        normalized === 'localhost' ||
+        normalized === 'local' ||
+        normalized === 'internal' ||
+        normalized === 'localdomain' ||
+        normalized.endsWith('.localhost') ||
+        normalized.endsWith('.local') ||
+        normalized.endsWith('.internal') ||
+        normalized.endsWith('.localdomain')
+    ) {
+        return true;
+    }
+    if (normalized.includes(':')) {
+        const clean = normalized.split('%')[0];
+        const hextets = parseIpv6Hextets(clean);
+        if (!hextets) return true;
+        const allZero = hextets.every(part => part === 0);
+        const isLoopback = hextets.slice(0, 7).every(part => part === 0) && hextets[7] === 1;
+        if (allZero || isLoopback) return true;
+        if ((hextets[0] & 0xffc0) === 0xfe80) return true; // fe80::/10
+        if ((hextets[0] & 0xfe00) === 0xfc00) return true; // fc00::/7
+        if (hextets.slice(0, 5).every(part => part === 0) && hextets[5] === 0xffff) return true; // ::ffff:0:0/96
+        return false;
+    }
+    const ipv4 = normalized.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+    if (!ipv4) return false;
+    const [, a, b, c, d] = ipv4.map(Number);
+    if ([a, b, c, d].some(octet => octet < 0 || octet > 255)) return true;
+    return (
+        a === 10 ||
+        a === 127 ||
+        a === 0 ||
+        (a === 100 && b >= 64 && b <= 127) ||
+        (a === 169 && b === 254) ||
+        (a === 172 && b >= 16 && b <= 31) ||
+        (a === 192 && b === 168)
+    );
+}
+
+function parseIpv6Hextets(address) {
+    const halves = address.split('::');
+    if (halves.length > 2) return null;
+    const parsePart = part => {
+        if (!part) return [];
+        const tokens = part.split(':');
+        const out = [];
+        for (let i = 0; i < tokens.length; i += 1) {
+            const token = tokens[i];
+            if (!token) return null;
+            if (token.includes('.')) {
+                if (i !== tokens.length - 1) return null;
+                const v4 = token.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+                if (!v4) return null;
+                const octets = v4.slice(1).map(Number);
+                if (octets.some(o => o < 0 || o > 255)) return null;
+                out.push((octets[0] << 8) | octets[1], (octets[2] << 8) | octets[3]);
+            } else {
+                if (!/^[0-9a-f]{1,4}$/i.test(token)) return null;
+                out.push(parseInt(token, 16));
+            }
+        }
+        return out;
+    };
+    const left = parsePart(halves[0]);
+    if (!left) return null;
+    if (halves.length === 1) {
+        return left.length === 8 ? left : null;
+    }
+    const right = parsePart(halves[1]);
+    if (!right) return null;
+    const missing = 8 - (left.length + right.length);
+    if (missing < 1) return null;
+    return [...left, ...new Array(missing).fill(0), ...right];
 }
 
 function validateArray(data, schema, config) {
@@ -633,7 +755,9 @@ function validateCustomRules(item, customRules) {
                     isValid = value !== undefined && value !== null && value !== '';
                     break;
                 case 'numeric':
-                    isValid = !isNaN(value) && isFinite(value);
+                    isValid =
+                        (typeof value === 'number' && Number.isFinite(value)) ||
+                        (typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value)));
                     break;
                 case 'positive':
                     isValid = typeof value === 'number' && value > 0;
@@ -693,9 +817,16 @@ function performDataQualityChecks(item) {
     return warnings;
 }
 
+function isSafeKey(key) {
+    return key !== '__proto__' && key !== 'constructor' && key !== 'prototype';
+}
+
 function getNestedValue(obj, path) {
-    return path.split('.').reduce((current, key) => {
-        return current && current[key] !== undefined ? current[key] : undefined;
+    return String(path || '').split('.').reduce((current, key) => {
+        if (!current || typeof current !== 'object' || !isSafeKey(key) || !Object.hasOwn(current, key)) {
+            return undefined;
+        }
+        return current[key];
     }, obj);
 }
 
@@ -725,8 +856,14 @@ function generateValidationSummary(results) {
 
 function mergeObjects(base, extra) {
     const result = {};
-    Object.assign(result, base || {});
-    Object.assign(result, extra || {});
+    for (const source of [base, extra]) {
+        if (!source || typeof source !== 'object') continue;
+        for (const key of Object.keys(source)) {
+            if (isSafeKey(key)) {
+                result[key] = source[key];
+            }
+        }
+    }
     return result;
 }
 

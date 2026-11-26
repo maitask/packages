@@ -10,7 +10,7 @@
  * - UTF-8 and Base64 support
  * - Empty row handling
  *
- * @version 0.1.0
+ * @version 0.1.1
  * @author Maitask Team
  * @license MIT
  */
@@ -217,6 +217,9 @@ function validateAndTransformData(dataRows, headers, config) {
         // Process each column
         for (let colIndex = 0; colIndex < headers.length; colIndex++) {
             const header = headers[colIndex];
+            if (header === '__proto__' || header === 'constructor' || header === 'prototype') {
+                throw new Error(`Unsafe CSV column header: ${header}`);
+            }
             let value = row[colIndex];
 
             // Handle missing values
@@ -226,7 +229,7 @@ function validateAndTransformData(dataRows, headers, config) {
                 value = value.trim();
             }
 
-            record[header] = value;
+            Object.defineProperty(record, header, { value, enumerable: true, writable: true, configurable: true });
         }
 
         // Add row metadata
