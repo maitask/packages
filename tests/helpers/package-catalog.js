@@ -40,11 +40,20 @@ function inspectPackageArchive(packageInfo) {
   }
 
   const payload = JSON.parse(result.stdout);
-  if (!Array.isArray(payload) || payload.length !== 1) {
+  let archive = null;
+  if (Array.isArray(payload) && payload.length === 1) {
+    archive = payload[0];
+  } else if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+    const entries = Object.entries(payload);
+    if (entries.length === 1 && entries[0][0] === packageInfo.manifest.name) {
+      archive = entries[0][1];
+    }
+  }
+  if (!archive || typeof archive !== 'object') {
     throw new Error(`${packageInfo.manifest.name}: npm pack returned an invalid result`);
   }
 
-  return payload[0];
+  return archive;
 }
 
 module.exports = {
